@@ -316,6 +316,22 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <div class="ai-result-text" id="ai-result-text"></div>
       <div class="ai-meta" id="ai-meta"></div>
       <div id="ai-stocks-grid" class="ai-stocks-grid"></div>
+
+      <!-- Explore All Matched Stocks Dropdown -->
+      <div id="ai-explorer" style="display:none;margin-top:18px;border-top:1px solid var(--b2);padding-top:16px;">
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--t3);margin-bottom:10px;">📋 Explore All Matched Stocks — Select Any for Full AI Explanation</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <select id="ai-stock-select" style="flex:1;min-width:220px;background:var(--bg3);border:1px solid var(--b2);border-radius:9px;padding:10px 14px;color:var(--t1);font-size:13px;font-weight:600;outline:none;cursor:pointer;font-family:var(--sans);">
+            <option value="">Select a company...</option>
+          </select>
+          <button class="ai-btn" onclick="explainSelectedStock()" style="padding:10px 20px;">🤖 Get AI Explanation</button>
+        </div>
+        <div class="ai-loading" id="explain-loading" style="margin-top:10px;"><div class="spin"></div>AI is analysing this stock — takes about 10 seconds...</div>
+        <div id="explain-result" style="display:none;margin-top:12px;background:var(--bg2);border:1px solid var(--b2);border-radius:10px;padding:16px 18px;">
+          <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--cyan);margin-bottom:10px;">🤖 Stock Explanation</div>
+          <div id="explain-result-text" style="font-size:13px;font-weight:500;color:var(--t2);line-height:1.7;white-space:pre-wrap;"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1935,20 +1951,8 @@ setInterval(init,120000);
 
 <script>
 // ─── AI ADVISOR ───────────────────────────────────────
-let aiRisk = 'conservative';
-let pfRisk = 'conservative';
-
-function setRisk(r, btn) {
-  aiRisk = r;
-  document.querySelectorAll('.ai-risk .ai-risk-btn').forEach(b => b.classList.remove('on'));
-  btn.classList.add('on');
-}
-
-function setPfRisk(r, btn) {
-  pfRisk = r;
-  document.querySelectorAll('#pf-tickers').closest('.ai-wrap').querySelectorAll('.ai-risk-btn').forEach(b => b.classList.remove('on'));
-  btn.classList.add('on');
-}
+let aiMatchedStocks = [];
+let aiLastQuery = '';
 
 function quickQ(q) {
   document.getElementById('ai-query').value = q;
@@ -1959,6 +1963,7 @@ async function runAI() {
   const query = document.getElementById('ai-query').value.trim();
   if (!query) { alert('Please type what you are looking for'); return; }
 
+  aiLastQuery = query;
   const btn = document.getElementById('ai-btn');
   const loading = document.getElementById('ai-loading');
   const result = document.getElementById('ai-result');
@@ -1971,7 +1976,7 @@ async function runAI() {
     const res = await fetch(`${API}/agent/recommend`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, risk_profile: aiRisk })
+      body: JSON.stringify({ query })
     });
     const data = await res.json();
 
@@ -1983,14 +1988,14 @@ async function runAI() {
     const meta = document.getElementById('ai-meta');
     meta.innerHTML = `
       <span class="ai-meta-item">📊 ${data.stocks_found} stocks matched</span>
-      <span class="ai-meta-item">🎯 Risk: ${aiRisk}</span>
-      <span class="ai-meta-item">🔍 Filters: ${Object.keys(data.filters_used || {}).join(', ') || 'broad search'}</span>
+      <span class="ai-meta-item">🔍 ${data.intent ? 'Intent: ' + data.intent.replace('_',' ') : 'broad search'}</span>
     `;
 
-    // Top stock cards
+    // Top 10 stock cards
+    aiMatchedStocks = data.all_stocks || data.top_stocks || [];
     const grid = document.getElementById('ai-stocks-grid');
     grid.innerHTML = '';
-    (data.top_stocks || []).slice(0, 5).forEach(s => {
+    (data.top_stocks || []).slice(0, 10).forEach(s => {
       const chg = s.price_change_pct || 0;
       const signal = s.buy_signal || 'N/A';
       const signalColor = signal === 'BUY' ? 'var(--green)' : signal === 'SELL' ? 'var(--red)' : 'var(--yellow)';
@@ -2004,6 +2009,24 @@ async function runAI() {
         </div>`;
     });
 
+    // Populate dropdown with ALL matched stocks
+    const select = document.getElementById('ai-stock-select');
+    select.innerHTML = '<option value="">Select a company...</option>';
+    aiMatchedStocks.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.ticker;
+      opt.textContent = s.company_name || s.ticker;
+      select.appendChild(opt);
+    });
+
+    // Show explorer dropdown
+    const explorer = document.getElementById('ai-explorer');
+    if (aiMatchedStocks.length > 0) explorer.style.display = 'block';
+
+    // Reset previous explanation
+    document.getElementById('explain-result').style.display = 'none';
+    document.getElementById('explain-result-text').textContent = '';
+
     result.classList.add('show');
   } catch (e) {
     document.getElementById('ai-result-text').textContent = 'Error: ' + e.message;
@@ -2013,6 +2036,36 @@ async function runAI() {
   }
 
   btn.disabled = false;
+  loading.classList.remove('show');
+}
+
+async function explainSelectedStock() {
+  const select = document.getElementById('ai-stock-select');
+  const ticker = select.value;
+  if (!ticker) { alert('Please select a company first'); return; }
+
+  const loading = document.getElementById('explain-loading');
+  const result = document.getElementById('explain-result');
+  const resultText = document.getElementById('explain-result-text');
+
+  loading.classList.add('show');
+  result.style.display = 'none';
+
+  try {
+    const res = await fetch(`${API}/agent/explain-stock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticker, query: aiLastQuery })
+    });
+    const data = await res.json();
+    if (data.status === 'error') throw new Error(data.message);
+    resultText.textContent = data.explanation;
+    result.style.display = 'block';
+  } catch (e) {
+    resultText.textContent = 'Error: ' + e.message;
+    result.style.display = 'block';
+  }
+
   loading.classList.remove('show');
 }
 
