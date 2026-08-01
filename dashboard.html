@@ -299,12 +299,6 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
         <div class="ai-sub">Type what you're looking for — our AI searches 955 stocks and recommends the best matches</div>
       </div>
     </div>
-    <div class="ai-risk">
-      <span class="ai-risk-label">Risk Profile:</span>
-      <button class="ai-risk-btn on" onclick="setRisk('conservative',this)">Conservative</button>
-      <button class="ai-risk-btn" onclick="setRisk('moderate',this)">Moderate</button>
-      <button class="ai-risk-btn" onclick="setRisk('aggressive',this)">Aggressive</button>
-    </div>
     <div class="ai-input-row">
       <input class="ai-input" id="ai-query" placeholder="e.g. find me small cap stocks with strong growth and low debt..." onkeydown="if(event.key==='Enter')runAI()"/>
       <button class="ai-btn" id="ai-btn" onclick="runAI()">🔍 Ask AI</button>
@@ -586,14 +580,8 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
         <div class="ai-sub">Enter tickers you own and our AI will review each one — hold, add more, or consider swapping</div>
       </div>
     </div>
-    <div class="ai-risk">
-      <span class="ai-risk-label">Risk Profile:</span>
-      <button class="ai-risk-btn on" onclick="setPfRisk('conservative',this)">Conservative</button>
-      <button class="ai-risk-btn" onclick="setPfRisk('moderate',this)">Moderate</button>
-      <button class="ai-risk-btn" onclick="setPfRisk('aggressive',this)">Aggressive</button>
-    </div>
     <div class="ai-input-row">
-      <input class="ai-input" id="pf-tickers" placeholder="Enter tickers separated by commas e.g. AAPL, TSLA, NVDA, XOM"/>
+      <input class="ai-input" id="pf-tickers" placeholder="e.g. Apple, Tesla, Nvidia  or  AAPL, TSLA, NVDA"/>
       <button class="ai-btn" id="pf-ai-btn" onclick="runPfReview()">🔍 Review Portfolio</button>
     </div>
     <div style="margin-bottom:8px;">
