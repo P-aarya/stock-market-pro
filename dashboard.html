@@ -299,6 +299,12 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
         <div class="ai-sub">Type what you're looking for — our AI searches 955 stocks and recommends the best matches</div>
       </div>
     </div>
+    <div class="ai-risk">
+      <span class="ai-risk-label">Risk Profile:</span>
+      <button class="ai-risk-btn on" onclick="setRisk('conservative',this)">Conservative</button>
+      <button class="ai-risk-btn" onclick="setRisk('moderate',this)">Moderate</button>
+      <button class="ai-risk-btn" onclick="setRisk('aggressive',this)">Aggressive</button>
+    </div>
     <div class="ai-input-row">
       <input class="ai-input" id="ai-query" placeholder="e.g. find me small cap stocks with strong growth and low debt..." onkeydown="if(event.key==='Enter')runAI()"/>
       <button class="ai-btn" id="ai-btn" onclick="runAI()">🔍 Ask AI</button>
@@ -316,22 +322,6 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <div class="ai-result-text" id="ai-result-text"></div>
       <div class="ai-meta" id="ai-meta"></div>
       <div id="ai-stocks-grid" class="ai-stocks-grid"></div>
-
-      <!-- Stock Explorer Dropdown -->
-      <div id="ai-explorer" style="display:none;margin-top:18px;border-top:1px solid var(--b2);padding-top:16px;">
-        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--t3);margin-bottom:10px;">📋 Explore All Matched Stocks</div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <select id="ai-stock-select" style="flex:1;min-width:200px;background:var(--bg3);border:1px solid var(--b2);border-radius:9px;padding:10px 14px;color:var(--t1);font-size:13px;font-weight:600;outline:none;cursor:pointer;font-family:var(--sans);">
-            <option value="">Select a company...</option>
-          </select>
-          <button class="ai-btn" onclick="explainSelectedStock()" style="padding:10px 18px;">🤖 Get AI Explanation</button>
-        </div>
-        <div class="ai-loading" id="explain-loading" style="margin-top:10px;"><div class="spin"></div>AI is analysing this stock...</div>
-        <div id="explain-result" style="display:none;margin-top:12px;background:var(--bg2);border:1px solid var(--b2);border-radius:10px;padding:16px 18px;">
-          <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--cyan);margin-bottom:10px;">🤖 Stock Explanation</div>
-          <div id="explain-result-text" style="font-size:13px;font-weight:500;color:var(--t2);line-height:1.7;white-space:pre-wrap;"></div>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -361,12 +351,13 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     </div>
     <div class="card" style="height:fit-content">
       <div class="chdr"><div class="ctitle">Sector Cap Split</div></div>
-      <div style="height:280px"><canvas id="sec-donut"></canvas></div>
+      <div style="height:200px"><canvas id="sec-donut"></canvas></div>
     </div>
   </div>
 
+  <!-- Gainers/Losers + Top MktCap -->
   <div class="g2">
-    <div class="card" style="min-height:320px;">
+    <div class="card">
       <div class="stabs">
         <button class="stab on" onclick="showSub('gl','gainers',this)">🟢 Gainers</button>
         <button class="stab" onclick="showSub('gl','losers',this)">🔴 Losers</button>
@@ -378,10 +369,11 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     </div>
     <div class="card">
       <div class="chdr"><div class="ctitle">Top 10 by Market Cap</div></div>
-      <div style="height:320px"><canvas id="mktcap-c"></canvas></div>
+      <div style="height:220px"><canvas id="mktcap-c"></canvas></div>
     </div>
   </div>
 
+  <!-- More charts -->
   <div class="g2">
     <div class="card">
       <div class="chdr"><div class="ctitle">P/E Ratio vs Market Cap</div></div>
@@ -401,7 +393,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     </div>
     <div class="card">
       <div class="chdr"><div class="ctitle">🌡️ Sector Performance Heatmap — Today's Change %</div></div>
-      <div id="heatmap-wrap" style="height:185px;overflow-y:auto;display:grid;grid-template-columns:repeat(4,1fr);gap:5px;align-content:start;padding-right:4px"></div>
+      <div id="heatmap-wrap" style="height:320px;overflow-y:auto;display:grid;grid-template-columns:repeat(4,1fr);gap:5px;align-content:start;padding-right:4px"></div>
     </div>
   </div>
 
@@ -451,7 +443,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 
   <div class="card" style="margin-bottom:16px">
     <div class="chdr">
-      <div class="ctitle">🧠 Market Intelligence — Analyst Consensus + AI Predictions</div>
+      <div class="ctitle">🤖 Prediction Model — Analyst Consensus + AI Predictions</div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <select class="sel" id="mi-sec" onchange="filterIntelligence()">
           <option value="">All Sectors (${count})</option>
@@ -502,7 +494,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     </div>
     <div class="info-note">📅 Earnings dates from Yahoo Finance. Limited availability on free tier — run fetch_earnings.py regularly to update. Shows all stocks with any earnings data.</div>
     <div class="tw"><table>
-      <thead><tr><th>Ticker</th><th>Company</th><th>Sector</th><th>Earnings Date</th><th>EPS Est.</th><th>EPS Actual</th><th>Surprise %</th><th>Price</th><th>Change</th></tr></thead>
+      <thead><tr><th>Ticker</th><th>Company</th><th>Sector</th><th>EPS Est.</th><th>EPS Actual</th><th>Price</th><th>Change</th></tr></thead>
       <tbody id="tb-earn"><tr><td colspan="9"><div class="load"><div class="spin"></div>Loading...</div></td></tr></tbody>
     </table></div>
     <div class="pgn" id="earn-pgn"></div>
@@ -591,17 +583,23 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <div class="ai-icon">🧠</div>
       <div>
         <div class="ai-title">AI Portfolio Review</div>
-        <div class="ai-sub">Enter company names or ticker symbols — our AI will review each stock and give you clear advice</div>
+        <div class="ai-sub">Enter tickers you own and our AI will review each one — hold, add more, or consider swapping</div>
       </div>
     </div>
+    <div class="ai-risk">
+      <span class="ai-risk-label">Risk Profile:</span>
+      <button class="ai-risk-btn on" onclick="setPfRisk('conservative',this)">Conservative</button>
+      <button class="ai-risk-btn" onclick="setPfRisk('moderate',this)">Moderate</button>
+      <button class="ai-risk-btn" onclick="setPfRisk('aggressive',this)">Aggressive</button>
+    </div>
     <div class="ai-input-row">
-      <input class="ai-input" id="pf-tickers" placeholder="e.g. Apple, Tesla, Nvidia  or  AAPL, TSLA, NVDA"/>
+      <input class="ai-input" id="pf-tickers" placeholder="Enter tickers separated by commas e.g. AAPL, TSLA, NVDA, XOM"/>
       <button class="ai-btn" id="pf-ai-btn" onclick="runPfReview()">🔍 Review Portfolio</button>
     </div>
     <div style="margin-bottom:8px;">
       <button style="font-size:11px;font-weight:700;color:var(--cyan);background:none;border:none;cursor:pointer;padding:0;" onclick="loadPortfolioTickers()">📋 Load from my holdings above</button>
     </div>
-    <div class="ai-loading" id="pf-ai-loading"><div class="spin"></div>AI is reviewing your portfolio — this takes about 15 seconds...</div>
+    <div class="ai-loading" id="pf-ai-loading"><div class="spin"></div>AI is reviewing your portfolio — this takes about 10 seconds...</div>
     <div class="ai-result" id="pf-ai-result">
       <div class="ai-result-title">🧠 Portfolio Review</div>
       <div class="ai-result-text" id="pf-ai-result-text"></div>
@@ -691,7 +689,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <button class="fstab on" onclick="showFST('overview',this)">📊 Overview</button>
       <button class="fstab" onclick="showFST('charts',this)">📈 Price Chart</button>
       <button class="fstab" onclick="showFST('financials',this)">💰 Financials</button>
-      <button class="fstab" onclick="showFST('intelligence',this)">🧠 Market Intelligence</button>
+      <button class="fstab" onclick="showFST('intelligence',this)">🤖 Prediction Model</button>
       <button class="fstab" onclick="showFST('earnings',this)">📅 Earnings</button>
       <button class="fstab" onclick="showFST('news',this)">📰 News</button>
     </div>
@@ -770,7 +768,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 </div>
 
 <script>
-const API=window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'?'http://localhost:8000':'https://prisoners-tutorials-yesterday-usa.trycloudflare.com ';
+const API=window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'?'http://localhost:8000':window.location.origin;
 const C=['#4f8ef7','#00d4ff','#00e676','#a55eea','#ffc800','#ff4444','#ff4fa3','#ff6b35','#00c8a0','#b8ff5b','#c084fc','#ff8fab','#38d9f5','#57ff8f','#ffe066','#f97316'];
 let aStocks=[],fStocks=[],pg=1,SZ=50,sortK='market_cap',sortA=false;
 let aIntel=[],fIntel=[],miPg=1,MI_SZ=24;
@@ -1164,8 +1162,7 @@ function renderIntelligence(){
       <div class="acpx ${gc(s.price_change_pct)}">${fp(s.current_price)} <span style="font-size:11px">${s.price_change_pct!=null?(s.price_change_pct>=0?'▲ +':'▼ ')+f2(s.price_change_pct)+'%':''}</span></div>
       <div style="display:flex;gap:4px;flex-wrap:wrap;margin:5px 0">
         ${mkRat(s.analyst_rating)}
-        <span class="badge ${ts.cls}">${ts.label}</span>
-        ${pred?`<span class="badge ${sigMap[pred.buy_signal]||'bb'}">${pred.buy_signal||'Hold'}</span>`:''}
+        ${pred?`<span class="badge ${pred.trend==='BULLISH'?'bg':pred.trend==='BEARISH'?'br':'bb'}">${pred.trend==='BULLISH'?'Bullish':pred.trend==='BEARISH'?'Bearish':'Neutral'}</span>`:''}
       </div>
       <div style="font-size:10px;font-weight:600;color:var(--t3);margin-bottom:7px">${s.num_analysts||'?'} analysts · RSI: <span class="${rsic(s.rsi_14)}">${s.rsi_14?f2(s.rsi_14,1):'--'}</span></div>
       <div class="actgt">
@@ -1266,14 +1263,12 @@ function renderEarnings(){
       <td class="sym">${e.ticker}</td>
       <td style="color:var(--t2);font-weight:600">${e.company_name||'--'}</td>
       <td style="font-size:10px;color:var(--t3);font-weight:700">${e.sector||'--'}</td>
-      <td style="font-weight:700;color:var(--yellow);font-family:var(--mono)">${e.next_earnings_date||'N/A'}</td>
       <td class="num">${e.eps_estimate?'$'+f2(e.eps_estimate):'--'}</td>
       <td class="num">${e.eps_actual?'$'+f2(e.eps_actual):'--'}</td>
-      <td>${sp!=null?`<span class="badge ${sp>=0?'bg':'br'}">${sp>=0?'+':''}${f2(sp)}%</span>`:'--'}</td>
       <td class="num">${fp(e.current_price)}</td>
       <td class="num ${gc(e.price_change_pct)}">${e.price_change_pct!=null?(e.price_change_pct>=0?'+':'')+f2(e.price_change_pct)+'%':'--'}</td>
     </tr>`;
-  }).join(''):'<tr><td colspan="9" class="empty">No earnings data. Run fetch_earnings.py to populate more data.</td></tr>';
+  }).join(''):'<tr><td colspan="7" class="empty">No earnings data. Run fetch_earnings.py to populate more data.</td></tr>';
   // Pagination
   const tot=Math.ceil(fEarn.length/EARN_SZ);
   let h=`<span class="pginfo">${fEarn.length} stocks with earnings data</span>`;
@@ -1410,15 +1405,17 @@ function buildTape(){
 // ══════════════════════════════════════
 // STOCK POPUP
 // ══════════════════════════════════════
-// Opens stock popup directly on Market Intelligence tab
+// Opens stock popup on Overview tab (first tab)
 function openStockIntel(ticker){
   openStock(ticker).then(()=>{
     setTimeout(()=>{
-      const btn=Array.from(document.querySelectorAll('.fstab')).find(b=>b.textContent.includes('Intelligence'));
-      if(btn) showFST('intelligence',btn);
+      const btn=Array.from(document.querySelectorAll('.fstab')).find(b=>b.textContent.includes('Overview'));
+      if(btn) showFST('overview',btn);
     },800);
   });
 }
+
+function openFS(ticker){ openStock(ticker); }
 
 async function openStock(ticker){
   curTick=ticker;
@@ -1518,7 +1515,7 @@ async function openStock(ticker){
   // Market Intelligence tab
   const ts=mkTechSignal(d.rsi_14,d.macd,d.current_price,d.ma_50,d.ma_200);
   document.getElementById('fs-int').innerHTML=`
-    <div class="inttitle">🧠 MARKET INTELLIGENCE — ${ticker}</div>
+    <div class="inttitle">🤖 PREDICTION MODEL — ${ticker}</div>
     <div class="intgrid">
       <div class="intitem"><div class="intlbl">Analyst Consensus</div><div class="intval" style="font-size:13px">${mkRat(d.analyst_rating)}</div><div class="intchg" style="color:var(--t3)">${d.num_analysts||'N/A'} analysts</div></div>
       <div class="intitem" style="border-color:rgba(0,212,255,0.2)"><div class="intlbl">Technical Signal</div><div class="intval" style="font-size:13px"><span class="badge ${ts.cls}">${ts.label}</span></div><div class="intchg" style="color:var(--t3);font-size:10px">${ts.signals.slice(0,2).join(' · ')||'Based on RSI/MACD/MA'}</div></div>
@@ -1970,14 +1967,10 @@ function quickQ(q) {
   runAI();
 }
 
-let aiMatchedStocks = [];
-let aiLastQuery = '';
-
 async function runAI() {
   const query = document.getElementById('ai-query').value.trim();
   if (!query) { alert('Please type what you are looking for'); return; }
 
-  aiLastQuery = query;
   const btn = document.getElementById('ai-btn');
   const loading = document.getElementById('ai-loading');
   const result = document.getElementById('ai-result');
@@ -1990,7 +1983,7 @@ async function runAI() {
     const res = await fetch(`${API}/agent/recommend`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query })
+      body: JSON.stringify({ query, risk_profile: aiRisk })
     });
     const data = await res.json();
 
@@ -2002,14 +1995,14 @@ async function runAI() {
     const meta = document.getElementById('ai-meta');
     meta.innerHTML = `
       <span class="ai-meta-item">📊 ${data.stocks_found} stocks matched</span>
-      <span class="ai-meta-item">🔍 ${data.intent ? 'Intent: ' + data.intent.replace('_',' ') : 'broad search'}</span>
+      <span class="ai-meta-item">🎯 Risk: ${aiRisk}</span>
+      <span class="ai-meta-item">🔍 Filters: ${Object.keys(data.filters_used || {}).join(', ') || 'broad search'}</span>
     `;
 
-    // Top 10 stock cards
-    aiMatchedStocks = data.all_stocks || data.top_stocks || [];
+    // Top stock cards
     const grid = document.getElementById('ai-stocks-grid');
     grid.innerHTML = '';
-    (data.top_stocks || []).slice(0, 10).forEach(s => {
+    (data.top_stocks || []).slice(0, 5).forEach(s => {
       const chg = s.price_change_pct || 0;
       const signal = s.buy_signal || 'N/A';
       const signalColor = signal === 'BUY' ? 'var(--green)' : signal === 'SELL' ? 'var(--red)' : 'var(--yellow)';
@@ -2023,24 +2016,6 @@ async function runAI() {
         </div>`;
     });
 
-    // Populate dropdown with all matched stocks
-    const select = document.getElementById('ai-stock-select');
-    select.innerHTML = '<option value="">Select a company...</option>';
-    aiMatchedStocks.forEach(s => {
-      const opt = document.createElement('option');
-      opt.value = s.ticker;
-      opt.textContent = s.company_name || s.ticker;
-      select.appendChild(opt);
-    });
-
-    // Show explorer dropdown if stocks found
-    const explorer = document.getElementById('ai-explorer');
-    if (aiMatchedStocks.length > 0) explorer.style.display = 'block';
-
-    // Reset previous explanation
-    document.getElementById('explain-result').style.display = 'none';
-    document.getElementById('explain-result-text').textContent = '';
-
     result.classList.add('show');
   } catch (e) {
     document.getElementById('ai-result-text').textContent = 'Error: ' + e.message;
@@ -2053,40 +2028,11 @@ async function runAI() {
   loading.classList.remove('show');
 }
 
-async function explainSelectedStock() {
-  const select = document.getElementById('ai-stock-select');
-  const ticker = select.value;
-  if (!ticker) { alert('Please select a company first'); return; }
-
-  const loading = document.getElementById('explain-loading');
-  const result = document.getElementById('explain-result');
-  const resultText = document.getElementById('explain-result-text');
-
-  loading.classList.add('show');
-  result.style.display = 'none';
-
-  try {
-    const res = await fetch(`${API}/agent/explain-stock`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ticker, query: aiLastQuery })
-    });
-    const data = await res.json();
-    if (data.status === 'error') throw new Error(data.message);
-    resultText.textContent = data.explanation;
-    result.style.display = 'block';
-  } catch (e) {
-    resultText.textContent = 'Error: ' + e.message;
-    result.style.display = 'block';
-  }
-
-  loading.classList.remove('show');
-}
-
 async function runPfReview() {
   const raw = document.getElementById('pf-tickers').value.trim();
-  if (!raw) { alert('Please enter at least one company name or ticker'); return; }
+  if (!raw) { alert('Please enter at least one ticker'); return; }
 
+  const tickers = raw.split(',').map(t => t.trim().toUpperCase()).filter(t => t);
   const btn = document.getElementById('pf-ai-btn');
   const loading = document.getElementById('pf-ai-loading');
   const result = document.getElementById('pf-ai-result');
@@ -2096,32 +2042,10 @@ async function runPfReview() {
   result.classList.remove('show');
 
   try {
-    // Resolve names to tickers first
-    const inputs = raw.split(',').map(t => t.trim()).filter(t => t);
-    const tickers = [];
-
-    for (const input of inputs) {
-      // If it looks like a ticker (all caps, short) use directly
-      if (/^[A-Z]{1,5}$/.test(input.toUpperCase()) && input.length <= 5) {
-        tickers.push(input.toUpperCase());
-      } else {
-        // Try to find by company name from loaded stocks
-        const match = aStocks.find(s =>
-          s.company_name && s.company_name.toLowerCase().includes(input.toLowerCase())
-        );
-        if (match) {
-          tickers.push(match.ticker);
-        } else {
-          // Fallback — treat as ticker
-          tickers.push(input.toUpperCase());
-        }
-      }
-    }
-
     const res = await fetch(`${API}/agent/portfolio-review`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tickers })
+      body: JSON.stringify({ tickers, risk_profile: pfRisk })
     });
     const data = await res.json();
 
@@ -2265,6 +2189,10 @@ function renderVP() {
   document.getElementById('vp-trades').textContent = vpTrades.length;
 }
 
+// Init virtual portfolio on load
+renderVP();
+// Refresh prices every 60 seconds
+setInterval(refreshVPPrices, 60000);
 </script>
 </body>
 </html>
