@@ -16,13 +16,16 @@ import traceback
 from datetime import datetime
 
 def get_db():
-    return mysql.connector.connect(
-        host=os.getenv("DB_HOST", "localhost"),
-        port=int(os.getenv("DB_PORT", 3306)),
-        user=os.getenv("DB_USER", "root"),
-        password=os.getenv("DB_PASSWORD", "Aroot092325"),
-        database=os.getenv("DB_NAME", "stock_market_pro_db")
-    )
+    config = {
+        "host": os.getenv("DB_HOST", "localhost"),
+        "port": int(os.getenv("DB_PORT", 3306)),
+        "user": os.getenv("DB_USER", "root"),
+        "password": os.getenv("DB_PASSWORD", "Aroot092325"),
+        "database": os.getenv("DB_NAME", "stock_market_pro_db")
+    }
+    if os.getenv("DB_SSL", "false").lower() == "true":
+        config["ssl_disabled"] = False
+    return mysql.connector.connect(**config)
 
 def get_tickers():
     conn = get_db()
