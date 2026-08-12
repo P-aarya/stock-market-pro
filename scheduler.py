@@ -36,36 +36,49 @@ def get_tickers():
     return rows
 
 def fetch_live(ticker):
-    """Fetch live price data. Returns dict or raises."""
+    """Fetch live price data using history() which is stable."""
     t = yf.Ticker(ticker)
+    hist = t.history(period="2d")
 
-    # fast_info is quick and reliable for prices
-    fi = t.fast_info
-    price      = fi.get("lastPrice")
-    prev_close = fi.get("previousClose")
-    open_price = fi.get("open")
-    day_high   = fi.get("dayHigh")
-    day_low    = fi.get("dayLow")
-    volume     = fi.get("lastVolume")
-    market_cap = fi.get("marketCap")
-    year_high  = fi.get("yearHigh")
-    year_low   = fi.get("yearLow")
+    if hist is None or hist.empty:
+        raise ValueError("no price data returned")
 
-    if price is None or prev_close in (None, 0):
-        raise ValueError("no price data (possibly delisted)")
+    latest = hist.iloc[-1]
+    prev = hist.iloc[-2] if len(hist) > 1 else hist.iloc[-1]
 
-    change     = price - prev_close
+    price = float(latest['Close'])
+    prev_close = float(prev['Close'])
+    open_price = float(latest['Open'])
+    day_high = float(latest['High'])
+    day_low = float(latest['Low'])
+    volume = int(latest['Volume'])
+
+    if price is None or prev_close == 0:
+        raise ValueError("no valid price data")
+
+    change = price - prev_close
     change_pct = (change / prev_close) * 100
 
+    # Get market cap and 52 week range from info
+    try:
+        info = t.info
+        market_cap = info.get("marketCap")
+        year_high = info.get("fiftyTwoWeekHigh")
+        year_low = info.get("fiftyTwoWeekLow")
+    except:
+        market_cap = None
+        year_high = None
+        year_low = None
+
     return {
-        "current_price":    round(float(price), 4),
-        "price_change":     round(float(change), 4),
-        "price_change_pct": round(float(change_pct), 4),
-        "open_price":       round(float(open_price), 4) if open_price else None,
-        "high":             round(float(day_high), 4) if day_high else None,
-        "low":              round(float(day_low), 4) if day_low else None,
-        "prev_close":       round(float(prev_close), 4),
-        "volume":           int(volume) if volume else None,
+        "current_price":    round(price, 4),
+        "price_change":     round(change, 4),
+        "price_change_pct": round(change_pct, 4),
+        "open_price":       round(open_price, 4),
+        "high":             round(day_high, 4),
+        "low":              round(day_low, 4),
+        "prev_close":       round(prev_close, 4),
+        "volume":           volume,
         "market_cap":       float(market_cap) if market_cap else None,
         "week_52_high":     round(float(year_high), 4) if year_high else None,
         "week_52_low":      round(float(year_low), 4) if year_low else None,
