@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Stock Market Pro — SSaye Club</title>
+<title>Stock Market Pro — AYEIM Ventures</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
@@ -47,7 +47,7 @@ body{background:var(--bg0);color:var(--t1);font-family:var(--sans);min-height:10
 .g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
 .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;align-items:start;}
 .g2{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:14px;align-items:start;}
-.g31{display:grid;grid-template-columns:3fr 1fr;gap:12px;margin-bottom:16px;}
+.g31{display:grid;grid-template-columns:3fr 1fr;gap:12px;margin-bottom:16px;align-items:start;}
 
 .sc{background:var(--bg2);border:1px solid var(--b1);border-radius:11px;padding:16px 18px;border-top:2px solid var(--sc-t,var(--blue));}
 .sc-l{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px;}
@@ -256,11 +256,13 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     <div class="brand-icon">📈</div>
     <div>
       <div class="brand-title">Stock Market <span>Pro</span></div>
-      <div class="brand-sub">SSaye Club Finance</div>
+      <div class="brand-sub">AYEIM Ventures</div>
     </div>
   </div>
   <div class="ntabs">
     <button class="ntab on" onclick="showPage('market',this)">📊 Market</button>
+    <button class="ntab" onclick="showPage('watchlist',this)">⭐ Watchlist</button>
+    <button class="ntab" onclick="showPage('commodities',this)">🏗️ Commodities</button>
     <button class="ntab" onclick="showPage('portfolio',this)">💼 Portfolio</button>
     <button class="ntab" onclick="showPage('transactions',this)">🔄 Transactions</button>
   </div>
@@ -290,43 +292,55 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     <div class="ic" style="--ic-c:var(--yellow)"><div class="ic-n">RUSSELL 2000 — IWM</div><div class="ic-v" id="i-iwm">--</div><div class="ic-c" id="i-iwm-c">--</div></div>
   </div>
 
-  <!-- AI Stock Finder -->
+  <!-- Currency Exchange Rates -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="chdr">
+      <div class="ctitle">💱 Live Currency Exchange Rates</div>
+      <div style="font-size:10px;font-weight:600;color:var(--t3);">Updates every 60 seconds</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;" id="currency-grid">
+      <div class="ic" style="--ic-c:var(--cyan)"><div class="ic-n">GBP/USD</div><div class="ic-v" id="c-gbpusd">--</div><div class="ic-c" id="c-gbpusd-c">--</div></div>
+      <div class="ic" style="--ic-c:var(--blue)"><div class="ic-n">EUR/USD</div><div class="ic-v" id="c-eurusd">--</div><div class="ic-c" id="c-eurusd-c">--</div></div>
+      <div class="ic" style="--ic-c:var(--yellow)"><div class="ic-n">USD/INR</div><div class="ic-v" id="c-usdinr">--</div><div class="ic-c" id="c-usdinr-c">--</div></div>
+      <div class="ic" style="--ic-c:var(--green)"><div class="ic-n">GBP/INR</div><div class="ic-v" id="c-gbpinr">--</div><div class="ic-c" id="c-gbpinr-c">--</div></div>
+      <div class="ic" style="--ic-c:var(--purple)"><div class="ic-n">USD/JPY</div><div class="ic-v" id="c-usdjpy">--</div><div class="ic-c" id="c-usdjpy-c">--</div></div>
+      <div class="ic" style="--ic-c:var(--red)"><div class="ic-n">EUR/GBP</div><div class="ic-v" id="c-eurgbp">--</div><div class="ic-c" id="c-eurgbp-c">--</div></div>
+    </div>
+  </div>
+
+  <!-- AI Stock Finder + Manual Screener Combined -->
   <div class="ai-wrap">
     <div class="ai-header">
       <div class="ai-icon">🤖</div>
       <div>
         <div class="ai-title">AI Stock Finder</div>
-        <div class="ai-sub">Type what you're looking for — our AI searches 955 stocks and recommends the best matches</div>
+        <div class="ai-sub">Type anything in plain English — or use manual filters below</div>
       </div>
     </div>
     <div class="ai-input-row">
       <input class="ai-input" id="ai-query" placeholder="e.g. find me small cap stocks with strong growth and low debt..." onkeydown="if(event.key==='Enter')runAI()"/>
       <button class="ai-btn" id="ai-btn" onclick="runAI()">🔍 Ask AI</button>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
       <span style="font-size:11px;font-weight:700;color:var(--t3);">Try:</span>
       <span style="font-size:11px;font-weight:600;color:var(--blue);cursor:pointer;" onclick="quickQ('undervalued mid cap stocks with high profit margins')">Undervalued mid caps</span>
       <span style="font-size:11px;font-weight:600;color:var(--blue);cursor:pointer;" onclick="quickQ('high dividend stocks with low volatility')">High dividend, low risk</span>
       <span style="font-size:11px;font-weight:600;color:var(--blue);cursor:pointer;" onclick="quickQ('technology stocks with strong revenue growth')">Tech growth stocks</span>
       <span style="font-size:11px;font-weight:600;color:var(--blue);cursor:pointer;" onclick="quickQ('energy stocks with low debt and strong cash flow')">Energy, strong cash flow</span>
     </div>
-    <div class="ai-loading" id="ai-loading"><div class="spin"></div>AI is analysing 955 stocks — this takes about 10 seconds...</div>
+    <div class="ai-loading" id="ai-loading"><div class="spin"></div>AI is analysing stocks — this takes about 10 seconds...</div>
     <div class="ai-result" id="ai-result">
       <div class="ai-result-title">🤖 AI Recommendation</div>
       <div class="ai-result-text" id="ai-result-text"></div>
       <div class="ai-meta" id="ai-meta"></div>
       <div id="ai-stocks-grid" class="ai-stocks-grid"></div>
-
-      <!-- Explore All Matched Stocks Dropdown -->
       <div id="ai-explorer" style="display:none;margin-top:18px;border-top:1px solid var(--b2);padding-top:16px;">
         <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--t3);margin-bottom:10px;">📋 Explore All Matched Stocks — Select Any for Full AI Explanation</div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <select id="ai-stock-select" style="flex:1;min-width:220px;background:var(--bg3);border:1px solid var(--b2);border-radius:9px;padding:10px 14px;color:var(--t1);font-size:13px;font-weight:600;outline:none;cursor:pointer;font-family:var(--sans);">
-            <option value="">Select a company...</option>
-          </select>
+          <select id="ai-stock-select" style="flex:1;min-width:220px;background:var(--bg3);border:1px solid var(--b2);border-radius:9px;padding:10px 14px;color:var(--t1);font-size:13px;font-weight:600;outline:none;cursor:pointer;font-family:var(--sans);"><option value="">Select a company...</option></select>
           <button class="ai-btn" onclick="explainSelectedStock()" style="padding:10px 20px;">🤖 Get AI Explanation</button>
         </div>
-        <div class="ai-loading" id="explain-loading" style="margin-top:10px;"><div class="spin"></div>AI is analysing this stock — takes about 10 seconds...</div>
+        <div class="ai-loading" id="explain-loading" style="margin-top:10px;"><div class="spin"></div>AI is analysing this stock...</div>
         <div id="explain-result" style="display:none;margin-top:12px;background:var(--bg2);border:1px solid var(--b2);border-radius:10px;padding:16px 18px;">
           <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--cyan);margin-bottom:10px;">🤖 Stock Explanation</div>
           <div id="explain-result-text" style="font-size:13px;font-weight:500;color:var(--t2);line-height:1.7;white-space:pre-wrap;"></div>
@@ -335,53 +349,6 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     </div>
   </div>
 
-  <!-- Sector + Sentiment (compact) + extra chart -->
-  <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-bottom:16px;align-items:start;">
-    <div class="card">
-      <div class="chdr"><div class="ctitle">Sector Performance — Click to Filter</div></div>
-      <div id="secbars"><div class="load"><div class="spin"></div>Loading...</div></div>
-    </div>
-    <div class="card" style="height:fit-content">
-      <div class="chdr"><div class="ctitle">Market Sentiment</div></div>
-      <div class="gauge">
-        <div class="gscore" id="g-score" style="color:var(--yellow)">--</div>
-        <div class="glabel" id="g-label" style="color:var(--yellow)">Loading...</div>
-        <div style="font-size:9px;color:var(--t3);font-weight:600;margin-top:2px">RSI + Breadth Index</div>
-        <div class="gbar"><div class="gneedle" id="g-needle" style="left:50%"></div></div>
-        <div style="display:flex;justify-content:space-between;width:100%;margin-top:4px">
-          <span style="font-size:9px;font-weight:700;color:var(--red)">Fear</span>
-          <span style="font-size:9px;font-weight:700;color:var(--green)">Greed</span>
-        </div>
-        <div class="gstats">
-          <div class="gstat"><div class="gstat-l">Score</div><div class="gstat-v" id="g-score2">--</div></div>
-          <div class="gstat"><div class="gstat-l">Avg RSI</div><div class="gstat-v" id="g-rsi">--</div></div>
-          <div class="gstat"><div class="gstat-l">Avg Chg</div><div class="gstat-v" id="g-chg">--</div></div>
-        </div>
-      </div>
-    </div>
-    <div class="card" style="height:fit-content">
-      <div class="chdr"><div class="ctitle">Sector Cap Split</div></div>
-      <div style="height:200px"><canvas id="sec-donut"></canvas></div>
-    </div>
-  </div>
-
-  <!-- Gainers/Losers + Top MktCap -->
-  <div class="g2">
-    <div class="card">
-      <div class="stabs">
-        <button class="stab on" onclick="showSub('gl','gainers',this)">🟢 Gainers</button>
-        <button class="stab" onclick="showSub('gl','losers',this)">🔴 Losers</button>
-        <button class="stab" onclick="showSub('gl','active',this)">⚡ Active</button>
-      </div>
-      <div id="gl-gainers"><div class="tw"><table><thead><tr><th>Ticker</th><th>Company</th><th>Price</th><th>Change</th><th>Volume</th></tr></thead><tbody id="tb-g"></tbody></table></div></div>
-      <div id="gl-losers" style="display:none"><div class="tw"><table><thead><tr><th>Ticker</th><th>Company</th><th>Price</th><th>Change</th><th>Volume</th></tr></thead><tbody id="tb-l"></tbody></table></div></div>
-      <div id="gl-active" style="display:none"><div class="tw"><table><thead><tr><th>Ticker</th><th>Company</th><th>Price</th><th>Change</th><th>Volume</th></tr></thead><tbody id="tb-a"></tbody></table></div></div>
-    </div>
-    <div class="card">
-      <div class="chdr"><div class="ctitle">Top 10 by Market Cap</div></div>
-      <div style="height:220px"><canvas id="mktcap-c"></canvas></div>
-    </div>
-  </div>
 
   <!-- More charts -->
   <div class="g2">
@@ -395,7 +362,6 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     </div>
   </div>
 
-  <!-- NEW CHARTS IN BLANK SPACE -->
   <div class="g2">
     <div class="card">
       <div class="chdr"><div class="ctitle">📊 Market Overview — Gainers vs Losers vs Unchanged</div></div>
@@ -442,7 +408,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 
   <div class="g2">
     <div class="card">
-      <div class="chdr"><div class="ctitle">⚡ Volume Spikes — Unusual Activity Today (Click to View)</div></div>
+      <div class="chdr"><div class="ctitle">⚡ Volume Spikes — Unusual Activity Today</div></div>
       <div style="height:185px"><canvas id="vspike-c"></canvas></div>
     </div>
     <div class="card">
@@ -676,6 +642,74 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   </div>
 </div>
 
+<!-- ═══════════ COMMODITIES PAGE ═══════════ -->
+<div class="page" id="page-commodities">
+  <div class="g4">
+    <div class="sc" style="--sc-t:var(--yellow)"><div class="sc-l">Commodities</div><div class="sc-v y" id="com-tot">20</div><div class="sc-s">Tracked live</div></div>
+    <div class="sc" style="--sc-t:var(--green)"><div class="sc-l">Gainers</div><div class="sc-v g" id="com-gain">--</div><div class="sc-s">Today</div></div>
+    <div class="sc" style="--sc-t:var(--red)"><div class="sc-l">Losers</div><div class="sc-v r" id="com-loss">--</div><div class="sc-s">Today</div></div>
+    <div class="sc" style="--sc-t:var(--cyan)"><div class="sc-l">Avg Change</div><div class="sc-v c" id="com-avg">--</div><div class="sc-s">Today</div></div>
+  </div>
+
+  <!-- Macro Economic Indicators -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="chdr"><div class="ctitle">🌍 Macro Economic Indicators</div></div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;" id="macro-grid">
+      <div class="sc" style="--sc-t:var(--red)"><div class="sc-l">VIX — Fear Index</div><div class="sc-v" id="mac-vix">--</div><div class="sc-s" id="mac-vix-c">--</div></div>
+      <div class="sc" style="--sc-t:var(--blue)"><div class="sc-l">Dollar Index (DXY)</div><div class="sc-v" id="mac-dxy">--</div><div class="sc-s" id="mac-dxy-c">--</div></div>
+      <div class="sc" style="--sc-t:var(--yellow)"><div class="sc-l">10Y Treasury Yield</div><div class="sc-v" id="mac-tnx">--</div><div class="sc-s" id="mac-tnx-c">--</div></div>
+      <div class="sc" style="--sc-t:var(--green)"><div class="sc-l">Gold (GC=F)</div><div class="sc-v" id="mac-gold">--</div><div class="sc-s" id="mac-gold-c">--</div></div>
+    </div>
+  </div>
+
+  <!-- Commodities Table -->
+  <div class="card">
+    <div class="chdr">
+      <div class="ctitle">🏗️ Live Commodity Prices</div>
+      <div style="display:flex;gap:6px;">
+        <button class="fbtn on" onclick="filterCom('all',this)">All</button>
+        <button class="fbtn" onclick="filterCom('metals',this)">Metals</button>
+        <button class="fbtn" onclick="filterCom('energy',this)">Energy</button>
+        <button class="fbtn" onclick="filterCom('agriculture',this)">Agriculture</button>
+        <button class="fbtn" onclick="filterCom('crypto',this)">Crypto</button>
+      </div>
+    </div>
+    <div class="tw"><table>
+      <thead><tr><th>Commodity</th><th>Category</th><th>Price</th><th>Change</th><th>% Change</th><th>Updated</th></tr></thead>
+      <tbody id="tb-com"><tr><td colspan="6"><div class="load"><div class="spin"></div></div></td></tr></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- ═══════════ WATCHLIST PAGE ═══════════ -->
+<div class="page" id="page-watchlist">
+  <div class="g4">
+    <div class="sc" style="--sc-t:var(--cyan)"><div class="sc-l">Watching</div><div class="sc-v c" id="wl-tot">0</div><div class="sc-s">Stocks saved</div></div>
+    <div class="sc" style="--sc-t:var(--green)"><div class="sc-l">Gainers</div><div class="sc-v g" id="wl-gain">--</div><div class="sc-s">In watchlist</div></div>
+    <div class="sc" style="--sc-t:var(--red)"><div class="sc-l">Losers</div><div class="sc-v r" id="wl-loss">--</div><div class="sc-s">In watchlist</div></div>
+    <div class="sc" style="--sc-t:var(--yellow)"><div class="sc-l">Avg Change</div><div class="sc-v" id="wl-avg">--</div><div class="sc-s">Today</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <div class="chdr">
+      <div class="ctitle">⭐ My Watchlist</div>
+      <div style="position:relative;display:flex;gap:8px;align-items:center;">
+        <div style="position:relative;">
+          <input class="srch" placeholder="🔍 Search by name or ticker..." id="wl-add-input" style="width:260px;" oninput="searchWatchlistStocks(this.value)" onkeydown="if(event.key==='Escape')closeWlSuggestions()"/>
+          <div id="wl-suggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--b2);border-radius:8px;z-index:100;max-height:220px;overflow-y:auto;margin-top:4px;box-shadow:0 8px 24px rgba(0,0,0,0.4);"></div>
+        </div>
+      </div>
+    </div>
+    <div id="wl-empty" style="text-align:center;padding:40px;color:var(--t3);font-size:13px;display:none;">
+      ⭐ Your watchlist is empty. Search for a stock and click the ⭐ button to add it here.
+    </div>
+    <div class="tw"><table id="wl-table">
+      <thead><tr><th>Ticker</th><th>Company</th><th>Sector</th><th>Price</th><th>Change</th><th>Signal</th><th>7D Target</th><th>Added</th><th>Action</th></tr></thead>
+      <tbody id="tb-wl"><tr><td colspan="9" style="text-align:center;color:var(--t3);padding:20px;">No stocks in watchlist yet</td></tr></tbody>
+    </table></div>
+  </div>
+</div>
+
 <!-- ═══════════ STOCK POPUP ═══════════ -->
 <div class="fsm" id="fsm">
   <div class="fsnav">
@@ -827,6 +861,8 @@ function showPage(n,btn){
   btn.classList.add('on');
   if(n==='portfolio')loadPortfolio();
   if(n==='transactions')loadTx();
+  if(n==='commodities'){loadCommodities();loadMacro();}
+  if(n==='watchlist')loadWatchlist();
 }
 function showSub(g,t,btn){
   ['gainers','losers','active'].forEach(s=>{const el=document.getElementById(g+'-'+s);if(el)el.style.display=s===t?'block':'none';});
@@ -864,6 +900,28 @@ async function loadIndices(){
     if(ve)ve.textContent=fp(s.current_price);
     if(ce){const c=s.price_change_pct;ce.textContent=c!=null?(c>=0?'▲ +':'▼ ')+f2(c)+'%':'--';ce.className='ic-c '+(c>=0?'g':'r');}
   });
+}
+
+async function loadCurrencies(){
+  try {
+    const d=await api('/api/market/currencies');
+    if(!d||!d.length)return;
+    const map={
+      'GBP/USD':'gbpusd','EUR/USD':'eurusd','USD/INR':'usdinr',
+      'GBP/INR':'gbpinr','USD/JPY':'usdjpy','EUR/GBP':'eurgbp'
+    };
+    d.forEach(c=>{
+      const k=map[c.pair];if(!k)return;
+      const ve=document.getElementById('c-'+k);
+      const ce=document.getElementById('c-'+k+'-c');
+      if(ve)ve.textContent=c.rate!=null?c.rate.toFixed(4):'--';
+      if(ce){
+        const chg=c.change_pct;
+        ce.textContent=chg!=null?(chg>=0?'▲ +':'▼ ')+Math.abs(chg).toFixed(2)+'%':'--';
+        ce.className='ic-c '+(chg>=0?'g':'r');
+      }
+    });
+  } catch(e){}
 }
 
 async function loadSentiment(){
@@ -1940,16 +1998,361 @@ async function checkConn(){
 }
 
 async function init(){
-  await Promise.all([loadSummary(),loadIndices(),loadSentiment(),loadSectors(),loadGL(),loadEarnings(),loadMarketNews(),loadStocks(),loadPredictions()]);
+  await Promise.all([loadSummary(),loadIndices(),loadSentiment(),loadSectors(),loadGL(),loadEarnings(),loadMarketNews(),loadStocks(),loadPredictions(),loadCurrencies()]);
 }
 
 init();
 checkConn();
-setInterval(()=>{loadSummary();loadIndices();loadSentiment();},30000);
+setInterval(()=>{loadSummary();loadIndices();loadSentiment();loadCurrencies();},30000);
 setInterval(init,120000);
 </script>
 
 <script>
+function toggleManualFilters(){
+  const panel = document.getElementById('manual-filters');
+  const icon = document.getElementById('filter-toggle-icon');
+  const btn = document.getElementById('filter-toggle-btn');
+  if(panel.style.display==='none'){
+    panel.style.display='block';
+    icon.textContent='▼';
+    btn.style.color='var(--cyan)';
+    btn.style.borderColor='var(--cyan)';
+  } else {
+    panel.style.display='none';
+    icon.textContent='▶';
+    btn.style.color='var(--t3)';
+    btn.style.borderColor='var(--b2)';
+  }
+}
+
+// ─── WATCHLIST AUTOCOMPLETE ───────────────────────────
+let wlSearchTimeout = null;
+
+async function searchWatchlistStocks(q){
+  clearTimeout(wlSearchTimeout);
+  const suggestions = document.getElementById('wl-suggestions');
+  if(!q || q.length < 1){ suggestions.style.display='none'; return; }
+
+  wlSearchTimeout = setTimeout(async()=>{
+    try {
+      const res = await fetch(`${API}/api/stocks/search?q=${encodeURIComponent(q)}&limit=10`);
+      const data = await res.json();
+      if(!data||!data.length){ suggestions.style.display='none'; return; }
+
+      suggestions.innerHTML = data.map(s=>`
+        <div onclick="selectWlStock('${s.ticker}','${(s.company_name||'').replace(/'/g,"\\'")}',event)"
+          style="padding:10px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--b1);transition:background 0.1s;"
+          onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">
+          <span style="font-family:monospace;font-weight:800;color:var(--cyan);font-size:13px;">${s.ticker}</span>
+          <span style="color:var(--t2);font-size:12px;font-weight:500;margin-left:12px;flex:1;">${s.company_name||''}</span>
+          <span style="font-size:10px;color:var(--t3);margin-left:8px;">${s.sector||''}</span>
+        </div>`).join('');
+      suggestions.style.display='block';
+    } catch(e){ suggestions.style.display='none'; }
+  }, 250);
+}
+
+function selectWlStock(ticker, name, e){
+  e.stopPropagation();
+  closeWlSuggestions();
+  document.getElementById('wl-add-input').value='';
+  if(watchlist.includes(ticker)){ alert(ticker+' is already in your watchlist'); return; }
+  watchlist.push(ticker);
+  localStorage.setItem('wl_tickers', JSON.stringify(watchlist));
+  loadWatchlist();
+}
+
+function closeWlSuggestions(){
+  const s = document.getElementById('wl-suggestions');
+  if(s) s.style.display='none';
+}
+
+document.addEventListener('click', function(e){
+  if(!e.target.closest('#wl-add-input') && !e.target.closest('#wl-suggestions')){
+    closeWlSuggestions();
+  }
+});
+
+// ─── COMMODITIES ──────────────────────────────────────
+const COMMODITIES = [
+  {ticker:'GC=F', name:'Gold', category:'metals'},
+  {ticker:'SI=F', name:'Silver', category:'metals'},
+  {ticker:'PL=F', name:'Platinum', category:'metals'},
+  {ticker:'PA=F', name:'Palladium', category:'metals'},
+  {ticker:'HG=F', name:'Copper', category:'metals'},
+  {ticker:'ALI=F', name:'Aluminium', category:'metals'},
+  {ticker:'CL=F', name:'Crude Oil (WTI)', category:'energy'},
+  {ticker:'BZ=F', name:'Brent Crude', category:'energy'},
+  {ticker:'NG=F', name:'Natural Gas', category:'energy'},
+  {ticker:'RB=F', name:'Gasoline', category:'energy'},
+  {ticker:'ZC=F', name:'Corn', category:'agriculture'},
+  {ticker:'ZW=F', name:'Wheat', category:'agriculture'},
+  {ticker:'ZS=F', name:'Soybeans', category:'agriculture'},
+  {ticker:'KC=F', name:'Coffee', category:'agriculture'},
+  {ticker:'SB=F', name:'Sugar', category:'agriculture'},
+  {ticker:'CT=F', name:'Cotton', category:'agriculture'},
+  {ticker:'CC=F', name:'Cocoa', category:'agriculture'},
+  {ticker:'LE=F', name:'Live Cattle', category:'agriculture'},
+  {ticker:'BTC=F', name:'Bitcoin Futures', category:'crypto'},
+  {ticker:'ETH=F', name:'Ethereum Futures', category:'crypto'},
+];
+
+let comData = [];
+let comFilter = 'all';
+
+async function loadCommodities(){
+  try {
+    const res = await fetch(`${API}/api/market/commodities`);
+    comData = await res.json();
+    renderCommodities();
+    // Update KPI
+    const gainers = comData.filter(c=>c.change_pct>0).length;
+    const losers = comData.filter(c=>c.change_pct<0).length;
+    const avg = comData.reduce((s,c)=>s+(c.change_pct||0),0)/comData.length;
+    const el = id=>document.getElementById(id);
+    if(el('com-gain'))el('com-gain').textContent=gainers;
+    if(el('com-loss'))el('com-loss').textContent=losers;
+    if(el('com-avg')){el('com-avg').textContent=(avg>=0?'+':'')+avg.toFixed(2)+'%';el('com-avg').className='sc-v '+(avg>=0?'g':'r');}
+  } catch(e){}
+}
+
+function filterCom(cat, btn){
+  comFilter = cat;
+  document.querySelectorAll('#page-commodities .fbtn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  renderCommodities();
+}
+
+function renderCommodities(){
+  const tbody = document.getElementById('tb-com');
+  if(!tbody||!comData.length)return;
+  const filtered = comFilter==='all' ? comData : comData.filter(c=>c.category===comFilter);
+  tbody.innerHTML = filtered.map(c=>{
+    const chg = c.change_pct||0;
+    return `<tr>
+      <td style="font-weight:700;color:var(--cyan)">${c.name}</td>
+      <td style="font-size:10px;color:var(--t3);text-transform:capitalize">${c.category}</td>
+      <td class="mono">${c.price!=null?'$'+c.price.toFixed(2):'--'}</td>
+      <td class="mono ${chg>=0?'g':'r'}">${chg>=0?'+':''}${(c.change||0).toFixed(2)}</td>
+      <td class="${chg>=0?'g':'r'}">${chg>=0?'+':''}${chg.toFixed(2)}%</td>
+      <td style="font-size:10px;color:var(--t3)">${c.updated||'--'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--t3)">No data</td></tr>';
+}
+
+// ─── MACRO INDICATORS ──────────────────────────────────
+async function loadMacro(){
+  try {
+    const res = await fetch(`${API}/api/market/macro`);
+    const data = await res.json();
+    const setVal = (id,val,chg)=>{
+      const ve=document.getElementById(id);
+      const ce=document.getElementById(id+'-c');
+      if(ve)ve.textContent=val!=null?val:'--';
+      if(ce&&chg!=null){ce.textContent=(chg>=0?'▲ +':'▼ ')+Math.abs(chg).toFixed(2)+'%';ce.className='sc-s '+(chg>=0?'g':'r');}
+    };
+    data.forEach(m=>{
+      if(m.ticker==='^VIX') setVal('mac-vix',m.price?.toFixed(2),m.change_pct);
+      if(m.ticker==='DX-Y.NYB'||m.ticker==='DXY') setVal('mac-dxy',m.price?.toFixed(2),m.change_pct);
+      if(m.ticker==='^TNX') setVal('mac-tnx',m.price?.toFixed(2)+'%',m.change_pct);
+      if(m.ticker==='GC=F') setVal('mac-gold','$'+m.price?.toFixed(0),m.change_pct);
+    });
+  } catch(e){}
+}
+
+// ─── WATCHLIST ─────────────────────────────────────────
+let watchlist = JSON.parse(localStorage.getItem('wl_tickers')||'[]');
+
+function addToWatchlist(){
+  const input = document.getElementById('wl-add-input');
+  const ticker = input.value.trim().toUpperCase();
+  if(!ticker){alert('Enter a ticker symbol');return;}
+  if(watchlist.includes(ticker)){alert(ticker+' is already in your watchlist');return;}
+  watchlist.push(ticker);
+  localStorage.setItem('wl_tickers',JSON.stringify(watchlist));
+  input.value='';
+  loadWatchlist();
+}
+
+function removeFromWatchlist(ticker){
+  watchlist = watchlist.filter(t=>t!==ticker);
+  localStorage.setItem('wl_tickers',JSON.stringify(watchlist));
+  loadWatchlist();
+}
+
+async function loadWatchlist(){
+  const tbody = document.getElementById('tb-wl');
+  const emptyMsg = document.getElementById('wl-empty');
+  if(!tbody)return;
+
+  document.getElementById('wl-tot').textContent = watchlist.length;
+
+  if(!watchlist.length){
+    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:20px;">No stocks in watchlist yet — add tickers above</td></tr>';
+    if(emptyMsg)emptyMsg.style.display='block';
+    return;
+  }
+  if(emptyMsg)emptyMsg.style.display='none';
+
+  tbody.innerHTML='<tr><td colspan="9"><div class="load"><div class="spin"></div></div></td></tr>';
+
+  try {
+    const results = [];
+    for(const ticker of watchlist){
+      try{
+        const res = await fetch(`${API}/api/stocks/${ticker}`);
+        const d = await res.json();
+        if(d) results.push({...d, ticker});
+      }catch(e){}
+    }
+
+    const gainers = results.filter(s=>s.price_change_pct>0).length;
+    const losers = results.filter(s=>s.price_change_pct<0).length;
+    const avg = results.reduce((s,r)=>s+(r.price_change_pct||0),0)/(results.length||1);
+    document.getElementById('wl-gain').textContent=gainers;
+    document.getElementById('wl-loss').textContent=losers;
+    const avgEl=document.getElementById('wl-avg');
+    if(avgEl){avgEl.textContent=(avg>=0?'+':'')+avg.toFixed(2)+'%';avgEl.className='sc-v '+(avg>=0?'g':'r');}
+
+    tbody.innerHTML = results.map(s=>{
+      const chg=s.price_change_pct||0;
+      const signal=s.buy_signal||'N/A';
+      const sigColor=signal==='BUY'?'var(--green)':signal==='SELL'?'var(--red)':'var(--yellow)';
+      const target=s.target_1w;
+      const targetChg=target&&s.current_price?((target-s.current_price)/s.current_price*100):null;
+      return `<tr onclick="openFS('${s.ticker}')">
+        <td class="sym">${s.ticker}</td>
+        <td style="color:var(--t2);font-weight:600">${s.company_name||'--'}</td>
+        <td style="font-size:10px;color:var(--t3)">${s.sector||'--'}</td>
+        <td class="mono">${s.current_price?'$'+s.current_price.toFixed(2):'--'}</td>
+        <td class="mono ${chg>=0?'g':'r'}">${chg>=0?'+':''}${chg.toFixed(2)}%</td>
+        <td style="color:${sigColor};font-weight:800;font-size:11px;">${signal}</td>
+        <td class="mono ${targetChg!=null?(targetChg>=0?'g':'r'):''}">${target?'$'+target.toFixed(2)+(targetChg!=null?' ('+(targetChg>=0?'+':'')+targetChg.toFixed(1)+'%)':''):'--'}</td>
+        <td style="font-size:10px;color:var(--t3)">--</td>
+        <td><button onclick="event.stopPropagation();removeFromWatchlist('${s.ticker}')" style="background:rgba(255,68,68,0.1);border:1px solid rgba(255,68,68,0.2);border-radius:5px;color:var(--red);font-size:11px;font-weight:700;cursor:pointer;padding:3px 8px;">Remove</button></td>
+      </tr>`;
+    }).join('');
+  } catch(e){
+    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--t3)">Error loading watchlist</td></tr>';
+  }
+}
+
+// Add to watchlist button in stock cards
+function addStockToWatchlist(ticker, e){
+  e.stopPropagation();
+  if(watchlist.includes(ticker)){
+    alert(ticker+' is already in your watchlist');
+    return;
+  }
+  watchlist.push(ticker);
+  localStorage.setItem('wl_tickers',JSON.stringify(watchlist));
+  alert(ticker+' added to watchlist ⭐');
+}
+
+// ─── MANUAL SCREENER ───────────────────────────────────
+async function runManualScreener(){
+  const btn = document.getElementById('screener-btn');
+  const loading = document.getElementById('screener-loading');
+  const results = document.getElementById('screener-results');
+
+  btn.disabled=true;
+  loading.style.display='block';
+  results.style.display='none';
+
+  const filters = {};
+  const cap = document.getElementById('scr-cap').value;
+  const sector = document.getElementById('scr-sector').value;
+  const signal = document.getElementById('scr-signal').value;
+  const trend = document.getElementById('scr-trend').value;
+  const priceMin = document.getElementById('scr-price-min').value;
+  const priceMax = document.getElementById('scr-price-max').value;
+  const peMax = document.getElementById('scr-pe-max').value;
+  const revMin = document.getElementById('scr-rev-min').value;
+  const marginMin = document.getElementById('scr-margin-min').value;
+  const debtMax = document.getElementById('scr-debt-max').value;
+  const divMin = document.getElementById('scr-div-min').value;
+  const betaMax = document.getElementById('scr-beta-max').value;
+
+  if(cap) filters.market_cap_category = cap;
+  if(sector) filters.sector = sector;
+  if(signal) filters.buy_signal = signal;
+  if(trend) filters.trend = trend;
+  if(priceMin||priceMax) filters.current_price = {};
+  if(priceMin) filters.current_price.min = parseFloat(priceMin);
+  if(priceMax) filters.current_price.max = parseFloat(priceMax);
+  if(peMax) filters.pe_ratio = {max: parseFloat(peMax)};
+  if(revMin) filters.revenue_growth = {min: parseFloat(revMin)/100};
+  if(marginMin) filters.profit_margin = {min: parseFloat(marginMin)/100};
+  if(debtMax) filters.debt_to_equity = {max: parseFloat(debtMax)};
+  if(divMin) filters.dividend_yield = {min: parseFloat(divMin)/100};
+  if(betaMax) filters.beta = {max: parseFloat(betaMax)};
+
+  try {
+    const res = await fetch(`${API}/api/screener`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({filters, limit: 50})
+    });
+    const stocks = await res.json();
+
+    document.getElementById('screener-count').textContent = `${stocks.length} stocks matched your filters`;
+
+    const tbody = document.getElementById('tb-screener');
+    tbody.innerHTML = stocks.map(s=>{
+      const chg=s.price_change_pct||0;
+      const rev=s.revenue_growth!=null?(s.revenue_growth*100).toFixed(1)+'%':'--';
+      const margin=s.profit_margin!=null?(s.profit_margin*100).toFixed(1)+'%':'--';
+      const signal=s.buy_signal||'N/A';
+      const sigColor=signal==='BUY'?'var(--green)':signal==='SELL'?'var(--red)':'var(--yellow)';
+      const trend=s.trend||'--';
+      const trendColor=trend==='BULLISH'?'var(--green)':trend==='BEARISH'?'var(--red)':'var(--yellow)';
+      return `<tr onclick="openFS('${s.ticker}')">
+        <td class="sym">${s.ticker}</td>
+        <td style="color:var(--t2);font-weight:600">${s.company_name||'--'}</td>
+        <td style="font-size:10px;color:var(--t3)">${s.sector||'--'}</td>
+        <td class="mono">${s.current_price?'$'+s.current_price.toFixed(2):'--'}</td>
+        <td class="mono ${chg>=0?'g':'r'}">${chg>=0?'+':''}${chg.toFixed(2)}%</td>
+        <td class="mono">${s.pe_ratio?s.pe_ratio.toFixed(1):'--'}</td>
+        <td class="${s.revenue_growth>=0?'g':'r'}">${rev}</td>
+        <td class="g">${margin}</td>
+        <td style="color:${sigColor};font-weight:800;font-size:11px;">${signal}</td>
+        <td style="color:${trendColor};font-weight:700;font-size:11px;">${trend}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--t3);padding:20px;">No stocks matched. Try relaxing your filters.</td></tr>';
+
+    results.style.display='block';
+  } catch(e){
+    document.getElementById('screener-count').textContent='Error: '+e.message;
+    results.style.display='block';
+  }
+
+  btn.disabled=false;
+  loading.style.display='none';
+}
+
+function buildQueryFromFilters(filters){
+  const parts = [];
+  if(filters.market_cap_category) parts.push(filters.market_cap_category+' cap stocks');
+  if(filters.sector) parts.push(filters.sector+' sector');
+  if(filters.buy_signal) parts.push('with '+filters.buy_signal+' signal');
+  if(filters.current_price?.min) parts.push('price above $'+filters.current_price.min);
+  if(filters.revenue_growth?.min) parts.push('revenue growth above '+(filters.revenue_growth.min*100)+'%');
+  if(filters.profit_margin?.min) parts.push('profit margin above '+(filters.profit_margin.min*100)+'%');
+  return parts.join(', ') || 'show me good stocks';
+}
+
+function resetScreener(){
+  ['scr-cap','scr-sector','scr-signal','scr-trend'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.value='';
+  });
+  ['scr-price-min','scr-price-max','scr-pe-max','scr-rev-min','scr-margin-min','scr-debt-max','scr-div-min','scr-beta-max'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.value='';
+  });
+  document.getElementById('screener-results').style.display='none';
+}
+
 // ─── AI ADVISOR ───────────────────────────────────────
 let aiMatchedStocks = [];
 let aiLastQuery = '';

@@ -257,10 +257,139 @@ def get_sectors():
         GROUP BY sector ORDER BY avg_change_pct DESC
     """)
 
+@app.get("/api/stocks/search")
+def search_stocks(q: str = "", limit: int = 10):
+    """Search stocks by ticker or company name for autocomplete."""
+    if not q:
+        return []
+    try:
+        results = query("""
+            SELECT ticker, company_name, sector, current_price, price_change_pct
+            FROM stocks_live
+            WHERE (ticker LIKE %s OR company_name LIKE %s)
+            AND current_price IS NOT NULL
+            ORDER BY
+                CASE WHEN ticker LIKE %s THEN 0 ELSE 1 END,
+                market_cap DESC
+            LIMIT %s
+        """, (f"{q.upper()}%", f"%{q}%", f"{q.upper()}%", limit))
+        return results or []
+    except:
+        return []
+
 @app.get("/api/market/indices")
 def get_indices():
     return query("""SELECT ticker,company_name,current_price,price_change,price_change_pct,last_updated
         FROM stocks_live WHERE ticker IN ('SPY','QQQ','DIA','IWM') AND current_price IS NOT NULL""")
+
+@app.get("/api/market/currencies")
+def get_currencies():
+    """Fetch live currency exchange rates."""
+    pairs = {
+        "GBP/USD": "GBPUSD=X",
+        "EUR/USD": "EURUSD=X",
+        "USD/INR": "USDINR=X",
+        "GBP/INR": "GBPINR=X",
+        "USD/JPY": "USDJPY=X",
+        "EUR/GBP": "EURGBP=X",
+    }
+    result = []
+    for name, ticker in pairs.items():
+        try:
+            t = yf.Ticker(ticker)
+            hist = t.history(period="2d")
+            if hist is not None and not hist.empty:
+                latest = float(hist['Close'].iloc[-1])
+                prev = float(hist['Close'].iloc[-2]) if len(hist) > 1 else latest
+                change_pct = ((latest - prev) / prev * 100) if prev > 0 else 0
+                result.append({"pair": name, "ticker": ticker, "rate": round(latest, 4), "change_pct": round(change_pct, 4)})
+        except:
+            result.append({"pair": name, "ticker": ticker, "rate": None, "change_pct": None})
+    return result
+
+@app.get("/api/market/commodities")
+def get_commodities():
+    """Fetch live commodity prices."""
+    commodities = [
+        {"ticker": "GC=F", "name": "Gold", "category": "metals"},
+        {"ticker": "SI=F", "name": "Silver", "category": "metals"},
+        {"ticker": "PL=F", "name": "Platinum", "category": "metals"},
+        {"ticker": "PA=F", "name": "Palladium", "category": "metals"},
+        {"ticker": "HG=F", "name": "Copper", "category": "metals"},
+        {"ticker": "ALI=F", "name": "Aluminium", "category": "metals"},
+        {"ticker": "CL=F", "name": "Crude Oil (WTI)", "category": "energy"},
+        {"ticker": "BZ=F", "name": "Brent Crude", "category": "energy"},
+        {"ticker": "NG=F", "name": "Natural Gas", "category": "energy"},
+        {"ticker": "RB=F", "name": "Gasoline", "category": "energy"},
+        {"ticker": "ZC=F", "name": "Corn", "category": "agriculture"},
+        {"ticker": "ZW=F", "name": "Wheat", "category": "agriculture"},
+        {"ticker": "ZS=F", "name": "Soybeans", "category": "agriculture"},
+        {"ticker": "KC=F", "name": "Coffee", "category": "agriculture"},
+        {"ticker": "SB=F", "name": "Sugar", "category": "agriculture"},
+        {"ticker": "CT=F", "name": "Cotton", "category": "agriculture"},
+        {"ticker": "CC=F", "name": "Cocoa", "category": "agriculture"},
+        {"ticker": "LE=F", "name": "Live Cattle", "category": "agriculture"},
+        {"ticker": "BTC=F", "name": "Bitcoin Futures", "category": "crypto"},
+        {"ticker": "ETH=F", "name": "Ethereum Futures", "category": "crypto"},
+    ]
+    result = []
+    for com in commodities:
+        try:
+            t = yf.Ticker(com["ticker"])
+            hist = t.history(period="2d")
+            if hist is not None and not hist.empty:
+                latest = float(hist['Close'].iloc[-1])
+                prev = float(hist['Close'].iloc[-2]) if len(hist) > 1 else latest
+                change = latest - prev
+                change_pct = (change / prev * 100) if prev > 0 else 0
+                result.append({
+                    "ticker": com["ticker"],
+                    "name": com["name"],
+                    "category": com["category"],
+                    "price": round(latest, 2),
+                    "change": round(change, 2),
+                    "change_pct": round(change_pct, 2),
+                    "updated": datetime.now().strftime("%H:%M")
+                })
+        except:
+            result.append({
+                "ticker": com["ticker"],
+                "name": com["name"],
+                "category": com["category"],
+                "price": None,
+                "change": None,
+                "change_pct": None,
+                "updated": "--"
+            })
+    return result
+
+@app.get("/api/market/macro")
+def get_macro():
+    """Fetch macro economic indicators."""
+    indicators = [
+        {"ticker": "^VIX", "name": "VIX Fear Index"},
+        {"ticker": "DX-Y.NYB", "name": "Dollar Index"},
+        {"ticker": "^TNX", "name": "10Y Treasury Yield"},
+        {"ticker": "GC=F", "name": "Gold"},
+    ]
+    result = []
+    for ind in indicators:
+        try:
+            t = yf.Ticker(ind["ticker"])
+            hist = t.history(period="2d")
+            if hist is not None and not hist.empty:
+                latest = float(hist['Close'].iloc[-1])
+                prev = float(hist['Close'].iloc[-2]) if len(hist) > 1 else latest
+                change_pct = ((latest - prev) / prev * 100) if prev > 0 else 0
+                result.append({
+                    "ticker": ind["ticker"],
+                    "name": ind["name"],
+                    "price": round(latest, 2),
+                    "change_pct": round(change_pct, 2)
+                })
+        except:
+            result.append({"ticker": ind["ticker"], "name": ind["name"], "price": None, "change_pct": None})
+    return result
 
 @app.get("/api/market/sentiment")
 def get_sentiment():
@@ -591,6 +720,19 @@ from agent import run_agent, review_portfolio
 from screener import get_top_movers, get_sector_summary
 from pydantic import BaseModel
 from typing import List
+
+class ScreenerRequest(BaseModel):
+    filters: dict = {}
+    limit: int = 50
+
+@app.post("/api/screener")
+async def run_screener(request: ScreenerRequest):
+    try:
+        from screener import screen_stocks
+        results = screen_stocks(request.filters, limit=request.limit)
+        return results or []
+    except Exception as e:
+        return []
 
 class RecommendRequest(BaseModel):
     query: str
