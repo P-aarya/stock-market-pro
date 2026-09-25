@@ -698,14 +698,15 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
           <input class="srch" placeholder="🔍 Search by name or ticker..." id="wl-add-input" style="width:260px;" oninput="searchWatchlistStocks(this.value)" onkeydown="if(event.key==='Escape')closeWlSuggestions()"/>
           <div id="wl-suggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--b2);border-radius:8px;z-index:100;max-height:220px;overflow-y:auto;margin-top:4px;box-shadow:0 8px 24px rgba(0,0,0,0.4);"></div>
         </div>
+        <button class="btn btns" onclick="addToWatchlistManual()" style="padding:8px 16px;font-size:12px;">+ Add</button>
       </div>
     </div>
     <div id="wl-empty" style="text-align:center;padding:40px;color:var(--t3);font-size:13px;display:none;">
       ⭐ Your watchlist is empty. Search for a stock and click the ⭐ button to add it here.
     </div>
     <div class="tw"><table id="wl-table">
-      <thead><tr><th>Ticker</th><th>Company</th><th>Sector</th><th>Price</th><th>Change</th><th>Signal</th><th>7D Target</th><th>Added</th><th>Action</th></tr></thead>
-      <tbody id="tb-wl"><tr><td colspan="9" style="text-align:center;color:var(--t3);padding:20px;">No stocks in watchlist yet</td></tr></tbody>
+      <thead><tr><th>Ticker</th><th>Company</th><th>Sector</th><th>Price</th><th>Change</th><th>Action</th></tr></thead>
+      <tbody id="tb-wl"><tr><td colspan="6" style="text-align:center;color:var(--t3);padding:20px;">No stocks in watchlist yet</td></tr></tbody>
     </table></div>
   </div>
 </div>
@@ -726,6 +727,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     <div class="fstabs">
       <button class="fstab on" onclick="showFST('overview',this)">📊 Overview</button>
       <button class="fstab" onclick="showFST('charts',this)">📈 Price Chart</button>
+      <button class="fstab" onclick="showFST('company',this)">🏢 Company</button>
       <button class="fstab" onclick="showFST('financials',this)">💰 Financials</button>
       <button class="fstab" onclick="showFST('intelligence',this)">🤖 Prediction Model</button>
       <button class="fstab" onclick="showFST('earnings',this)">📅 Earnings</button>
@@ -749,11 +751,11 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
         <div class="chdr">
           <div class="ctitle">Price History — <span id="fs-tick-lbl" style="color:var(--cyan)"></span></div>
           <div style="display:flex;gap:5px">
-            <button class="fbtn" onclick="setPer('1d',this)">1D</button>
-            <button class="fbtn on" onclick="setPer('5y',this)">5Y</button>
-            <button class="fbtn" onclick="setPer('1y',this)">1Y</button>
+            <button class="fbtn on" onclick="setPer('3mo',this)">3M</button>
             <button class="fbtn" onclick="setPer('6mo',this)">6M</button>
-            <button class="fbtn" onclick="setPer('3mo',this)">3M</button>
+            <button class="fbtn" onclick="setPer('1y',this)">1Y</button>
+            <button class="fbtn" onclick="setPer('3y',this)">3Y</button>
+            <button class="fbtn" onclick="setPer('5y',this)">5Y</button>
           </div>
         </div>
         <div id="px-wrap" style="height:300px;display:flex;align-items:center;justify-content:center">
@@ -775,6 +777,21 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <div class="fs2">
         <div class="card"><div class="chdr"><div class="ctitle">5-Year EBITDA ($B)</div></div><div style="height:180px"><canvas id="ebt-c"></canvas></div></div>
         <div class="card"><div class="chdr"><div class="ctitle">5-Year Operating Income ($B)</div></div><div style="height:180px"><canvas id="opi-c"></canvas></div></div>
+      </div>
+      <!-- Balance Sheet + P&L Tables -->
+      <div class="fs2" style="margin-top:8px;">
+        <div class="card">
+          <div class="chdr"><div class="ctitle">📊 Balance Sheet — Latest Annual</div></div>
+          <div id="fs-balance-sheet">
+            <div class="load"><div class="spin"></div>Loading...</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="chdr"><div class="ctitle">📈 Profit & Loss — Latest Annual</div></div>
+          <div id="fs-pnl">
+            <div class="load"><div class="spin"></div>Loading...</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -801,6 +818,11 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <div id="fs-news-list"><div class="load"><div class="spin"></div>Loading news...</div></div>
     </div>
 
+    <!-- Company Tab -->
+    <div class="fssec" id="fss-company">
+      <div id="fs-company-content"><div class="load"><div class="spin"></div>Loading company data...</div></div>
+    </div>
+
     <div class="disclaimer">Data from Yahoo Finance. Analyst ratings = real Wall Street consensus. Technical signals = calculated from live data. Not financial advice.</div>
   </div>
 </div>
@@ -814,7 +836,7 @@ let aPreds=[],fPreds=[],predPg=1,PRED_SZ=24;
 let aEarn=[],fEarn=[],earnPg=1,EARN_SZ=50;
 let aTx=[],txF='all';
 let charts={};
-let curTick=null,curPer='5y';
+let curTick=null,curPer='3mo';
 let newsTimer=null;
 
 // ── Utils ──
@@ -877,6 +899,134 @@ function showFST(t,btn){
   if(t==='charts')loadPxChart();
   if(t==='financials')drawHistCharts();
   if(t==='intelligence')loadPrediction();
+  if(t==='company')loadCompanyTab();
+}
+
+async function loadCompanyTab(){
+  const wrap = document.getElementById('fs-company-content');
+  if(!wrap||!curTick)return;
+  wrap.innerHTML='<div class="load"><div class="spin"></div>Loading company data...</div>';
+  try {
+    const d = await api(`/api/stocks/${curTick}/company`);
+    if(!d){wrap.innerHTML='<div style="color:var(--t3);padding:20px;">No company data available.</div>';return;}
+
+    const fmt = v => v!=null ? (typeof v==='number' ? (Math.abs(v)>=1e9?'$'+(v/1e9).toFixed(2)+'B':Math.abs(v)>=1e6?'$'+(v/1e6).toFixed(2)+'M':'$'+v.toLocaleString()) : v) : '--';
+    const pct = v => v!=null ? (v*100).toFixed(1)+'%' : '--';
+
+    wrap.innerHTML = `
+      <!-- Company Overview -->
+      <div style="margin-bottom:24px;">
+        <div class="inttitle">🏢 COMPANY OVERVIEW</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+          <div>
+            ${d.description ? `<p style="font-size:13px;color:var(--t2);line-height:1.7;margin-bottom:16px;">${d.description.substring(0,400)}${d.description.length>400?'...':''}</p>` : ''}
+            <div style="display:grid;gap:8px;">
+              ${d.sector?`<div style="display:flex;gap:8px;"><span style="font-size:11px;color:var(--t3);font-weight:600;width:120px;">Sector</span><span style="font-size:12px;color:var(--t1);font-weight:700;">${d.sector}</span></div>`:''}
+              ${d.industry?`<div style="display:flex;gap:8px;"><span style="font-size:11px;color:var(--t3);font-weight:600;width:120px;">Industry</span><span style="font-size:12px;color:var(--t1);font-weight:700;">${d.industry}</span></div>`:''}
+              ${d.country?`<div style="display:flex;gap:8px;"><span style="font-size:11px;color:var(--t3);font-weight:600;width:120px;">Headquarters</span><span style="font-size:12px;color:var(--t1);font-weight:700;">${d.city||''} ${d.country}</span></div>`:''}
+              ${d.founded?`<div style="display:flex;gap:8px;"><span style="font-size:11px;color:var(--t3);font-weight:600;width:120px;">Founded</span><span style="font-size:12px;color:var(--t1);font-weight:700;">${d.founded}</span></div>`:''}
+              ${d.employees?`<div style="display:flex;gap:8px;"><span style="font-size:11px;color:var(--t3);font-weight:600;width:120px;">Employees</span><span style="font-size:12px;color:var(--t1);font-weight:700;">${d.employees.toLocaleString()}</span></div>`:''}
+              ${d.ceo?`<div style="display:flex;gap:8px;"><span style="font-size:11px;color:var(--t3);font-weight:600;width:120px;">CEO</span><span style="font-size:12px;color:var(--t1);font-weight:700;">${d.ceo}</span></div>`:''}
+              ${d.website?`<div style="display:flex;gap:8px;"><span style="font-size:11px;color:var(--t3);font-weight:600;width:120px;">Website</span><a href="${d.website}" target="_blank" style="font-size:12px;color:var(--cyan);font-weight:700;">${d.website}</a></div>`:''}
+            </div>
+          </div>
+          <!-- Financial Summary -->
+          <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:10px;padding:16px;">
+            <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--cyan);margin-bottom:12px;">Latest Annual Financials</div>
+            <div style="display:grid;gap:8px;">
+              ${d.revenue?`<div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:var(--t3);">Revenue</span><span style="font-size:12px;font-weight:700;color:var(--t1);font-family:monospace;">${fmt(d.revenue)}</span></div>`:''}
+              ${d.gross_profit?`<div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:var(--t3);">Gross Profit</span><span style="font-size:12px;font-weight:700;color:var(--green);font-family:monospace;">${fmt(d.gross_profit)}</span></div>`:''}
+              ${d.operating_income?`<div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:var(--t3);">Operating Income</span><span style="font-size:12px;font-weight:700;color:${d.operating_income>=0?'var(--green)':'var(--red)'};font-family:monospace;">${fmt(d.operating_income)}</span></div>`:''}
+              ${d.net_income?`<div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:var(--t3);">Net Income</span><span style="font-size:12px;font-weight:700;color:${d.net_income>=0?'var(--green)':'var(--red)'};font-family:monospace;">${fmt(d.net_income)}</span></div>`:''}
+              <div style="border-top:1px solid var(--b1);margin:4px 0;"></div>
+              ${d.total_assets?`<div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:var(--t3);">Total Assets</span><span style="font-size:12px;font-weight:700;color:var(--t1);font-family:monospace;">${fmt(d.total_assets)}</span></div>`:''}
+              ${d.total_debt?`<div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:var(--t3);">Total Debt</span><span style="font-size:12px;font-weight:700;color:var(--red);font-family:monospace;">${fmt(d.total_debt)}</span></div>`:''}
+              ${d.cash?`<div style="display:flex;justify-content:space-between;"><span style="font-size:12px;color:var(--t3);">Cash on Hand</span><span style="font-size:12px;font-weight:700;color:var(--cyan);font-family:monospace;">${fmt(d.cash)}</span></div>`:''}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Shareholder Structure -->
+      <div style="margin-bottom:24px;">
+        <div class="inttitle">👥 SHAREHOLDER STRUCTURE</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+          <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:10px;padding:16px;">
+            <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--cyan);margin-bottom:12px;">Ownership Breakdown</div>
+            <div style="display:grid;gap:12px;">
+
+              <!-- Within Company — Insiders -->
+              <div style="border-bottom:1px solid var(--b1);padding-bottom:10px;">
+                <div style="font-size:10px;font-weight:800;color:var(--yellow);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">🏢 Within Company (Insiders)</div>
+                ${d.insider_pct!=null?`
+                <div style="margin-bottom:6px;">
+                  <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+                    <span style="font-size:12px;color:var(--t2);">CEO, Directors & Employees</span>
+                    <span style="font-size:12px;font-weight:800;color:var(--yellow);">${pct(d.insider_pct)}</span>
+                  </div>
+                  <div style="background:var(--bg2);border-radius:4px;height:6px;"><div style="background:var(--yellow);border-radius:4px;height:100%;width:${Math.min(d.insider_pct*100,100)}%;"></div></div>
+                  ${d.shares_outstanding?`<div style="font-size:10px;color:var(--t3);margin-top:3px;">${((d.insider_pct||0)*d.shares_outstanding/1e6).toFixed(1)}M shares</div>`:''}
+                </div>`:'<div style="font-size:12px;color:var(--t3);">Data not available</div>'}
+              </div>
+
+              <!-- Outside Company — Institutional -->
+              <div style="border-bottom:1px solid var(--b1);padding-bottom:10px;">
+                <div style="font-size:10px;font-weight:800;color:var(--blue);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">🏦 Outside Company (Institutional)</div>
+                ${d.institution_pct!=null?`
+                <div style="margin-bottom:6px;">
+                  <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+                    <span style="font-size:12px;color:var(--t2);">Funds, Banks & Large Investors</span>
+                    <span style="font-size:12px;font-weight:800;color:var(--blue);">${pct(d.institution_pct)}</span>
+                  </div>
+                  <div style="background:var(--bg2);border-radius:4px;height:6px;"><div style="background:var(--blue);border-radius:4px;height:100%;width:${Math.min(d.institution_pct*100,100)}%;"></div></div>
+                  ${d.shares_outstanding?`<div style="font-size:10px;color:var(--t3);margin-top:3px;">${((d.institution_pct||0)*d.shares_outstanding/1e6).toFixed(1)}M shares</div>`:''}
+                </div>`:'<div style="font-size:12px;color:var(--t3);">Data not available</div>'}
+              </div>
+
+              <!-- Public — Retail Investors -->
+              <div>
+                <div style="font-size:10px;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">🌍 Public (Retail Investors)</div>
+                ${d.public_float_pct!=null?`
+                <div style="margin-bottom:6px;">
+                  <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+                    <span style="font-size:12px;color:var(--t2);">General Public & Small Investors</span>
+                    <span style="font-size:12px;font-weight:800;color:var(--green);">${pct(d.public_float_pct)}</span>
+                  </div>
+                  <div style="background:var(--bg2);border-radius:4px;height:6px;"><div style="background:var(--green);border-radius:4px;height:100%;width:${Math.min(d.public_float_pct*100,100)}%;"></div></div>
+                  ${d.float_shares?`<div style="font-size:10px;color:var(--t3);margin-top:3px;">${(d.float_shares/1e6).toFixed(1)}M shares in float</div>`:''}
+                </div>`:'<div style="font-size:12px;color:var(--t3);">Data not available</div>'}
+              </div>
+
+              <!-- Total Shares -->
+              ${d.shares_outstanding?`
+              <div style="border-top:1px solid var(--b1);padding-top:8px;display:flex;justify-content:space-between;">
+                <span style="font-size:12px;color:var(--t3);">Total Shares Outstanding</span>
+                <span style="font-size:12px;font-weight:700;color:var(--t1);font-family:monospace;">${(d.shares_outstanding/1e6).toFixed(1)}M</span>
+              </div>`:''}
+            </div>
+          </div>
+
+          <!-- Top Institutional Holders -->
+          <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:10px;padding:16px;">
+            <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--cyan);margin-bottom:12px;">🏆 Top Institutional Holders</div>
+            ${d.top_holders && d.top_holders.length ? `
+              <div style="display:grid;gap:10px;">
+                ${d.top_holders.slice(0,8).map((h,i)=>`
+                  <div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
+                      <span style="font-size:11px;color:var(--t2);font-weight:600;flex:1;">${h.name}</span>
+                      <span style="font-size:11px;font-weight:800;color:var(--cyan);font-family:monospace;margin-left:8px;">${h.pct_held!=null?(h.pct_held*100).toFixed(2)+'%':'--'}</span>
+                    </div>
+                    <div style="background:var(--bg2);border-radius:3px;height:4px;"><div style="background:var(--cyan);opacity:${1-i*0.1};border-radius:3px;height:100%;width:${h.pct_held!=null?Math.min(h.pct_held*100*5,100):0}%;"></div></div>
+                    ${h.shares?`<div style="font-size:10px;color:var(--t3);margin-top:2px;">${(h.shares/1e6).toFixed(1)}M shares</div>`:''}
+                  </div>`).join('')}
+              </div>` : '<div style="color:var(--t3);font-size:12px;">No holder data available</div>'}
+          </div>
+        </div>
+      </div>`;
+  } catch(e){
+    wrap.innerHTML=`<div style="color:var(--t3);padding:20px;">Error loading company data: ${e.message}</div>`;
+  }
 }
 
 async function loadSummary(){
@@ -1645,6 +1795,7 @@ async function loadPxChart(){
   if(!data||!data.length){document.getElementById('px-wrap').innerHTML='<div class="empty">No price history available</div>';return;}
   const now=new Date(),cut=new Date();
   if(curPer==='1y')cut.setFullYear(now.getFullYear()-1);
+  else if(curPer==='3y')cut.setFullYear(now.getFullYear()-3);
   else if(curPer==='6mo')cut.setMonth(now.getMonth()-6);
   else if(curPer==='3mo')cut.setMonth(now.getMonth()-3);
   else cut.setFullYear(now.getFullYear()-5);
@@ -1700,6 +1851,123 @@ function drawHistCharts(){
   mkC('inc-c',{type:'bar',data:{labels:years,datasets:[{data:hist.map(h=>(h.net_income||0)/1e9),backgroundColor:hist.map(h=>(h.net_income||0)>=0?'rgba(0,230,118,0.7)':'rgba(255,68,68,0.7)'),borderRadius:5,borderWidth:0}]},options:bOpt()});
   mkC('ebt-c',{type:'bar',data:{labels:years,datasets:[{data:hist.map(h=>(h.ebitda||0)/1e9),backgroundColor:'rgba(165,94,234,0.7)',borderRadius:5,borderWidth:0}]},options:bOpt()});
   mkC('opi-c',{type:'bar',data:{labels:years,datasets:[{data:hist.map(h=>(h.operating_income||0)/1e9),backgroundColor:'rgba(255,200,0,0.7)',borderRadius:5,borderWidth:0}]},options:bOpt()});
+  // Load Balance Sheet and P&L
+  loadBalanceSheetAndPnL();
+}
+
+async function loadBalanceSheetAndPnL(){
+  if(!curTick)return;
+  const bsEl = document.getElementById('fs-balance-sheet');
+  const pnlEl = document.getElementById('fs-pnl');
+  if(!bsEl||!pnlEl)return;
+
+  bsEl.innerHTML='<div class="load"><div class="spin"></div>Loading...</div>';
+  pnlEl.innerHTML='<div class="load"><div class="spin"></div>Loading...</div>';
+
+  const fmt = v => {
+    if(v==null||v===0) return '--';
+    const abs = Math.abs(v);
+    const neg = v < 0;
+    const str = abs>=1e9?'$'+(abs/1e9).toFixed(2)+'B':abs>=1e6?'$'+(abs/1e6).toFixed(2)+'M':'$'+abs.toLocaleString();
+    return neg?'('+str+')':str;
+  };
+
+  try {
+    const hist = (await api(`/api/stocks/${curTick}/historical`))||[];
+    const years = hist.slice(-3).reverse(); // last 3 years newest first
+    const yrs = years.map(h=>h.year);
+
+    if(!yrs.length){
+      pnlEl.innerHTML='<div style="color:var(--t3);padding:16px;">No historical data available. Run fetch_stocks.py to populate.</div>';
+      bsEl.innerHTML='<div style="color:var(--t3);padding:16px;">No historical data available.</div>';
+      return;
+    }
+
+    const grid = `grid-template-columns:2fr ${yrs.map(()=>'1fr').join(' ')}`;
+
+    const hdr = `<div style="display:grid;${grid};gap:4px;padding:8px 0;border-bottom:2px solid var(--b2);margin-bottom:4px;">
+      <span style="font-size:11px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:1px;">Item</span>
+      ${yrs.map(y=>`<span style="font-size:11px;font-weight:800;color:var(--cyan);text-align:right;">${y}</span>`).join('')}
+    </div>`;
+
+    const row = (label, vals) => `
+      <div style="display:grid;${grid};gap:4px;padding:7px 0;border-bottom:1px solid var(--b1);">
+        <span style="font-size:12px;color:var(--t3);">${label}</span>
+        ${vals.map(v=>`<span style="font-size:12px;font-weight:700;color:#ffffff;text-align:right;font-family:monospace;">${fmt(v)}</span>`).join('')}
+      </div>`;
+
+    const pctRow = (label, vals) => `
+      <div style="display:grid;${grid};gap:4px;padding:7px 0;border-bottom:1px solid var(--b1);">
+        <span style="font-size:12px;color:var(--t3);">${label}</span>
+        ${vals.map(v=>`<span style="font-size:12px;font-weight:700;color:#ffffff;text-align:right;font-family:monospace;">${v!=null?v.toFixed(1)+'%':'--'}</span>`).join('')}
+      </div>`;
+
+    const secHdr = label=>`<div style="font-size:10px;font-weight:800;color:var(--cyan);text-transform:uppercase;letter-spacing:1px;padding:10px 0 4px;">${label}</div>`;
+
+    // ── P&L 3-Year Comparison ──
+    pnlEl.innerHTML = hdr +
+      secHdr('Revenue & Profit') +
+      row('Total Revenue', years.map(h=>h.revenue)) +
+      row('Operating Income', years.map(h=>h.operating_income)) +
+      row('EBITDA', years.map(h=>h.ebitda)) +
+      row('Net Income', years.map(h=>h.net_income)) +
+      row('Free Cash Flow', years.map(h=>h.free_cash_flow)) +
+      secHdr('Margins') +
+      pctRow('Operating Margin', years.map(h=>h.operating_income&&h.revenue?h.operating_income/h.revenue*100:null)) +
+      pctRow('Net Margin', years.map(h=>h.net_income&&h.revenue?h.net_income/h.revenue*100:null)) +
+      pctRow('EBITDA Margin', years.map(h=>h.ebitda&&h.revenue?h.ebitda/h.revenue*100:null));
+
+    // ── Balance Sheet - Multi-year from company API ──
+    const d = await api(`/api/stocks/${curTick}/company`);
+    const bsYears = d?.balance_sheet_years || [];
+
+    if(bsYears.length > 0){
+      const bsYrs = bsYears.map(y=>y.year);
+      const bsg = `grid-template-columns:2fr ${bsYrs.map(()=>'1fr').join(' ')}`;
+      const bshdr = `<div style="display:grid;${bsg};gap:4px;padding:8px 0;border-bottom:2px solid var(--b2);margin-bottom:4px;">
+        <span style="font-size:11px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:1px;">Item</span>
+        ${bsYrs.map(y=>`<span style="font-size:11px;font-weight:800;color:var(--cyan);text-align:right;">${y}</span>`).join('')}
+      </div>`;
+      const bsrow = (label, key) => `
+        <div style="display:grid;${bsg};gap:4px;padding:7px 0;border-bottom:1px solid var(--b1);">
+          <span style="font-size:12px;color:var(--t3);">${label}</span>
+          ${bsYears.map(y=>`<span style="font-size:12px;font-weight:700;color:#ffffff;text-align:right;font-family:monospace;">${fmt(y[key])}</span>`).join('')}
+        </div>`;
+      const bsratiorow = (label, vals) => `
+        <div style="display:grid;${bsg};gap:4px;padding:7px 0;border-bottom:1px solid var(--b1);">
+          <span style="font-size:12px;color:var(--t3);">${label}</span>
+          ${vals.map(v=>`<span style="font-size:12px;font-weight:700;color:#ffffff;text-align:right;font-family:monospace;">${v!=null?v.toFixed(2):'--'}</span>`).join('')}
+        </div>`;
+
+      bsEl.innerHTML = bshdr +
+        secHdr('Assets') +
+        bsrow('Total Assets', 'total_assets') +
+        bsrow('Current Assets', 'current_assets') +
+        bsrow('Cash & Equivalents', 'cash') +
+        bsrow('Non-Current Assets', 'non_current_assets') +
+        secHdr('Liabilities') +
+        bsrow('Total Liabilities', 'total_liabilities') +
+        bsrow('Current Liabilities', 'current_liabilities') +
+        bsrow('Total Debt', 'total_debt') +
+        secHdr('Equity & Working Capital') +
+        bsrow('Total Equity', 'total_equity') +
+        bsratiorow('Working Capital', bsYears.map(y=>y.current_assets&&y.current_liabilities?y.current_assets-y.current_liabilities:null)) +
+        secHdr('Key Ratios') +
+        bsratiorow('Debt to Equity', bsYears.map(y=>y.total_debt&&y.total_equity?y.total_debt/y.total_equity:null)) +
+        bsratiorow('Current Ratio', bsYears.map(y=>y.current_assets&&y.current_liabilities?y.current_assets/y.current_liabilities:null));
+    } else if(d){
+      // Fallback to single year
+      const sg = 'grid-template-columns:2fr 1fr';
+      const sr = (label,val) => `<div style="display:grid;${sg};gap:4px;padding:7px 0;border-bottom:1px solid var(--b1);"><span style="font-size:12px;color:var(--t3);">${label}</span><span style="font-size:12px;font-weight:700;color:#ffffff;text-align:right;font-family:monospace;">${fmt(val)}</span></div>`;
+      bsEl.innerHTML = sr('Total Assets',d.total_assets)+sr('Total Liabilities',d.total_liabilities)+sr('Total Equity',d.total_equity)+sr('Total Debt',d.total_debt)+sr('Cash',d.cash);
+    } else {
+      bsEl.innerHTML='<div style="color:var(--t3);padding:16px;">No balance sheet data available.</div>';
+    }
+
+  } catch(e){
+    bsEl.innerHTML='<div style="color:var(--t3);padding:16px;">Error loading data: '+e.message+'</div>';
+    pnlEl.innerHTML='<div style="color:var(--t3);padding:16px;">Error loading data</div>';
+  }
 }
 
 // ── Prediction Chart: Past → Today → Future ──
@@ -2163,15 +2431,20 @@ async function loadMacro(){
 // ─── WATCHLIST ─────────────────────────────────────────
 let watchlist = JSON.parse(localStorage.getItem('wl_tickers')||'[]');
 
-function addToWatchlist(){
+function addToWatchlistManual(){
   const input = document.getElementById('wl-add-input');
   const ticker = input.value.trim().toUpperCase();
-  if(!ticker){alert('Enter a ticker symbol');return;}
+  if(!ticker){alert('Please type a ticker or company name first');return;}
   if(watchlist.includes(ticker)){alert(ticker+' is already in your watchlist');return;}
   watchlist.push(ticker);
   localStorage.setItem('wl_tickers',JSON.stringify(watchlist));
   input.value='';
+  closeWlSuggestions();
   loadWatchlist();
+}
+
+function addToWatchlist(){
+  addToWatchlistManual();
 }
 
 function removeFromWatchlist(ticker){
@@ -2188,13 +2461,13 @@ async function loadWatchlist(){
   document.getElementById('wl-tot').textContent = watchlist.length;
 
   if(!watchlist.length){
-    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:20px;">No stocks in watchlist yet — add tickers above</td></tr>';
+    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--t3);padding:20px;">No stocks in watchlist yet — add tickers above</td></tr>';
     if(emptyMsg)emptyMsg.style.display='block';
     return;
   }
   if(emptyMsg)emptyMsg.style.display='none';
 
-  tbody.innerHTML='<tr><td colspan="9"><div class="load"><div class="spin"></div></div></td></tr>';
+  tbody.innerHTML='<tr><td colspan="6"><div class="load"><div class="spin"></div></div></td></tr>';
 
   try {
     const results = [];
@@ -2216,24 +2489,17 @@ async function loadWatchlist(){
 
     tbody.innerHTML = results.map(s=>{
       const chg=s.price_change_pct||0;
-      const signal=s.buy_signal||'N/A';
-      const sigColor=signal==='BUY'?'var(--green)':signal==='SELL'?'var(--red)':'var(--yellow)';
-      const target=s.target_1w;
-      const targetChg=target&&s.current_price?((target-s.current_price)/s.current_price*100):null;
       return `<tr onclick="openFS('${s.ticker}')">
         <td class="sym">${s.ticker}</td>
         <td style="color:var(--t2);font-weight:600">${s.company_name||'--'}</td>
         <td style="font-size:10px;color:var(--t3)">${s.sector||'--'}</td>
         <td class="mono">${s.current_price?'$'+s.current_price.toFixed(2):'--'}</td>
         <td class="mono ${chg>=0?'g':'r'}">${chg>=0?'+':''}${chg.toFixed(2)}%</td>
-        <td style="color:${sigColor};font-weight:800;font-size:11px;">${signal}</td>
-        <td class="mono ${targetChg!=null?(targetChg>=0?'g':'r'):''}">${target?'$'+target.toFixed(2)+(targetChg!=null?' ('+(targetChg>=0?'+':'')+targetChg.toFixed(1)+'%)':''):'--'}</td>
-        <td style="font-size:10px;color:var(--t3)">--</td>
         <td><button onclick="event.stopPropagation();removeFromWatchlist('${s.ticker}')" style="background:rgba(255,68,68,0.1);border:1px solid rgba(255,68,68,0.2);border-radius:5px;color:var(--red);font-size:11px;font-weight:700;cursor:pointer;padding:3px 8px;">Remove</button></td>
       </tr>`;
     }).join('');
   } catch(e){
-    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--t3)">Error loading watchlist</td></tr>';
+    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--t3)">Error loading watchlist</td></tr>';
   }
 }
 

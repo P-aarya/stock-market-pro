@@ -257,6 +257,150 @@ def get_sectors():
         GROUP BY sector ORDER BY avg_change_pct DESC
     """)
 
+@app.get("/api/stocks/{ticker}/company")
+def get_company_data(ticker: str):
+    """Fetch comprehensive company data including financials and shareholders."""
+    try:
+        t = yf.Ticker(ticker.upper())
+        info = t.info or {}
+
+        # Get balance sheet - multi year
+        balance_sheet_years = []
+        try:
+            bs = t.balance_sheet
+            if bs is not None and not bs.empty:
+                for col in bs.columns[:3]:  # last 3 years
+                    year = str(col)[:4]
+                    def safe_get(key):
+                        try: return float(bs.loc[key, col]) if key in bs.index else None
+                        except: return None
+                    ta = safe_get('Total Assets')
+                    ca = safe_get('Current Assets')
+                    balance_sheet_years.append({
+                        "year": year,
+                        "total_assets": ta,
+                        "total_liabilities": safe_get('Total Liabilities Net Minority Interest'),
+                        "total_equity": safe_get('Stockholders Equity'),
+                        "total_debt": safe_get('Total Debt'),
+                        "cash": safe_get('Cash And Cash Equivalents'),
+                        "current_assets": ca,
+                        "current_liabilities": safe_get('Current Liabilities'),
+                        "non_current_assets": (ta-ca) if ta and ca else None,
+                    })
+        except:
+            pass
+
+        total_assets = balance_sheet_years[0].get('total_assets') if balance_sheet_years else None
+        total_debt = balance_sheet_years[0].get('total_debt') if balance_sheet_years else None
+        cash = balance_sheet_years[0].get('cash') if balance_sheet_years else None
+        total_liabilities = balance_sheet_years[0].get('total_liabilities') if balance_sheet_years else None
+        total_equity = balance_sheet_years[0].get('total_equity') if balance_sheet_years else None
+        current_assets = balance_sheet_years[0].get('current_assets') if balance_sheet_years else None
+        current_liabilities = balance_sheet_years[0].get('current_liabilities') if balance_sheet_years else None
+
+        # Get financials
+        try:
+            fin = t.financials
+            revenue = float(fin.loc['Total Revenue'].iloc[0]) if 'Total Revenue' in fin.index else None
+            gross_profit = float(fin.loc['Gross Profit'].iloc[0]) if 'Gross Profit' in fin.index else None
+            operating_income = float(fin.loc['Operating Income'].iloc[0]) if 'Operating Income' in fin.index else None
+            net_income = float(fin.loc['Net Income'].iloc[0]) if 'Net Income' in fin.index else None
+            cost_of_revenue = float(fin.loc['Cost Of Revenue'].iloc[0]) if 'Cost Of Revenue' in fin.index else None
+            operating_expenses = float(fin.loc['Operating Expense'].iloc[0]) if 'Operating Expense' in fin.index else None
+            ebitda = info.get('ebitda')
+        except:
+            revenue = gross_profit = operating_income = net_income = cost_of_revenue = operating_expenses = ebitda = None
+
+        # Get major holders
+        insider_pct = None
+        institution_pct = None
+        public_float_pct = None
+        try:
+            mh = t.major_holders
+            if mh is not None and not mh.empty:
+                for _, row in mh.iterrows():
+                    val_str = str(row.iloc[0]).replace('%','').strip()
+                    label = str(row.iloc[1]).lower()
+                    try:
+                        val = float(val_str) / 100
+                        if 'insider' in label:
+                            insider_pct = val
+                        elif 'institution' in label:
+                            institution_pct = val
+                        elif 'float' in label:
+                            public_float_pct = val
+                    except:
+                        pass
+        except:
+            pass
+
+        # Get institutional holders with shares
+        top_holders = []
+        try:
+            ih = t.institutional_holders
+            if ih is not None and not ih.empty:
+                for _, row in ih.head(10).iterrows():
+                    top_holders.append({
+                        "name": str(row.get('Holder', row.iloc[0])),
+                        "pct_held": float(row.get('% Out', row.iloc[3])) if len(row) > 3 else None,
+                        "shares": int(row.get('Shares', row.iloc[1])) if len(row) > 1 else None
+                    })
+        except:
+            pass
+
+        # Get CEO from company officers
+        ceo = None
+        try:
+            officers = info.get('companyOfficers', [])
+            for officer in officers:
+                if 'CEO' in officer.get('title', '') or 'Chief Executive' in officer.get('title', ''):
+                    ceo = officer.get('name')
+                    break
+        except:
+            pass
+
+        return {
+            "ticker": ticker.upper(),
+            "company_name": info.get('longName'),
+            "description": info.get('longBusinessSummary'),
+            "sector": info.get('sector'),
+            "industry": info.get('industry'),
+            "country": info.get('country'),
+            "city": info.get('city'),
+            "website": info.get('website'),
+            "employees": info.get('fullTimeEmployees'),
+            "founded": info.get('founded'),
+            "ceo": ceo,
+            "exchange": info.get('exchange'),
+            "shares_outstanding": info.get('sharesOutstanding'),
+            "float_shares": info.get('floatShares'),
+            "revenue": revenue or info.get('totalRevenue'),
+            "gross_profit": gross_profit,
+            "operating_income": operating_income,
+            "net_income": net_income or info.get('netIncomeToCommon'),
+            "cost_of_revenue": cost_of_revenue,
+            "operating_expenses": operating_expenses,
+            "ebitda": ebitda,
+            "total_assets": total_assets,
+            "total_liabilities": total_liabilities,
+            "total_equity": total_equity,
+            "total_debt": total_debt,
+            "cash": cash or info.get('totalCash'),
+            "current_assets": current_assets,
+            "current_liabilities": current_liabilities,
+            "debt_to_equity": info.get('debtToEquity'),
+            "current_ratio": info.get('currentRatio'),
+            "profit_margin": info.get('profitMargins'),
+            "gross_margin": info.get('grossMargins'),
+            "insider_pct": insider_pct or info.get('heldPercentInsiders'),
+            "institution_pct": institution_pct or info.get('heldPercentInstitutions'),
+            "public_float_pct": public_float_pct,
+            "top_holders": top_holders,
+            "balance_sheet_years": balance_sheet_years
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
 @app.get("/api/stocks/search")
 def search_stocks(q: str = "", limit: int = 10):
     """Search stocks by ticker or company name for autocomplete."""
@@ -266,7 +410,7 @@ def search_stocks(q: str = "", limit: int = 10):
         results = query("""
             SELECT ticker, company_name, sector, current_price, price_change_pct
             FROM stocks_live
-            WHERE (ticker LIKE %s OR company_name LIKE %s)
+            WHERE (ticker LIKE %s OR LOWER(company_name) LIKE LOWER(%s))
             AND current_price IS NOT NULL
             ORDER BY
                 CASE WHEN ticker LIKE %s THEN 0 ELSE 1 END,
@@ -279,8 +423,41 @@ def search_stocks(q: str = "", limit: int = 10):
 
 @app.get("/api/market/indices")
 def get_indices():
-    return query("""SELECT ticker,company_name,current_price,price_change,price_change_pct,last_updated
+    # Try DB first
+    db_result = query("""SELECT ticker,company_name,current_price,price_change,price_change_pct,last_updated
         FROM stocks_live WHERE ticker IN ('SPY','QQQ','DIA','IWM') AND current_price IS NOT NULL""")
+    
+    if db_result and len(db_result) >= 4:
+        return db_result
+    
+    # Fallback: fetch live from yfinance
+    indices = {
+        'SPY': 'S&P 500 ETF',
+        'QQQ': 'NASDAQ 100 ETF', 
+        'DIA': 'Dow Jones ETF',
+        'IWM': 'Russell 2000 ETF'
+    }
+    result = []
+    for ticker, name in indices.items():
+        try:
+            t = yf.Ticker(ticker)
+            hist = t.history(period="2d")
+            if hist is not None and not hist.empty:
+                price = float(hist['Close'].iloc[-1])
+                prev = float(hist['Close'].iloc[-2]) if len(hist) > 1 else price
+                change = price - prev
+                change_pct = (change/prev*100) if prev > 0 else 0
+                result.append({
+                    "ticker": ticker,
+                    "company_name": name,
+                    "current_price": round(price, 2),
+                    "price_change": round(change, 2),
+                    "price_change_pct": round(change_pct, 2),
+                    "last_updated": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                })
+        except:
+            pass
+    return result or db_result or []
 
 @app.get("/api/market/currencies")
 def get_currencies():
