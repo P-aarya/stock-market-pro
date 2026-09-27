@@ -299,7 +299,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <div style="font-size:10px;font-weight:600;color:var(--t3);">Updates every 60 seconds</div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;" id="currency-grid">
-      <div class="ic" style="--ic-c:var(--cyan)"><div class="ic-n">GBP/USD</div><div class="ic-v" id="c-gbpusd">--</div><div class="ic-c" id="c-gbpusd-c">--</div></div>
+      <div class="ic" style="--ic-c:var(--cyan)"><div class="ic-n">USD/GBP</div><div class="ic-v" id="c-gbpusd">--</div><div class="ic-c" id="c-gbpusd-c">--</div></div>
       <div class="ic" style="--ic-c:var(--blue)"><div class="ic-n">EUR/USD</div><div class="ic-v" id="c-eurusd">--</div><div class="ic-c" id="c-eurusd-c">--</div></div>
       <div class="ic" style="--ic-c:var(--yellow)"><div class="ic-n">USD/INR</div><div class="ic-v" id="c-usdinr">--</div><div class="ic-c" id="c-usdinr-c">--</div></div>
       <div class="ic" style="--ic-c:var(--green)"><div class="ic-n">GBP/INR</div><div class="ic-v" id="c-gbpinr">--</div><div class="ic-c" id="c-gbpinr-c">--</div></div>
@@ -1057,7 +1057,7 @@ async function loadCurrencies(){
     const d=await api('/api/market/currencies');
     if(!d||!d.length)return;
     const map={
-      'GBP/USD':'gbpusd','EUR/USD':'eurusd','USD/INR':'usdinr',
+      'USD/GBP':'gbpusd','EUR/USD':'eurusd','USD/INR':'usdinr',
       'GBP/INR':'gbpinr','USD/JPY':'usdjpy','EUR/GBP':'eurgbp'
     };
     d.forEach(c=>{

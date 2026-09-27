@@ -463,7 +463,7 @@ def get_indices():
 def get_currencies():
     """Fetch live currency exchange rates."""
     pairs = {
-        "GBP/USD": "GBPUSD=X",
+        "USD/GBP": "GBPUSD=X",  # invert rate
         "EUR/USD": "EURUSD=X",
         "USD/INR": "USDINR=X",
         "GBP/INR": "GBPINR=X",
@@ -478,6 +478,10 @@ def get_currencies():
             if hist is not None and not hist.empty:
                 latest = float(hist['Close'].iloc[-1])
                 prev = float(hist['Close'].iloc[-2]) if len(hist) > 1 else latest
+                # Invert rate for USD/GBP (GBPUSD=X gives GBP per USD, we want USD per GBP)
+                if name == "USD/GBP":
+                    latest = round(1/latest, 4) if latest else latest
+                    prev = round(1/prev, 4) if prev else prev
                 change_pct = ((latest - prev) / prev * 100) if prev > 0 else 0
                 result.append({"pair": name, "ticker": ticker, "rate": round(latest, 4), "change_pct": round(change_pct, 4)})
         except:
