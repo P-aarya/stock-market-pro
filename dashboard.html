@@ -349,8 +349,56 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     </div>
   </div>
 
+  <!-- Sector Performance -->
+  <div class="card" style="margin-bottom:16px;">
+    <div class="chdr"><div class="ctitle">Sector Performance — Click to Filter</div></div>
+    <div id="secbars"><div class="load"><div class="spin"></div>Loading...</div></div>
+  </div>
+
+  <!-- Sentiment + Sector Cap -->
+  <div class="g2" style="margin-bottom:16px;">
+    <div class="card">
+      <div class="chdr"><div class="ctitle">Market Sentiment</div></div>
+      <div class="gauge">
+        <div class="gscore" id="g-score" style="color:var(--yellow)">--</div>
+        <div class="glabel" id="g-label" style="color:var(--yellow)">Loading...</div>
+        <div style="font-size:9px;color:var(--t3);font-weight:600;margin-top:2px">RSI + Breadth Index</div>
+        <div class="gbar"><div class="gneedle" id="g-needle" style="left:50%"></div></div>
+        <div style="display:flex;justify-content:space-between;width:100%;margin-top:4px">
+          <span style="font-size:9px;font-weight:700;color:var(--red)">Fear</span>
+          <span style="font-size:9px;font-weight:700;color:var(--green)">Greed</span>
+        </div>
+        <div class="gstats">
+          <div class="gstat"><div class="gstat-l">Score</div><div class="gstat-v" id="g-score2">--</div></div>
+          <div class="gstat"><div class="gstat-l">Avg RSI</div><div class="gstat-v" id="g-rsi">--</div></div>
+          <div class="gstat"><div class="gstat-l">Avg Chg</div><div class="gstat-v" id="g-chg">--</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="chdr"><div class="ctitle">Sector Cap Split</div></div>
+      <div style="height:280px"><canvas id="sec-donut"></canvas></div>
+    </div>
+  </div>
 
   <!-- More charts -->
+  <div class="g2">
+    <div class="card">
+      <div class="stabs">
+        <button class="stab on" onclick="showSub('gl','gainers',this)">🟢 Gainers</button>
+        <button class="stab" onclick="showSub('gl','losers',this)">🔴 Losers</button>
+        <button class="stab" onclick="showSub('gl','active',this)">⚡ Active</button>
+      </div>
+      <div id="gl-gainers"><div class="tw"><table><thead><tr><th>Ticker</th><th>Company</th><th>Price</th><th>Change</th><th>Volume</th></tr></thead><tbody id="tb-g"></tbody></table></div></div>
+      <div id="gl-losers" style="display:none"><div class="tw"><table><thead><tr><th>Ticker</th><th>Company</th><th>Price</th><th>Change</th><th>Volume</th></tr></thead><tbody id="tb-l"></tbody></table></div></div>
+      <div id="gl-active" style="display:none"><div class="tw"><table><thead><tr><th>Ticker</th><th>Company</th><th>Price</th><th>Change</th><th>Volume</th></tr></thead><tbody id="tb-a"></tbody></table></div></div>
+    </div>
+    <div class="card">
+      <div class="chdr"><div class="ctitle">Top 10 by Market Cap</div></div>
+      <div style="height:360px"><canvas id="mktcap-c"></canvas></div>
+    </div>
+  </div>
+
   <div class="g2">
     <div class="card">
       <div class="chdr"><div class="ctitle">P/E Ratio vs Market Cap</div></div>
@@ -663,20 +711,55 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   </div>
 
   <!-- Commodities Table -->
-  <div class="card">
+  <div class="card" style="margin-bottom:16px;">
     <div class="chdr">
       <div class="ctitle">🏗️ Live Commodity Prices</div>
-      <div style="display:flex;gap:6px;">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
         <button class="fbtn on" onclick="filterCom('all',this)">All</button>
-        <button class="fbtn" onclick="filterCom('metals',this)">Metals</button>
-        <button class="fbtn" onclick="filterCom('energy',this)">Energy</button>
-        <button class="fbtn" onclick="filterCom('agriculture',this)">Agriculture</button>
-        <button class="fbtn" onclick="filterCom('crypto',this)">Crypto</button>
+        <button class="fbtn" onclick="filterComGroup(['precious_metals','metals'],this)">Metals</button>
+        <button class="fbtn" onclick="filterComGroup(['energy'],this)">Energy</button>
+        <button class="fbtn" onclick="filterComGroup(['agriculture','softs','livestock','food'],this)">Agriculture</button>
+        <button class="fbtn" onclick="filterComGroup(['crypto'],this)">Crypto</button>
+        <button class="fbtn" onclick="filterComGroup(['clean_energy','carbon','water'],this)">Clean Energy</button>
+        <button class="fbtn" onclick="filterComGroup(['physical_ai'],this)">Physical AI</button>
+        <button class="fbtn" onclick="filterComGroup(['shipping','timber','indices'],this)">Others</button>
       </div>
     </div>
     <div class="tw"><table>
       <thead><tr><th>Commodity</th><th>Category</th><th>Price</th><th>Change</th><th>% Change</th><th>Updated</th></tr></thead>
       <tbody id="tb-com"><tr><td colspan="6"><div class="load"><div class="spin"></div></div></td></tr></tbody>
+    </table></div>
+  </div>
+
+  <!-- Commodity-Linked Companies -->
+  <div class="card">
+    <div class="chdr">
+      <div class="ctitle">🏢 Commodity-Linked Companies — Click to View Full Details</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="fbtn on" onclick="filterComCo('all',this)">All</button>
+        <button class="fbtn" onclick="filterComCo('gold',this)">Gold</button>
+        <button class="fbtn" onclick="filterComCo('silver',this)">Silver</button>
+        <button class="fbtn" onclick="filterComCo('copper',this)">Copper</button>
+        <button class="fbtn" onclick="filterComCo('steel',this)">Steel</button>
+        <button class="fbtn" onclick="filterComCo('lithium',this)">Lithium</button>
+        <button class="fbtn" onclick="filterComCo('uranium',this)">Uranium</button>
+        <button class="fbtn" onclick="filterComCo('oil',this)">Oil</button>
+        <button class="fbtn" onclick="filterComCo('gas',this)">Gas</button>
+        <button class="fbtn" onclick="filterComCo('agriculture',this)">Agriculture</button>
+        <button class="fbtn" onclick="filterComCo('softs',this)">Softs</button>
+        <button class="fbtn" onclick="filterComCo('livestock',this)">Livestock</button>
+        <button class="fbtn" onclick="filterComCo('crypto',this)">Crypto</button>
+        <button class="fbtn" onclick="filterComCo('clean_energy',this)">Clean Energy</button>
+        <button class="fbtn" onclick="filterComCo('water',this)">Water</button>
+        <button class="fbtn" onclick="filterComCo('shipping',this)">Shipping</button>
+        <button class="fbtn" onclick="filterComCo('timber',this)">Timber</button>
+        <button class="fbtn" onclick="filterComCo('physical_ai',this)">Physical AI</button>
+        <button class="fbtn" onclick="filterComCo('mining',this)">Mining</button>
+      </div>
+    </div>
+    <div class="tw"><table>
+      <thead><tr><th>Ticker</th><th>Company</th><th>Linked To</th><th>Price</th><th>Change</th><th>Signal</th><th>Market Cap</th></tr></thead>
+      <tbody id="tb-com-co"><tr><td colspan="7"><div class="load"><div class="spin"></div>Loading...</div></td></tr></tbody>
     </table></div>
   </div>
 </div>
@@ -715,6 +798,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 <div class="fsm" id="fsm">
   <div class="fsnav">
     <div class="fsnav-l">
+      <img id="fs-logo" src="" alt="" style="width:32px;height:32px;border-radius:8px;object-fit:contain;background:#fff;padding:3px;display:none;margin-right:4px;" onerror="this.style.display='none'"/>
       <span class="fssym" id="fs-sym">--</span>
       <span class="fspx" id="fs-px">--</span>
       <span class="fschg" id="fs-chg">--</span>
@@ -730,6 +814,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <button class="fstab" onclick="showFST('company',this)">🏢 Company</button>
       <button class="fstab" onclick="showFST('financials',this)">💰 Financials</button>
       <button class="fstab" onclick="showFST('intelligence',this)">🤖 Prediction Model</button>
+      <button class="fstab" onclick="showFST('quarterly',this)">📆 Quarterly</button>
       <button class="fstab" onclick="showFST('earnings',this)">📅 Earnings</button>
       <button class="fstab" onclick="showFST('news',this)">📰 News</button>
     </div>
@@ -750,7 +835,13 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <div class="card" style="margin-bottom:14px">
         <div class="chdr">
           <div class="ctitle">Price History — <span id="fs-tick-lbl" style="color:var(--cyan)"></span></div>
-          <div style="display:flex;gap:5px">
+          <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">
+            <!-- Chart type toggle -->
+            <div style="display:flex;gap:3px;background:var(--bg3);border-radius:7px;padding:2px;margin-right:6px;">
+              <button id="chart-line-btn" onclick="setChartType('line',this)" style="padding:4px 10px;border-radius:5px;border:none;background:var(--blue);color:#fff;font-size:11px;font-weight:700;cursor:pointer;">📈 Line</button>
+              <button id="chart-candle-btn" onclick="setChartType('candle',this)" style="padding:4px 10px;border-radius:5px;border:none;background:none;color:var(--t3);font-size:11px;font-weight:700;cursor:pointer;">🕯 Candle</button>
+            </div>
+            <!-- Period buttons -->
             <button class="fbtn on" onclick="setPer('3mo',this)">3M</button>
             <button class="fbtn" onclick="setPer('6mo',this)">6M</button>
             <button class="fbtn" onclick="setPer('1y',this)">1Y</button>
@@ -758,7 +849,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
             <button class="fbtn" onclick="setPer('5y',this)">5Y</button>
           </div>
         </div>
-        <div id="px-wrap" style="height:300px;display:flex;align-items:center;justify-content:center">
+        <div id="px-wrap" style="height:320px;display:flex;align-items:center;justify-content:center">
           <div class="load"><div class="spin"></div>Loading price data...</div>
         </div>
       </div>
@@ -808,6 +899,13 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       </div>
       <div class="intbox" id="fs-int"></div>
       <div id="pred-accuracy-wrap"></div>
+    </div>
+
+    <div class="fssec" id="fss-quarterly">
+      <div class="card">
+        <div class="chdr"><div class="ctitle">📆 Quarterly Results — Last 8 Quarters</div></div>
+        <div id="fs-quarterly"><div class="load"><div class="spin"></div>Loading quarterly data...</div></div>
+      </div>
     </div>
 
     <div class="fssec" id="fss-earnings">
@@ -883,7 +981,7 @@ function showPage(n,btn){
   btn.classList.add('on');
   if(n==='portfolio')loadPortfolio();
   if(n==='transactions')loadTx();
-  if(n==='commodities'){loadCommodities();loadMacro();}
+  if(n==='commodities'){loadCommodities();loadMacro();loadComCo();}
   if(n==='watchlist')loadWatchlist();
 }
 function showSub(g,t,btn){
@@ -900,6 +998,7 @@ function showFST(t,btn){
   if(t==='financials')drawHistCharts();
   if(t==='intelligence')loadPrediction();
   if(t==='company')loadCompanyTab();
+  if(t==='quarterly')loadQuarterly();
 }
 
 async function loadCompanyTab(){
@@ -1078,23 +1177,18 @@ async function loadSentiment(){
   const d=await api('/api/market/sentiment');if(!d)return;
   const score=d.score||50;
   const col=score>=60?'var(--green)':score>=45?'var(--yellow)':score>=30?'var(--orange)':'var(--red)';
-  document.getElementById('g-score').textContent=Math.round(score);
-  document.getElementById('g-score').style.color=col;
-  document.getElementById('g-score2').textContent=Math.round(score);
-  document.getElementById('g-score2').style.color=col;
-  document.getElementById('g-label').textContent=d.label||'Neutral';
-  document.getElementById('g-label').style.color=col;
-  document.getElementById('g-needle').style.left=score+'%';
-  const re=document.getElementById('g-rsi');
-  re.textContent=d.avg_rsi?f2(d.avg_rsi,1):'--';
-  re.style.color=d.avg_rsi?(d.avg_rsi>=70?'var(--red)':d.avg_rsi<=30?'var(--green)':'var(--t1)'):'var(--t1)';
-  const ce=document.getElementById('g-chg');
-  ce.textContent=d.avg_change!=null?(d.avg_change>=0?'+':'')+f2(d.avg_change)+'%':'--';
-  ce.style.color=d.avg_change>=0?'var(--green)':'var(--red)';
+  const el=id=>document.getElementById(id);
+  if(el('g-score')){el('g-score').textContent=Math.round(score);el('g-score').style.color=col;}
+  if(el('g-score2')){el('g-score2').textContent=Math.round(score);el('g-score2').style.color=col;}
+  if(el('g-label')){el('g-label').textContent=d.label||'Neutral';el('g-label').style.color=col;}
+  if(el('g-needle'))el('g-needle').style.left=score+'%';
+  if(el('g-rsi')){el('g-rsi').textContent=d.avg_rsi?f2(d.avg_rsi,1):'--';el('g-rsi').style.color=d.avg_rsi?(d.avg_rsi>=70?'var(--red)':d.avg_rsi<=30?'var(--green)':'var(--t1)'):'var(--t1)';}
+  if(el('g-chg')){el('g-chg').textContent=d.avg_change!=null?(d.avg_change>=0?'+':'')+f2(d.avg_change)+'%':'--';el('g-chg').style.color=d.avg_change>=0?'var(--green)':'var(--red)';}
 }
 
 async function loadSectors(){
   const d=await api('/api/market/sectors');if(!d)return;
+  const secbars=document.getElementById('secbars');if(!secbars)return;
   const max=Math.max(...d.map(s=>Math.abs(s.avg_change_pct||0)));
   document.getElementById('secbars').innerHTML=d.map(s=>{
     const p=s.avg_change_pct||0,w=max>0?Math.abs(p)/max*100:0,col=p>=0?'var(--green)':'var(--red)';
@@ -1120,9 +1214,12 @@ function filterBySector(sector){
 async function loadGL(){
   const [g,l,a]=await Promise.all([api('/api/market/gainers?limit=15'),api('/api/market/losers?limit=15'),api('/api/market/most-active?limit=15')]);
   const row=s=>`<tr onclick="openStock('${s.ticker}')"><td class="sym">${s.ticker}</td><td style="color:var(--t2);font-weight:600;max-width:120px;overflow:hidden;text-overflow:ellipsis">${s.company_name||'--'}</td><td class="num">${fp(s.current_price)}</td><td class="num ${gc(s.price_change_pct)}">${ar(s.price_change_pct)} ${s.price_change_pct!=null?(s.price_change_pct>=0?'+':'')+f2(s.price_change_pct)+'%':'--'}</td><td style="color:var(--t3);font-weight:600">${fv(s.volume)}</td></tr>`;
-  if(g)document.getElementById('tb-g').innerHTML=g.map(row).join('')||'<tr><td colspan="5" class="empty">No data</td></tr>';
-  if(l)document.getElementById('tb-l').innerHTML=l.map(row).join('')||'<tr><td colspan="5" class="empty">No data</td></tr>';
-  if(a)document.getElementById('tb-a').innerHTML=a.map(row).join('')||'<tr><td colspan="5" class="empty">No data</td></tr>';
+  const tbg=document.getElementById('tb-g');
+  const tbl=document.getElementById('tb-l');
+  const tba=document.getElementById('tb-a');
+  if(g&&tbg)tbg.innerHTML=g.map(row).join('')||'<tr><td colspan="5" class="empty">No data</td></tr>';
+  if(l&&tbl)tbl.innerHTML=l.map(row).join('')||'<tr><td colspan="5" class="empty">No data</td></tr>';
+  if(a&&tba)tba.innerHTML=a.map(row).join('')||'<tr><td colspan="5" class="empty">No data</td></tr>';
 }
 
 async function loadCharts(){
@@ -1410,9 +1507,9 @@ async function loadPredictions(){
   filterPredictions();
 }
 function filterPredictions(){
-  const sec=document.getElementById('pred-sec').value;
-  const sig=document.getElementById('pred-signal').value;
-  const q=document.getElementById('pred-srch').value.toLowerCase();
+  const sec=document.getElementById('mi-sec').value;
+  const sig=document.getElementById('mi-rat').value;
+  const q=document.getElementById('mi-srch').value.toLowerCase();
   fPreds=aPreds.filter(s=>
     (!sec||s.sector===sec)&&
     (!sig||s.buy_signal===sig)&&
@@ -1422,8 +1519,8 @@ function filterPredictions(){
 }
 function renderPredictions(){
   const start=(predPg-1)*PRED_SZ,page=fPreds.slice(start,start+PRED_SZ);
-  document.getElementById('pred-count').textContent=fPreds.length?`Showing ${start+1}–${Math.min(start+PRED_SZ,fPreds.length)} of ${fPreds.length} predictions`:'';
-  document.getElementById('pred-grid').innerHTML=page.length?page.map(s=>{
+  document.getElementById('mi-count').textContent=fPreds.length?`Showing ${start+1}–${Math.min(start+PRED_SZ,fPreds.length)} of ${fPreds.length} predictions`:'';
+  document.getElementById('mi-grid').innerHTML=page.length?page.map(s=>{
     const pct1m=s.target_1m&&s.current_price?((s.target_1m-s.current_price)/s.current_price*100):0;
     const up=pct1m>=0;
     const sigMap={'Strong Buy':'bg','Buy':'bc','Hold':'bb','Sell':'by','Strong Sell':'br'};
@@ -1454,9 +1551,9 @@ function renderPredictions(){
   if(predPg>1)h+=`<button class="pgbtn" onclick="goPredPg(${predPg-1})">← Prev</button>`;
   for(let i=Math.max(1,predPg-2);i<=Math.min(tot,predPg+2);i++)h+=`<button class="pgbtn ${i===predPg?'on':''}" onclick="goPredPg(${i})">${i}</button>`;
   if(predPg<tot)h+=`<button class="pgbtn" onclick="goPredPg(${predPg+1})">Next →</button>`;
-  document.getElementById('pred-pgn').innerHTML=h;
+  document.getElementById('mi-pgn').innerHTML=h;
 }
-function goPredPg(p){predPg=p;renderPredictions();document.getElementById('pred-grid').scrollIntoView({behavior:'smooth'});}
+function goPredPg(p){predPg=p;renderPredictions();document.getElementById('mi-grid').scrollIntoView({behavior:'smooth'});}
 
 // Earnings — all sectors, paginated
 async function loadEarnings(){
@@ -1663,6 +1760,15 @@ async function openStock(ticker){
   document.getElementById('fs-chg').className='fschg '+(pct>=0?'g':'r');
   document.getElementById('fs-name').textContent=(d.company_name||'')+(d.sector?' · '+d.sector:'')+(d.industry?' · '+d.industry:'');
   document.getElementById('fs-badges').innerHTML=mkRat(d.analyst_rating);
+  // Load company logo via Clearbit
+  const logoEl = document.getElementById('fs-logo');
+  if(d.website){
+    const domain = d.website.replace(/https?:\/\//,'').replace(/\/.*/,'').replace(/^www\./,'');
+    logoEl.src = `https://logo.clearbit.com/${domain}`;
+    logoEl.style.display = 'inline-block';
+  } else {
+    logoEl.style.display = 'none';
+  }
 
   document.getElementById('fs-met').innerHTML=[
     mi('Current Price',fp(d.current_price)),
@@ -1809,14 +1915,65 @@ async function loadPxChart(){
   const totalChg=lastPx&&firstPx?((lastPx-firstPx)/firstPx*100):0;
   const lineCol=totalChg>=0?'#00e676':'#ff4444';
   document.getElementById('px-wrap').innerHTML='<canvas id="px-c"></canvas>';
-  document.getElementById('px-wrap').style.cssText='height:300px;';
-  mkC('px-c',{type:'line',data:{labels:fd.map(x=>x.date),datasets:[{
-    label:`${curTick} — Now: ${fp(lastPx)} (${totalChg>=0?'+':''}${f2(totalChg)}% over period)`,
-    data:fd.map(x=>x.close),borderColor:lineCol,borderWidth:2,pointRadius:0,tension:0.05,fill:true,
-    backgroundColor:totalChg>=0?'rgba(0,230,118,0.06)':'rgba(255,68,68,0.06)'
-  }]},options:{responsive:true,maintainAspectRatio:false,
-    plugins:{legend:{labels:{color:'#c0cce0',font:{size:12,weight:'700'},padding:16}},tooltip:{mode:'index',intersect:false,callbacks:{label:c=>fp(c.raw)}}},
-    scales:{x:{ticks:{color:'#58697a',maxTicksLimit:10,font:{size:10}},grid:{color:'rgba(28,28,48,0.6)'}},y:{ticks:{color:'#58697a',callback:v=>fp(v)},grid:{color:'rgba(28,28,48,0.6)'}}},interaction:{mode:'index',intersect:false}}});
+  document.getElementById('px-wrap').style.cssText='height:320px;';
+
+  if(curChartType === 'candle'){
+    // Candlestick chart using bar chart simulation
+    const upCol = 'rgba(0,230,118,0.85)';
+    const dnCol = 'rgba(255,68,68,0.85)';
+    const opens = fd.map(x=>x.open||x.close);
+    const highs = fd.map(x=>x.high||x.close);
+    const lows = fd.map(x=>x.low||x.close);
+    const closes2 = fd.map(x=>x.close);
+
+    // Use floating bars for OHLC candles
+    mkC('px-c',{
+      type:'bar',
+      data:{
+        labels:fd.map(x=>x.date),
+        datasets:[
+          // Body (open to close)
+          {label:'Body',
+           data:fd.map((x,i)=>[opens[i],closes2[i]]),
+           backgroundColor:fd.map(x=>x.close>=(x.open||x.close)?upCol:dnCol),
+           borderColor:fd.map(x=>x.close>=(x.open||x.close)?'rgba(0,230,118,1)':'rgba(255,68,68,1)'),
+           borderWidth:1,barPercentage:0.6,categoryPercentage:0.8,order:2},
+          // High-Low line
+          {label:'High/Low',
+           data:fd.map((x,i)=>[lows[i],highs[i]]),
+           backgroundColor:fd.map(x=>x.close>=(x.open||x.close)?upCol:dnCol),
+           borderColor:fd.map(x=>x.close>=(x.open||x.close)?'rgba(0,230,118,0.8)':'rgba(255,68,68,0.8)'),
+           borderWidth:1,barPercentage:0.1,categoryPercentage:0.8,order:1},
+        ]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{
+          legend:{display:false},
+          tooltip:{mode:'index',intersect:false,callbacks:{
+            title:items=>items[0]?.label||'',
+            label:(c)=>{
+              const i=c.dataIndex;
+              return `O:${fp(opens[i])} H:${fp(highs[i])} L:${fp(lows[i])} C:${fp(closes2[i])}`;
+            }
+          }}
+        },
+        scales:{
+          x:{ticks:{color:'#58697a',maxTicksLimit:10,font:{size:10}},grid:{color:'rgba(28,28,48,0.6)'}},
+          y:{ticks:{color:'#58697a',callback:v=>fp(v)},grid:{color:'rgba(28,28,48,0.6)'}}
+        }
+      }
+    });
+  } else {
+    // Line chart (default)
+    mkC('px-c',{type:'line',data:{labels:fd.map(x=>x.date),datasets:[{
+      label:`${curTick} — Now: ${fp(lastPx)} (${totalChg>=0?'+':''}${f2(totalChg)}% over period)`,
+      data:fd.map(x=>x.close),borderColor:lineCol,borderWidth:2,pointRadius:0,tension:0.05,fill:true,
+      backgroundColor:totalChg>=0?'rgba(0,230,118,0.06)':'rgba(255,68,68,0.06)'
+    }]},options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#c0cce0',font:{size:12,weight:'700'},padding:16}},tooltip:{mode:'index',intersect:false,callbacks:{label:c=>fp(c.raw)}}},
+      scales:{x:{ticks:{color:'#58697a',maxTicksLimit:10,font:{size:10}},grid:{color:'rgba(28,28,48,0.6)'}},y:{ticks:{color:'#58697a',callback:v=>fp(v)},grid:{color:'rgba(28,28,48,0.6)'}}},interaction:{mode:'index',intersect:false}}});
+  }
 
   const closes=fd.map(x=>x.close);
   const rsiData=closes.map((c,i)=>{if(i<14)return null;const sl=closes.slice(i-14,i+1),dl=sl.map((s,j)=>j>0?s-sl[j-1]:0).slice(1);const g=dl.filter(d=>d>0).reduce((a,b)=>a+b,0)/14,l2=Math.abs(dl.filter(d=>d<0).reduce((a,b)=>a+b,0))/14;return l2===0?100:+(100-(100/(1+g/l2))).toFixed(1);});
@@ -1840,6 +1997,15 @@ async function loadPxChart(){
 
   mkC('volh-c',{type:'bar',data:{labels:fd.map(x=>x.date),datasets:[{data:fd.map(x=>x.volume),backgroundColor:'rgba(79,142,247,0.45)',borderWidth:0}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#58697a',maxTicksLimit:10,font:{size:9}},grid:{display:false}},y:{ticks:{color:'#58697a',callback:v=>fv(v)},grid:{color:'rgba(28,28,48,0.5)'}}}}});
+}
+let curChartType = 'line';
+function setChartType(type, btn){
+  curChartType = type;
+  document.getElementById('chart-line-btn').style.background = type==='line'?'var(--blue)':'none';
+  document.getElementById('chart-line-btn').style.color = type==='line'?'#fff':'var(--t3)';
+  document.getElementById('chart-candle-btn').style.background = type==='candle'?'var(--blue)':'none';
+  document.getElementById('chart-candle-btn').style.color = type==='candle'?'#fff':'var(--t3)';
+  loadPxChart();
 }
 function setPer(p,btn){curPer=p;document.querySelectorAll('#fss-charts .fbtn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');loadPxChart();}
 
@@ -2280,16 +2446,15 @@ function toggleManualFilters(){
   const panel = document.getElementById('manual-filters');
   const icon = document.getElementById('filter-toggle-icon');
   const btn = document.getElementById('filter-toggle-btn');
+  if(!panel) return;
   if(panel.style.display==='none'){
     panel.style.display='block';
-    icon.textContent='▼';
-    btn.style.color='var(--cyan)';
-    btn.style.borderColor='var(--cyan)';
+    if(icon) icon.textContent='▼';
+    if(btn){btn.style.color='var(--cyan)';btn.style.borderColor='var(--cyan)';}
   } else {
     panel.style.display='none';
-    icon.textContent='▶';
-    btn.style.color='var(--t3)';
-    btn.style.borderColor='var(--b2)';
+    if(icon) icon.textContent='▶';
+    if(btn){btn.style.color='var(--t3)';btn.style.borderColor='var(--b2)';}
   }
 }
 
@@ -2341,6 +2506,208 @@ document.addEventListener('click', function(e){
   }
 });
 
+// ─── COMMODITY COMPANIES ──────────────────────────────
+const COM_COMPANIES = [
+  // ── GOLD ──
+  {ticker:'NEM',  name:'Newmont Corporation',      commodity:'gold',        label:'Gold Mining'},
+  {ticker:'GOLD', name:'Barrick Gold',              commodity:'gold',        label:'Gold Mining'},
+  {ticker:'AEM',  name:'Agnico Eagle Mines',        commodity:'gold',        label:'Gold Mining'},
+  {ticker:'FNV',  name:'Franco-Nevada',             commodity:'gold',        label:'Gold Royalty'},
+  {ticker:'WPM',  name:'Wheaton Precious Metals',   commodity:'gold',        label:'Gold Streaming'},
+  {ticker:'BTG',  name:'B2Gold Corp',               commodity:'gold',        label:'Gold Mining'},
+  {ticker:'IAG',  name:'IAMGOLD Corporation',       commodity:'gold',        label:'Gold Mining'},
+  // ── SILVER ──
+  {ticker:'AG',   name:'First Majestic Silver',     commodity:'silver',      label:'Silver Mining'},
+  {ticker:'PAAS', name:'Pan American Silver',       commodity:'silver',      label:'Silver Mining'},
+  {ticker:'CDE',  name:'Coeur Mining',              commodity:'silver',      label:'Silver/Gold Mining'},
+  {ticker:'HL',   name:'Hecla Mining',              commodity:'silver',      label:'Silver Mining'},
+  {ticker:'EXK',  name:'Endeavour Silver',          commodity:'silver',      label:'Silver Mining'},
+  // ── COPPER ──
+  {ticker:'FCX',  name:'Freeport-McMoRan',          commodity:'copper',      label:'Copper Mining'},
+  {ticker:'SCCO', name:'Southern Copper',           commodity:'copper',      label:'Copper Mining'},
+  {ticker:'TECK', name:'Teck Resources',            commodity:'copper',      label:'Copper/Zinc Mining'},
+  {ticker:'HBM',  name:'Hudbay Minerals',           commodity:'copper',      label:'Copper Mining'},
+  // ── STEEL & IRON ──
+  {ticker:'NUE',  name:'Nucor Corporation',         commodity:'steel',       label:'Steel Production'},
+  {ticker:'X',    name:'United States Steel',       commodity:'steel',       label:'Steel Production'},
+  {ticker:'STLD', name:'Steel Dynamics',            commodity:'steel',       label:'Steel Production'},
+  {ticker:'CLF',  name:'Cleveland-Cliffs',          commodity:'steel',       label:'Iron Ore/Steel'},
+  {ticker:'CMC',  name:'Commercial Metals',         commodity:'steel',       label:'Steel Products'},
+  // ── ALUMINIUM ──
+  {ticker:'AA',   name:'Alcoa Corporation',         commodity:'aluminium',   label:'Aluminium Production'},
+  {ticker:'CENX', name:'Century Aluminum',          commodity:'aluminium',   label:'Aluminium Smelting'},
+  // ── ZINC/NICKEL/LEAD ──
+  {ticker:'VALE', name:'Vale SA',                   commodity:'mining',      label:'Iron Ore/Nickel'},
+  {ticker:'BHP',  name:'BHP Group',                 commodity:'mining',      label:'Diversified Mining'},
+  {ticker:'RIO',  name:'Rio Tinto',                 commodity:'mining',      label:'Diversified Mining'},
+  {ticker:'TECK', name:'Teck Resources',            commodity:'mining',      label:'Zinc/Copper Mining'},
+  // ── LITHIUM & RARE EARTH ──
+  {ticker:'ALB',  name:'Albemarle Corporation',     commodity:'lithium',     label:'Lithium Producer'},
+  {ticker:'MP',   name:'MP Materials',              commodity:'lithium',     label:'Rare Earth Mining'},
+  {ticker:'LAC',  name:'Lithium Americas',          commodity:'lithium',     label:'Lithium Mining'},
+  {ticker:'LTHM', name:'Livent Corporation',        commodity:'lithium',     label:'Lithium Chemicals'},
+  {ticker:'SQM',  name:'SQM (Chile)',               commodity:'lithium',     label:'Lithium/Potash'},
+  // ── URANIUM ──
+  {ticker:'CCJ',  name:'Cameco Corporation',        commodity:'uranium',     label:'Uranium Mining'},
+  {ticker:'UEC',  name:'Uranium Energy Corp',       commodity:'uranium',     label:'Uranium Mining'},
+  {ticker:'UUUU', name:'Energy Fuels Inc',          commodity:'uranium',     label:'Uranium/Vanadium'},
+  {ticker:'DNN',  name:'Denison Mines',             commodity:'uranium',     label:'Uranium Mining'},
+  // ── OIL ──
+  {ticker:'XOM',  name:'ExxonMobil',                commodity:'oil',         label:'Oil & Gas Major'},
+  {ticker:'CVX',  name:'Chevron Corporation',       commodity:'oil',         label:'Oil & Gas Major'},
+  {ticker:'COP',  name:'ConocoPhillips',            commodity:'oil',         label:'Oil Exploration'},
+  {ticker:'OXY',  name:'Occidental Petroleum',      commodity:'oil',         label:'Oil Producer'},
+  {ticker:'PXD',  name:'Pioneer Natural Resources', commodity:'oil',         label:'Oil Producer'},
+  {ticker:'SLB',  name:'Schlumberger',              commodity:'oil',         label:'Oil Services'},
+  {ticker:'HAL',  name:'Halliburton',               commodity:'oil',         label:'Oil Services'},
+  {ticker:'BKR',  name:'Baker Hughes',              commodity:'oil',         label:'Oil Services'},
+  // ── NATURAL GAS ──
+  {ticker:'EQT',  name:'EQT Corporation',           commodity:'gas',         label:'Natural Gas Producer'},
+  {ticker:'LNG',  name:'Cheniere Energy',           commodity:'gas',         label:'LNG Export'},
+  {ticker:'AR',   name:'Antero Resources',          commodity:'gas',         label:'Natural Gas Producer'},
+  {ticker:'RRC',  name:'Range Resources',           commodity:'gas',         label:'Natural Gas Producer'},
+  {ticker:'SWN',  name:'Southwestern Energy',       commodity:'gas',         label:'Natural Gas Producer'},
+  // ── AGRICULTURE ──
+  {ticker:'ADM',  name:'Archer-Daniels-Midland',    commodity:'agriculture', label:'Grain Processing'},
+  {ticker:'BG',   name:'Bunge Global',              commodity:'agriculture', label:'Agriculture Trading'},
+  {ticker:'MOS',  name:'Mosaic Company',            commodity:'agriculture', label:'Fertilizers'},
+  {ticker:'DE',   name:'Deere & Company',           commodity:'agriculture', label:'Agriculture Equipment'},
+  {ticker:'NTR',  name:'Nutrien Ltd',               commodity:'agriculture', label:'Potash/Nitrogen'},
+  {ticker:'CF',   name:'CF Industries',             commodity:'agriculture', label:'Nitrogen Fertilizer'},
+  {ticker:'CTVA', name:'Corteva Inc',               commodity:'agriculture', label:'Crop Protection'},
+  {ticker:'FMC',  name:'FMC Corporation',           commodity:'agriculture', label:'Agricultural Chemicals'},
+  // ── SOFT COMMODITIES ──
+  {ticker:'SBUX', name:'Starbucks',                 commodity:'softs',       label:'Coffee Consumer'},
+  {ticker:'MKC',  name:'McCormick & Company',       commodity:'softs',       label:'Spices/Food'},
+  {ticker:'HSY',  name:'Hershey Company',           commodity:'softs',       label:'Cocoa Consumer'},
+  {ticker:'K',    name:'Kellogg Company',           commodity:'softs',       label:'Grain Consumer'},
+  {ticker:'GIS',  name:'General Mills',             commodity:'softs',       label:'Wheat/Grain Consumer'},
+  // ── LIVESTOCK ──
+  {ticker:'TSN',  name:'Tyson Foods',               commodity:'livestock',   label:'Beef/Poultry'},
+  {ticker:'HRL',  name:'Hormel Foods',              commodity:'livestock',   label:'Pork/Protein'},
+  {ticker:'PPC',  name:'Pilgrim\'s Pride',          commodity:'livestock',   label:'Poultry Producer'},
+  {ticker:'SAFM', name:'Sanderson Farms',           commodity:'livestock',   label:'Poultry Producer'},
+  // ── CRYPTO ──
+  {ticker:'COIN', name:'Coinbase Global',           commodity:'crypto',      label:'Crypto Exchange'},
+  {ticker:'MSTR', name:'MicroStrategy',             commodity:'crypto',      label:'Bitcoin Holdings'},
+  {ticker:'MARA', name:'Marathon Digital',          commodity:'crypto',      label:'Bitcoin Mining'},
+  {ticker:'RIOT', name:'Riot Platforms',            commodity:'crypto',      label:'Bitcoin Mining'},
+  {ticker:'HUT',  name:'Hut 8 Mining',              commodity:'crypto',      label:'Bitcoin Mining'},
+  {ticker:'CLSK', name:'CleanSpark',                commodity:'crypto',      label:'Bitcoin Mining'},
+  // ── CLEAN ENERGY ──
+  {ticker:'NEE',  name:'NextEra Energy',            commodity:'clean_energy',label:'Renewable Energy'},
+  {ticker:'FSLR', name:'First Solar',               commodity:'clean_energy',label:'Solar Panels'},
+  {ticker:'ENPH', name:'Enphase Energy',            commodity:'clean_energy',label:'Solar Systems'},
+  {ticker:'PLUG', name:'Plug Power',                commodity:'clean_energy',label:'Hydrogen Fuel Cells'},
+  {ticker:'BE',   name:'Bloom Energy',              commodity:'clean_energy',label:'Fuel Cells'},
+  {ticker:'RUN',  name:'Sunrun Inc',                commodity:'clean_energy',label:'Residential Solar'},
+  {ticker:'SEDG', name:'SolarEdge',                 commodity:'clean_energy',label:'Solar Technology'},
+  {ticker:'CHPT', name:'ChargePoint',               commodity:'clean_energy',label:'EV Charging'},
+  // ── WATER ──
+  {ticker:'AWK',  name:'American Water Works',      commodity:'water',       label:'Water Utility'},
+  {ticker:'XYL',  name:'Xylem Inc',                 commodity:'water',       label:'Water Technology'},
+  {ticker:'WTRG', name:'Essential Utilities',       commodity:'water',       label:'Water/Gas Utility'},
+  {ticker:'WM',   name:'Waste Management',          commodity:'water',       label:'Waste/Water Services'},
+  {ticker:'RSG',  name:'Republic Services',         commodity:'water',       label:'Environmental Services'},
+  // ── SHIPPING ──
+  {ticker:'ZIM',  name:'ZIM Shipping',              commodity:'shipping',    label:'Container Shipping'},
+  {ticker:'SBLK', name:'Star Bulk Carriers',        commodity:'shipping',    label:'Dry Bulk Shipping'},
+  {ticker:'GOGL', name:'Golden Ocean Group',        commodity:'shipping',    label:'Dry Bulk Shipping'},
+  {ticker:'DHT',  name:'DHT Holdings',              commodity:'shipping',    label:'Oil Tankers'},
+  {ticker:'STNG', name:'Scorpio Tankers',           commodity:'shipping',    label:'Product Tankers'},
+  // ── TIMBER & LUMBER ──
+  {ticker:'WY',   name:'Weyerhaeuser',              commodity:'timber',      label:'Timber REIT'},
+  {ticker:'RYN',  name:'Rayonier Inc',              commodity:'timber',      label:'Timber REIT'},
+  {ticker:'PCH',  name:'PotlatchDeltic',            commodity:'timber',      label:'Timber/Real Estate'},
+  // ── PHYSICAL AI & ROBOTICS ──
+  {ticker:'ISRG', name:'Intuitive Surgical',        commodity:'physical_ai', label:'Surgical Robots'},
+  {ticker:'TER',  name:'Teradyne',                  commodity:'physical_ai', label:'Industrial Robots'},
+  {ticker:'CGNX', name:'Cognex Corporation',        commodity:'physical_ai', label:'Machine Vision'},
+  {ticker:'ROK',  name:'Rockwell Automation',       commodity:'physical_ai', label:'Industrial Automation'},
+  {ticker:'ABB',  name:'ABB Ltd',                   commodity:'physical_ai', label:'Robotics/Automation'},
+  {ticker:'SYM',  name:'Symbotic Inc',              commodity:'physical_ai', label:'Warehouse Robots'},
+  {ticker:'PATH', name:'UiPath',                    commodity:'physical_ai', label:'RPA Software'},
+  {ticker:'PLTR', name:'Palantir Technologies',     commodity:'physical_ai', label:'AI/Data Platform'},
+  {ticker:'NVDA', name:'Nvidia Corporation',        commodity:'physical_ai', label:'AI Chips'},
+];
+
+let comCoData = [];
+let comCoFilter = 'all';
+
+async function loadComCo(){
+  const tbody = document.getElementById('tb-com-co');
+  if(!tbody) return;
+  tbody.innerHTML='<tr><td colspan="7"><div class="load"><div class="spin"></div>Loading commodity companies...</div></td></tr>';
+  try {
+    // Fetch each company individually using existing endpoint
+    const results = await Promise.all(
+      COM_COMPANIES.map(c => 
+        fetch(`${API}/api/stocks/${c.ticker}`)
+          .then(r=>r.json())
+          .then(d=>({...c, current_price:d.current_price, price_change_pct:d.price_change_pct, market_cap:d.market_cap, analyst_rating:d.analyst_rating}))
+          .catch(()=>c)
+      )
+    );
+    comCoData = results;
+    renderComCo();
+  } catch(e){
+    tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--t3);padding:20px;">Error loading companies</td></tr>';
+  }
+}
+
+function filterComCo(cat, btn){
+  comCoFilter = cat;
+  document.querySelectorAll('#page-commodities .fbtn').forEach(b=>{
+    if(b.textContent!=='All'&&b.getAttribute('onclick')?.includes('filterComCo'))b.classList.remove('on');
+  });
+  document.querySelectorAll('#page-commodities .fbtn').forEach(b=>{
+    if(b.getAttribute('onclick')===`filterComCo('${cat}',this)`)b.classList.add('on');
+  });
+  renderComCo();
+}
+
+let comCoShowAll = false;
+function renderComCo(){
+  const tbody = document.getElementById('tb-com-co');
+  if(!tbody) return;
+  const filtered = comCoFilter==='all' ? comCoData : comCoData.filter(c=>c.commodity===comCoFilter);
+  if(!filtered.length){
+    tbody.innerHTML=`<tr><td colspan="7" style="text-align:center;color:var(--t3);padding:20px;">No companies found</td></tr>`;
+    return;
+  }
+  const display = comCoShowAll ? filtered : filtered.slice(0,10);
+  tbody.innerHTML = display.map(c=>{
+    const chg = c.price_change_pct||0;
+    const signal = c.buy_signal||c.analyst_rating||'N/A';
+    const sigColor = signal==='BUY'||signal==='STRONG BUY'?'var(--green)':signal==='SELL'?'var(--red)':'var(--yellow)';
+    const mcap = c.market_cap;
+    const mcapStr = mcap?mcap>=1e12?'$'+(mcap/1e12).toFixed(1)+'T':mcap>=1e9?'$'+(mcap/1e9).toFixed(1)+'B':'$'+(mcap/1e6).toFixed(0)+'M':'--';
+    return `<tr onclick="openFS('${c.ticker}')" style="cursor:pointer;">
+      <td class="sym">${c.ticker}</td>
+      <td style="color:var(--t2);font-weight:600;">${c.name}</td>
+      <td><span style="font-size:10px;background:var(--bg3);border:1px solid var(--b2);border-radius:5px;padding:2px 7px;color:var(--cyan);font-weight:700;">${c.label}</span></td>
+      <td class="mono">${c.current_price?'$'+c.current_price.toFixed(2):'--'}</td>
+      <td class="mono ${chg>=0?'g':'r'}">${chg>=0?'+':''}${chg.toFixed(2)}%</td>
+      <td style="color:${sigColor};font-weight:800;font-size:11px;">${signal}</td>
+      <td style="font-size:11px;color:var(--t3);">${mcapStr}</td>
+    </tr>`;
+  }).join('');
+
+  // Show All / Show Less button
+  const existingBtn = document.getElementById('comco-show-more');
+  if(existingBtn) existingBtn.remove();
+  if(filtered.length > 10){
+    const btn = document.createElement('tr');
+    btn.id = 'comco-show-more';
+    btn.innerHTML = `<td colspan="7" style="text-align:center;padding:10px;">
+      <button onclick="comCoShowAll=!comCoShowAll;renderComCo()" style="background:var(--bg3);border:1px solid var(--b2);border-radius:8px;padding:7px 20px;color:var(--cyan);font-size:12px;font-weight:700;cursor:pointer;">
+        ${comCoShowAll?'Show Less ▲':'Show All '+filtered.length+' Companies ▼'}
+      </button>
+    </td>`;
+    tbody.appendChild(btn);
+  }
+}
+
 // ─── COMMODITIES ──────────────────────────────────────
 const COMMODITIES = [
   {ticker:'GC=F', name:'Gold', category:'metals'},
@@ -2378,34 +2745,62 @@ async function loadCommodities(){
     const losers = comData.filter(c=>c.change_pct<0).length;
     const avg = comData.reduce((s,c)=>s+(c.change_pct||0),0)/comData.length;
     const el = id=>document.getElementById(id);
+    if(el('com-tot'))el('com-tot').textContent=comData.length;
     if(el('com-gain'))el('com-gain').textContent=gainers;
     if(el('com-loss'))el('com-loss').textContent=losers;
     if(el('com-avg')){el('com-avg').textContent=(avg>=0?'+':'')+avg.toFixed(2)+'%';el('com-avg').className='sc-v '+(avg>=0?'g':'r');}
   } catch(e){}
 }
 
+let comFilterCategories = [];
 function filterCom(cat, btn){
   comFilter = cat;
+  comFilterCategories = [];
   document.querySelectorAll('#page-commodities .fbtn').forEach(b=>b.classList.remove('on'));
   btn.classList.add('on');
+  comShowAll = false;
+  renderCommodities();
+}
+function filterComGroup(cats, btn){
+  comFilter = 'group';
+  comFilterCategories = cats;
+  document.querySelectorAll('#page-commodities .fbtn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  comShowAll = false;
   renderCommodities();
 }
 
+let comShowAll = false;
 function renderCommodities(){
   const tbody = document.getElementById('tb-com');
   if(!tbody||!comData.length)return;
-  const filtered = comFilter==='all' ? comData : comData.filter(c=>c.category===comFilter);
-  tbody.innerHTML = filtered.map(c=>{
+  const filtered = comFilter==='all' ? comData : comFilter==='group' ? comData.filter(c=>comFilterCategories.includes(c.category)) : comData.filter(c=>c.category===comFilter);
+  const display = comShowAll ? filtered : filtered.slice(0,10);
+  tbody.innerHTML = display.map(c=>{
     const chg = c.change_pct||0;
     return `<tr>
       <td style="font-weight:700;color:var(--cyan)">${c.name}</td>
-      <td style="font-size:10px;color:var(--t3);text-transform:capitalize">${c.category}</td>
+      <td style="font-size:10px;color:var(--t3);text-transform:capitalize">${c.category.replace(/_/g,' ')}</td>
       <td class="mono">${c.price!=null?'$'+c.price.toFixed(2):'--'}</td>
       <td class="mono ${chg>=0?'g':'r'}">${chg>=0?'+':''}${(c.change||0).toFixed(2)}</td>
       <td class="${chg>=0?'g':'r'}">${chg>=0?'+':''}${chg.toFixed(2)}%</td>
       <td style="font-size:10px;color:var(--t3)">${c.updated||'--'}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--t3)">No data</td></tr>';
+
+  // Show All / Show Less button
+  const existing = document.getElementById('com-show-more');
+  if(existing) existing.remove();
+  if(filtered.length > 10){
+    const btn = document.createElement('tr');
+    btn.id = 'com-show-more';
+    btn.innerHTML = `<td colspan="6" style="text-align:center;padding:10px;">
+      <button onclick="comShowAll=!comShowAll;renderCommodities()" style="background:var(--bg3);border:1px solid var(--b2);border-radius:8px;padding:7px 20px;color:var(--cyan);font-size:12px;font-weight:700;cursor:pointer;">
+        ${comShowAll?'Show Less ▲':'Show All '+filtered.length+' ▼'}
+      </button>
+    </td>`;
+    tbody.appendChild(btn);
+  }
 }
 
 // ─── MACRO INDICATORS ──────────────────────────────────
@@ -2520,8 +2915,7 @@ async function runManualScreener(){
   const btn = document.getElementById('screener-btn');
   const loading = document.getElementById('screener-loading');
   const results = document.getElementById('screener-results');
-
-  btn.disabled=true;
+  if(!btn||!loading||!results) return;
   loading.style.display='block';
   results.style.display='none';
 
@@ -2786,123 +3180,367 @@ function loadPortfolioTickers() {
   document.getElementById('pf-tickers').value = tickers.join(', ');
 }
 
-// ─── VIRTUAL PORTFOLIO ────────────────────────────
-let vpTrades = JSON.parse(localStorage.getItem('vp_trades') || '[]');
+</script>
 
-function showVPModal() {
-  document.getElementById('vp-modal').style.display = 'flex';
-}
 
-async function addVPTrade() {
-  const ticker = document.getElementById('vp-tick').value.trim().toUpperCase();
-  const qty = parseFloat(document.getElementById('vp-qty').value);
-  const px = parseFloat(document.getElementById('vp-px').value);
-  const sig = document.getElementById('vp-sig').value;
+<!-- ═══════════ BOUNTY — AI CHATBOT ═══════════ -->
+<style>
+#bounty-btn{position:fixed;bottom:28px;right:28px;width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,#00c8ff,#6464ff);box-shadow:0 4px 24px rgba(0,200,255,0.45);cursor:pointer;z-index:9999;display:flex;align-items:center;justify-content:center;font-size:26px;border:none;transition:transform 0.2s;}
+#bounty-btn:hover{transform:scale(1.1);}
+#bounty-badge{position:absolute;top:-3px;right:-3px;background:#00e676;color:#000;font-size:9px;font-weight:900;border-radius:10px;padding:2px 6px;display:none;}
+#bounty-win{position:fixed;bottom:100px;right:28px;width:420px;height:600px;background:var(--bg2);border:1px solid var(--b2);border-radius:18px;box-shadow:0 8px 48px rgba(0,0,0,0.7);z-index:9998;display:none;flex-direction:column;overflow:hidden;}
+#bounty-win.open{display:flex;}
+#bounty-hdr{background:linear-gradient(135deg,rgba(0,200,255,0.18),rgba(100,100,255,0.18));border-bottom:1px solid var(--b2);padding:14px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.b-avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#00c8ff,#6464ff);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.b-name{font-size:15px;font-weight:900;color:var(--t1);}
+.b-status{font-size:11px;color:#00e676;font-weight:700;margin-top:1px;}
+.b-hdr-btns{margin-left:auto;display:flex;gap:6px;}
+.b-hdr-btn{background:none;border:none;color:var(--t3);font-size:16px;cursor:pointer;padding:4px 6px;border-radius:6px;}
+.b-hdr-btn:hover{color:var(--t1);background:var(--bg3);}
+#bounty-msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;}
+#bounty-msgs::-webkit-scrollbar{width:4px;}
+#bounty-msgs::-webkit-scrollbar-thumb{background:var(--b2);border-radius:4px;}
+.bm{display:flex;gap:8px;align-items:flex-start;max-width:100%;}
+.bm.user{flex-direction:row-reverse;}
+.bm-av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;margin-top:2px;}
+.bm.ai .bm-av{background:linear-gradient(135deg,#00c8ff,#6464ff);}
+.bm.user .bm-av{background:linear-gradient(135deg,#a855f7,#6464ff);}
+.bm-body{max-width:78%;display:flex;flex-direction:column;gap:3px;}
+.bm.user .bm-body{align-items:flex-end;}
+.bm-bubble{padding:10px 14px;border-radius:16px;font-size:13px;line-height:1.65;font-weight:500;word-break:break-word;position:relative;}
+.bm.ai .bm-bubble{background:var(--bg3);color:var(--t1);border-top-left-radius:4px;}
+.bm.user .bm-bubble{background:linear-gradient(135deg,#00c8ff,#6464ff);color:#fff;border-top-right-radius:4px;}
+.bm-time{font-size:10px;color:var(--t3);padding:0 4px;}
+.bm-actions{display:none;gap:4px;margin-top:3px;}
+.bm:hover .bm-actions{display:flex;}
+.bm.user .bm-actions{justify-content:flex-end;}
+.bm-act{background:var(--bg3);border:1px solid var(--b1);border-radius:6px;color:var(--t3);font-size:10px;cursor:pointer;padding:2px 7px;transition:all 0.15s;}
+.bm-act:hover{color:var(--cyan);border-color:var(--cyan);}
+.b-reply-bar{display:none;background:var(--bg3);border-left:3px solid var(--cyan);padding:6px 10px;margin:0 12px 6px;border-radius:0 8px 8px 0;font-size:11px;color:var(--t3);position:relative;}
+.b-reply-bar .b-reply-close{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--t3);cursor:pointer;font-size:14px;}
+.b-edit-bar{display:none;background:rgba(0,200,255,0.08);border-top:1px solid rgba(0,200,255,0.2);padding:6px 12px;font-size:11px;color:var(--cyan);align-items:center;gap:6px;}
+.b-edit-bar button{background:none;border:none;color:var(--t3);cursor:pointer;font-size:13px;margin-left:auto;}
+#bounty-input-wrap{padding:10px 12px;border-top:1px solid var(--b2);background:var(--bg2);flex-shrink:0;}
+#bounty-input{width:100%;background:var(--bg3);border:1px solid var(--b2);border-radius:12px;padding:10px 14px;color:var(--t1);font-size:13px;font-weight:500;outline:none;font-family:var(--sans);resize:none;line-height:1.5;max-height:120px;box-sizing:border-box;transition:border-color 0.2s;}
+#bounty-input:focus{border-color:var(--cyan);}
+#bounty-send-row{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}
+#bounty-send{background:linear-gradient(135deg,#00c8ff,#6464ff);border:none;border-radius:10px;padding:8px 20px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;transition:opacity 0.2s;}
+#bounty-send:hover{opacity:0.85;}
+.b-footer{font-size:10px;color:var(--t3);}
+.b-typing{display:flex;gap:4px;padding:10px 14px;background:var(--bg3);border-radius:16px;border-top-left-radius:4px;width:fit-content;}
+.b-typing span{width:6px;height:6px;background:var(--cyan);border-radius:50%;animation:bdot 1.2s infinite;}
+.b-typing span:nth-child(2){animation-delay:0.2s;}
+.b-typing span:nth-child(3){animation-delay:0.4s;}
+@keyframes bdot{0%,60%,100%{transform:translateY(0);}30%{transform:translateY(-7px);}}
+.b-stock-list{margin-top:8px;display:flex;flex-direction:column;gap:4px;}
+.b-stock-item{background:var(--bg2);border:1px solid var(--b1);border-radius:8px;padding:7px 10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:border-color 0.15s;}
+.b-stock-item:hover{border-color:var(--cyan);}
+.b-stock-item .bsi-left .bsi-ticker{font-size:12px;font-weight:800;color:var(--cyan);font-family:monospace;}
+.b-stock-item .bsi-left .bsi-name{font-size:11px;color:var(--t3);}
+.b-stock-item .bsi-right .bsi-price{font-size:12px;font-weight:700;color:var(--t1);text-align:right;}
+.b-stock-item .bsi-right .bsi-chg{font-size:11px;font-weight:600;text-align:right;}
+@media(max-width:480px){#bounty-win{width:calc(100vw - 16px);right:8px;height:75vh;bottom:80px;}}
+</style>
 
-  if (!ticker || !qty || !px) { alert('Please fill in all fields'); return; }
+<!-- Bounty Button -->
+<button id="bounty-btn" onclick="toggleBounty()" title="Chat with Bounty AI">
+  🤖
+  <span id="bounty-badge">1</span>
+</button>
 
-  // Get current price from API
-  let currentPrice = px;
+<!-- Bounty Window -->
+<div id="bounty-win">
+  <div id="bounty-hdr">
+    <div class="b-avatar">🤖</div>
+    <div>
+      <div class="b-name">Bounty</div>
+      <div class="b-status">● Online — Your AI Finance Assistant</div>
+    </div>
+    <div class="b-hdr-btns">
+      <button class="b-hdr-btn" onclick="clearBounty()" title="Clear chat">🗑</button>
+      <button class="b-hdr-btn" onclick="toggleBounty()" title="Close">✕</button>
+    </div>
+  </div>
+  <div id="bounty-msgs"></div>
+  <div class="b-reply-bar" id="b-reply-bar">
+    <span id="b-reply-text"></span>
+    <button class="b-reply-close" onclick="cancelReply()">✕</button>
+  </div>
+  <div class="b-edit-bar" id="b-edit-bar">
+    <span>✏️ Editing message</span>
+    <button onclick="cancelEdit()">✕</button>
+  </div>
+  <div id="bounty-input-wrap">
+    <textarea id="bounty-input" placeholder="Ask Bounty anything about stocks, markets, commodities..." rows="2" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendBounty();}oninput="autoBountyResize(this)"></textarea>
+    <div id="bounty-send-row">
+      <span class="b-footer">Shift+Enter for new line</span>
+      <button id="bounty-send" onclick="sendBounty()">Send ➤</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── QUARTERLY RESULTS ─────────────────────────────────────
+async function loadQuarterly(){
+  if(!curTick) return;
+  const el = document.getElementById('fs-quarterly');
+  if(!el) return;
+  el.innerHTML = '<div class="load"><div class="spin"></div>Loading quarterly results...</div>';
   try {
-    const res = await fetch(`${API}/api/stocks/${ticker}`);
-    const d = await res.json();
-    if (d && d.current_price) currentPrice = d.current_price;
-  } catch(e) {}
-
-  vpTrades.push({
-    ticker, qty, buyPrice: px, currentPrice,
-    signal: sig, addedAt: new Date().toLocaleDateString()
-  });
-
-  localStorage.setItem('vp_trades', JSON.stringify(vpTrades));
-  document.getElementById('vp-modal').style.display = 'none';
-  document.getElementById('vp-tick').value = '';
-  document.getElementById('vp-qty').value = '';
-  document.getElementById('vp-px').value = '';
-  renderVP();
-}
-
-function removeVPTrade(i) {
-  vpTrades.splice(i, 1);
-  localStorage.setItem('vp_trades', JSON.stringify(vpTrades));
-  renderVP();
-}
-
-function clearVP() {
-  if (!confirm('Clear all virtual trades?')) return;
-  vpTrades = [];
-  localStorage.setItem('vp_trades', JSON.stringify(vpTrades));
-  renderVP();
-}
-
-async function refreshVPPrices() {
-  for (let t of vpTrades) {
-    try {
-      const res = await fetch(`${API}/api/stocks/${t.ticker}`);
-      const d = await res.json();
-      if (d && d.current_price) t.currentPrice = d.current_price;
-    } catch(e) {}
+    const data = await api(`/api/stocks/${curTick}/quarterly`);
+    if(!data || !data.length){
+      el.innerHTML = '<div style="color:var(--t3);padding:20px;text-align:center;">No quarterly data available for this stock.</div>';
+      return;
+    }
+    const fmt = v => v!=null?(Math.abs(v)>=1e9?'$'+(v/1e9).toFixed(2)+'B':Math.abs(v)>=1e6?'$'+(v/1e6).toFixed(2)+'M':v.toFixed(2)):'--';
+    const pct = v => v!=null?(v>=0?'+':'')+v.toFixed(1)+'%':'--';
+    el.innerHTML = `
+      <div class="tw"><table>
+        <thead><tr>
+          <th>Quarter</th>
+          <th>Revenue</th>
+          <th>Net Income</th>
+          <th>EPS Actual</th>
+          <th>EPS Estimate</th>
+          <th>Surprise %</th>
+          <th>YoY Growth</th>
+        </tr></thead>
+        <tbody>
+          ${data.map(q=>{
+            const surprise = q.surprise_pct;
+            const yoy = q.revenue_yoy;
+            return `<tr>
+              <td style="font-weight:700;color:var(--cyan);">${q.quarter||'--'}</td>
+              <td class="mono">${fmt(q.revenue)}</td>
+              <td class="mono ${q.net_income>=0?'g':'r'}">${fmt(q.net_income)}</td>
+              <td class="mono">${q.eps_actual!=null?'$'+q.eps_actual.toFixed(2):'--'}</td>
+              <td class="mono" style="color:var(--t3);">${q.eps_estimate!=null?'$'+q.eps_estimate.toFixed(2):'--'}</td>
+              <td class="${surprise>=0?'g':'r'}" style="font-weight:700;">${pct(surprise)}</td>
+              <td class="${yoy>=0?'g':'r'}">${pct(yoy)}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table></div>`;
+  } catch(e){
+    el.innerHTML = '<div style="color:var(--t3);padding:20px;text-align:center;">Error loading quarterly data.</div>';
   }
-  localStorage.setItem('vp_trades', JSON.stringify(vpTrades));
-  renderVP();
 }
 
-function renderVP() {
-  const tbody = document.getElementById('vp-tbody');
-  if (!vpTrades.length) {
-    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;color:var(--t3);padding:20px;font-size:13px;">No virtual trades yet — use AI Stock Finder to get recommendations then add them here</td></tr>';
-    document.getElementById('vp-val').textContent = '$0.00';
-    document.getElementById('vp-inv').textContent = '$0.00';
-    document.getElementById('vp-pnl').textContent = '$0.00';
-    document.getElementById('vp-pnl-pct').textContent = '0.00%';
-    document.getElementById('vp-trades').textContent = '0';
+// ─── BOUNTY AI CHATBOT ─────────────────────────────────────
+let bountyOpen = false;
+let bountyHistory = [];
+let bountyGreeted = false;
+let bountyReplyTo = null;
+let bountyEditId = null;
+let bountyMsgCounter = 0;
+
+function toggleBounty(){
+  bountyOpen = !bountyOpen;
+  const win = document.getElementById('bounty-win');
+  const badge = document.getElementById('bounty-badge');
+  if(bountyOpen){
+    win.classList.add('open');
+    badge.style.display = 'none';
+    document.getElementById('bounty-input').focus();
+    if(!bountyGreeted){ showBountyGreeting(); bountyGreeted = true; }
+  } else {
+    win.classList.remove('open');
+  }
+}
+
+function showBountyGreeting(){
+  const h = new Date().getHours();
+  const greet = h<12?'Good morning':h<17?'Good afternoon':'Good evening';
+  addBountyMsg('ai', `${greet}! 👋 I'm **Bounty**, your AI finance assistant.\n\nI can help you with:\n• 📈 Stock analysis and recommendations\n• 🏗️ Commodity prices and trends\n• 💼 Portfolio advice and strategy\n• 🌍 US market insights and news\n• 📚 Financial concepts explained simply\n\nWhat would you like to know today?`);
+}
+
+function autoBountyResize(el){
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function addBountyMsg(role, text, stocks=[], msgId=null){
+  const msgs = document.getElementById('bounty-msgs');
+  const id = msgId || 'bm-' + (++bountyMsgCounter);
+  const now = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+
+  const formatted = text
+    .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\n/g,'<br>');
+
+  // Build stock list if any
+  let stocksHtml = '';
+  if(stocks && stocks.length > 0 && role === 'ai'){
+    stocksHtml = `<div class="b-stock-list">${stocks.slice(0,8).map(s=>{
+      const chg = s.price_change_pct||0;
+      return `<div class="b-stock-item" onclick="openFS('${s.ticker}')">
+        <div class="bsi-left">
+          <div class="bsi-ticker">${s.ticker}</div>
+          <div class="bsi-name">${(s.company_name||'').substring(0,22)}</div>
+        </div>
+        <div class="bsi-right">
+          <div class="bsi-price">${s.current_price?'$'+s.current_price.toFixed(2):'--'}</div>
+          <div class="bsi-chg ${chg>=0?'g':'r'}">${chg>=0?'▲ +':'▼ '}${Math.abs(chg).toFixed(2)}%</div>
+        </div>
+      </div>`;
+    }).join('')}</div>`;
+  }
+
+  const actionBtns = role === 'user'
+    ? `<button class="b-act" onclick="editBountyMsg('${id}')">✏️ Edit</button>
+       <button class="b-act" onclick="deleteBountyMsg('${id}')">🗑 Delete</button>
+       <button class="b-act" onclick="copyBountyMsg('${id}')">📋 Copy</button>`
+    : `<button class="b-act" onclick="replyBountyMsg('${id}','${text.substring(0,60).replace(/'/g,"\\'")}')">↩️ Reply</button>
+       <button class="b-act" onclick="copyBountyMsg('${id}')">📋 Copy</button>`;
+
+  const div = document.createElement('div');
+  div.className = `bm ${role}`;
+  div.id = id;
+  div.dataset.text = text;
+  div.innerHTML = `
+    <div class="bm-av">${role==='ai'?'🤖':'👤'}</div>
+    <div class="bm-body">
+      <div class="bm-bubble" id="${id}-bubble">${formatted}${stocksHtml}</div>
+      <div class="bm-time">${now}</div>
+      <div class="bm-actions">${actionBtns}</div>
+    </div>`;
+
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return id;
+}
+
+function addBountyTyping(){
+  const msgs = document.getElementById('bounty-msgs');
+  const div = document.createElement('div');
+  div.className = 'bm ai';
+  div.id = 'bounty-typing';
+  div.innerHTML = `<div class="bm-av">🤖</div><div class="b-typing"><span></span><span></span><span></span></div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function removeBountyTyping(){
+  const t = document.getElementById('bounty-typing');
+  if(t) t.remove();
+}
+
+async function sendBounty(){
+  const input = document.getElementById('bounty-input');
+  const text = input.value.trim();
+  if(!text) return;
+
+  // If editing — update message
+  if(bountyEditId){
+    const bubble = document.getElementById(bountyEditId + '-bubble');
+    if(bubble) bubble.innerHTML = text.replace(/\n/g,'<br>');
+    document.getElementById(bountyEditId).dataset.text = text;
+    cancelEdit();
+    input.value = '';
+    input.style.height = 'auto';
     return;
   }
 
-  let totalInvested = 0, totalValue = 0;
+  // Add user message
+  const replyContext = bountyReplyTo ? `[Replying to: "${bountyReplyTo.substring(0,50)}..."] ` : '';
+  const fullText = replyContext + text;
+  addBountyMsg('user', text);
+  bountyHistory.push({role:'user', content: fullText});
+  input.value = '';
+  input.style.height = 'auto';
+  cancelReply();
 
-  tbody.innerHTML = vpTrades.map((t, i) => {
-    const invested = t.qty * t.buyPrice;
-    const value = t.qty * t.currentPrice;
-    const pnl = value - invested;
-    const pnlPct = ((pnl / invested) * 100).toFixed(2);
-    totalInvested += invested;
-    totalValue += value;
-    const cls = pnl >= 0 ? 'g' : 'r';
-    const sigColor = t.signal === 'BUY' ? 'var(--green)' : 'var(--yellow)';
-    return `<tr>
-      <td><span class="sym">${t.ticker}</span></td>
-      <td style="color:var(--t2)">${t.ticker}</td>
-      <td>${t.qty}</td>
-      <td class="mono">$${t.buyPrice.toFixed(2)}</td>
-      <td class="mono">$${t.currentPrice.toFixed(2)}</td>
-      <td class="mono">$${invested.toFixed(2)}</td>
-      <td class="mono">$${value.toFixed(2)}</td>
-      <td class="mono ${cls}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}</td>
-      <td class="${cls}">${pnl >= 0 ? '+' : ''}${pnlPct}%</td>
-      <td style="color:${sigColor};font-weight:800;font-size:11px;">${t.signal}</td>
-      <td style="color:var(--t3);font-size:11px;">${t.addedAt}</td>
-      <td><button onclick="removeVPTrade(${i})" style="background:rgba(255,68,68,0.1);border:1px solid rgba(255,68,68,0.2);border-radius:5px;color:var(--red);font-size:11px;font-weight:700;cursor:pointer;padding:3px 8px;">Remove</button></td>
-    </tr>`;
-  }).join('');
+  // Typing indicator
+  addBountyTyping();
 
-  const totalPnl = totalValue - totalInvested;
-  const totalPnlPct = totalInvested > 0 ? ((totalPnl / totalInvested) * 100).toFixed(2) : '0.00';
-  const cls = totalPnl >= 0 ? 'g' : 'r';
+  try {
+    const res = await fetch(`${API}/agent/recommend`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        query: fullText,
+        chat_history: bountyHistory.slice(-8),
+        portfolio_tickers: watchlist || []
+      })
+    });
+    const data = await res.json();
+    removeBountyTyping();
 
-  document.getElementById('vp-val').textContent = '$' + totalValue.toFixed(2);
-  document.getElementById('vp-inv').textContent = '$' + totalInvested.toFixed(2);
-  const pnlEl = document.getElementById('vp-pnl');
-  pnlEl.textContent = (totalPnl >= 0 ? '+$' : '-$') + Math.abs(totalPnl).toFixed(2);
-  pnlEl.className = 'sc-v ' + cls;
-  document.getElementById('vp-pnl-pct').textContent = (totalPnl >= 0 ? '+' : '') + totalPnlPct + '%';
-  document.getElementById('vp-trades').textContent = vpTrades.length;
+    const intent = data.intent || '';
+    let reply = data.recommendation || "I couldn't find an answer. Could you rephrase your question?";
+    
+    // Only show stocks for stock-discovery intents
+    const showStocks = ['filter_stocks','market_question','commodity_stocks'].includes(intent);
+    const stocks = showStocks ? (data.top_stocks || []) : [];
+
+    addBountyMsg('ai', reply, stocks);
+    bountyHistory.push({role:'assistant', content: reply});
+    if(bountyHistory.length > 24) bountyHistory = bountyHistory.slice(-24);
+
+  } catch(e){
+    removeBountyTyping();
+    addBountyMsg('ai', "Sorry, I'm having trouble connecting right now. Please try again in a moment. 🙏");
+  }
 }
 
-// Init virtual portfolio on load
-renderVP();
-// Refresh prices every 60 seconds
-setInterval(refreshVPPrices, 60000);
+function editBountyMsg(id){
+  const el = document.getElementById(id);
+  if(!el) return;
+  const text = el.dataset.text || '';
+  bountyEditId = id;
+  const input = document.getElementById('bounty-input');
+  input.value = text;
+  input.focus();
+  autoBountyResize(input);
+  document.getElementById('b-edit-bar').style.display = 'flex';
+  document.getElementById('bounty-send').textContent = 'Update ✓';
+}
+
+function cancelEdit(){
+  bountyEditId = null;
+  document.getElementById('b-edit-bar').style.display = 'none';
+  document.getElementById('bounty-send').textContent = 'Send ➤';
+  document.getElementById('bounty-input').value = '';
+  document.getElementById('bounty-input').style.height = 'auto';
+}
+
+function deleteBountyMsg(id){
+  const el = document.getElementById(id);
+  if(el) el.remove();
+}
+
+function copyBountyMsg(id){
+  const el = document.getElementById(id);
+  if(!el) return;
+  const text = el.dataset.text || el.querySelector('.bm-bubble')?.innerText || '';
+  navigator.clipboard.writeText(text).then(()=>{
+    const btn = el.querySelector('.b-act');
+    if(btn){ const orig = btn.textContent; btn.textContent = '✅ Copied'; setTimeout(()=>btn.textContent=orig, 1500); }
+  });
+}
+
+function replyBountyMsg(id, preview){
+  bountyReplyTo = preview;
+  document.getElementById('b-reply-bar').style.display = 'block';
+  document.getElementById('b-reply-text').textContent = '↩️ Replying to: ' + preview;
+  document.getElementById('bounty-input').focus();
+}
+
+function cancelReply(){
+  bountyReplyTo = null;
+  document.getElementById('b-reply-bar').style.display = 'none';
+}
+
+function clearBounty(){
+  document.getElementById('bounty-msgs').innerHTML = '';
+  bountyHistory = [];
+  bountyGreeted = false;
+  showBountyGreeting();
+  bountyGreeted = true;
+}
+
+// Show badge after 4 seconds
+setTimeout(()=>{ if(!bountyOpen) document.getElementById('bounty-badge').style.display='block'; }, 4000);
 </script>
 </body>
 </html>

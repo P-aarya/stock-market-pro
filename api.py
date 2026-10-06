@@ -257,6 +257,83 @@ def get_sectors():
         GROUP BY sector ORDER BY avg_change_pct DESC
     """)
 
+@app.get("/api/stocks/{ticker}/quarterly")
+def get_quarterly(ticker: str):
+    """Fetch quarterly earnings results from yfinance."""
+    try:
+        t = yf.Ticker(ticker.upper())
+        stmt = t.quarterly_income_stmt
+        if stmt is None or stmt.empty:
+            stmt = t.quarterly_financials
+        if stmt is None or stmt.empty:
+            return []
+
+        # Find correct row names (yfinance changes these)
+        def find_row(keys):
+            for k in keys:
+                for idx in stmt.index:
+                    if k.lower() in str(idx).lower():
+                        return str(idx)
+            return None
+
+        rev_key = find_row(['total revenue','revenue'])
+        ni_key = find_row(['net income from continuing operation net minori','net income'])
+        gp_key = find_row(['gross profit'])
+        op_key = find_row(['operating income','ebit'])
+
+        results = []
+        for col in stmt.columns[:8]:
+            try:
+                year = str(col)[:4]
+                month = int(str(col)[5:7]) if len(str(col)) > 6 else 1
+                quarter = f"Q{((month-1)//3)+1} {year}"
+
+                def safe(key):
+                    try:
+                        if key and key in stmt.index:
+                            v = stmt.loc[key, col]
+                            return float(v) if v is not None and str(v) != 'nan' else None
+                    except: pass
+                    return None
+
+                results.append({
+                    "quarter": quarter,
+                    "date": str(col)[:10],
+                    "revenue": safe(rev_key),
+                    "net_income": safe(ni_key),
+                    "gross_profit": safe(gp_key),
+                    "operating_income": safe(op_key),
+                    "eps_actual": None,
+                    "eps_estimate": None,
+                    "surprise_pct": None,
+                    "revenue_yoy": None
+                })
+            except: continue
+
+        # Add EPS from earnings history
+        try:
+            eh = t.earnings_history
+            if eh is not None and not eh.empty:
+                for i, (_, row) in enumerate(eh.iterrows()):
+                    if i < len(results):
+                        ea = row.get('epsActual') or row.get('EPS Actual')
+                        ee = row.get('epsEstimate') or row.get('EPS Estimate')
+                        results[i]['eps_actual'] = float(ea) if ea and str(ea)!='nan' else None
+                        results[i]['eps_estimate'] = float(ee) if ee and str(ee)!='nan' else None
+                        if results[i]['eps_actual'] and results[i]['eps_estimate'] and results[i]['eps_estimate'] != 0:
+                            results[i]['surprise_pct'] = round((results[i]['eps_actual'] - results[i]['eps_estimate']) / abs(results[i]['eps_estimate']) * 100, 1)
+        except: pass
+
+        # YoY revenue growth
+        for i in range(len(results)):
+            if i + 4 < len(results) and results[i]['revenue'] and results[i+4]['revenue']:
+                results[i]['revenue_yoy'] = round((results[i]['revenue'] - results[i+4]['revenue']) / abs(results[i+4]['revenue']) * 100, 1)
+
+        return [r for r in results if r['revenue'] or r['net_income']]
+    except Exception as e:
+        print(f"Quarterly error for {ticker}: {e}")
+        return []
+
 @app.get("/api/stocks/{ticker}/company")
 def get_company_data(ticker: str):
     """Fetch comprehensive company data including financials and shareholders."""
@@ -401,6 +478,44 @@ def get_company_data(ticker: str):
     except Exception as e:
         return {"error": str(e)}
 
+@app.get("/api/stocks/batch")
+def get_stocks_batch(tickers: str = ""):
+    if not tickers:
+        return []
+    ticker_list = [t.strip().upper() for t in tickers.split(',') if t.strip()]
+    if not ticker_list:
+        return []
+    try:
+        conn = get_db()
+        cursor = conn.cursor(dictionary=True)
+        placeholders = ','.join(['%s'] * len(ticker_list))
+        sql = f"SELECT ticker, company_name, current_price, price_change_pct, market_cap FROM stocks_live WHERE ticker IN ({placeholders})"
+        print(f"DEBUG batch SQL: {sql}")
+        print(f"DEBUG batch params: {ticker_list}")
+        cursor.execute(sql, ticker_list)
+        rows = cursor.fetchall()
+        print(f"DEBUG batch rows: {len(rows)}")
+        cursor.close()
+        conn.close()
+        result = []
+        for row in rows:
+            r = {}
+            for k, v in row.items():
+                if v is None:
+                    r[k] = None
+                elif isinstance(v, (int, float)):
+                    r[k] = float(v)
+                elif hasattr(v, 'isoformat'):
+                    r[k] = str(v)
+                else:
+                    r[k] = v
+            result.append(r)
+        print(f"DEBUG batch result: {result[:2]}")
+        return result
+    except Exception as e:
+        print(f"Batch error: {e}")
+        return []
+
 @app.get("/api/stocks/search")
 def search_stocks(q: str = "", limit: int = 10):
     """Search stocks by ticker or company name for autocomplete."""
@@ -490,28 +605,122 @@ def get_currencies():
 
 @app.get("/api/market/commodities")
 def get_commodities():
-    """Fetch live commodity prices."""
+    """Fetch live commodity prices — 100 commodities across all categories."""
     commodities = [
-        {"ticker": "GC=F", "name": "Gold", "category": "metals"},
-        {"ticker": "SI=F", "name": "Silver", "category": "metals"},
-        {"ticker": "PL=F", "name": "Platinum", "category": "metals"},
-        {"ticker": "PA=F", "name": "Palladium", "category": "metals"},
-        {"ticker": "HG=F", "name": "Copper", "category": "metals"},
-        {"ticker": "ALI=F", "name": "Aluminium", "category": "metals"},
-        {"ticker": "CL=F", "name": "Crude Oil (WTI)", "category": "energy"},
-        {"ticker": "BZ=F", "name": "Brent Crude", "category": "energy"},
-        {"ticker": "NG=F", "name": "Natural Gas", "category": "energy"},
-        {"ticker": "RB=F", "name": "Gasoline", "category": "energy"},
-        {"ticker": "ZC=F", "name": "Corn", "category": "agriculture"},
-        {"ticker": "ZW=F", "name": "Wheat", "category": "agriculture"},
-        {"ticker": "ZS=F", "name": "Soybeans", "category": "agriculture"},
-        {"ticker": "KC=F", "name": "Coffee", "category": "agriculture"},
-        {"ticker": "SB=F", "name": "Sugar", "category": "agriculture"},
-        {"ticker": "CT=F", "name": "Cotton", "category": "agriculture"},
-        {"ticker": "CC=F", "name": "Cocoa", "category": "agriculture"},
-        {"ticker": "LE=F", "name": "Live Cattle", "category": "agriculture"},
-        {"ticker": "BTC=F", "name": "Bitcoin Futures", "category": "crypto"},
-        {"ticker": "ETH=F", "name": "Ethereum Futures", "category": "crypto"},
+        # ── PRECIOUS METALS ──
+        {"ticker": "GC=F",  "name": "Gold",              "category": "precious_metals"},
+        {"ticker": "SI=F",  "name": "Silver",             "category": "precious_metals"},
+        {"ticker": "PL=F",  "name": "Platinum",           "category": "precious_metals"},
+        {"ticker": "PA=F",  "name": "Palladium",          "category": "precious_metals"},
+        {"ticker": "MGC=F", "name": "Micro Gold",         "category": "precious_metals"},
+        {"ticker": "SIL=F", "name": "Micro Silver",       "category": "precious_metals"},
+        # ── INDUSTRIAL METALS ──
+        {"ticker": "HG=F",  "name": "Copper",             "category": "metals"},
+        {"ticker": "ALI=F", "name": "Aluminium",          "category": "metals"},
+        {"ticker": "ZN=F",  "name": "Zinc",               "category": "metals"},
+        {"ticker": "PB=F",  "name": "Lead",               "category": "metals"},
+        {"ticker": "NI=F",  "name": "Nickel",             "category": "metals"},
+        {"ticker": "TIN=F", "name": "Tin",                "category": "metals"},
+        {"ticker": "STEEL", "name": "Steel",              "category": "metals"},
+        {"ticker": "IRN=F", "name": "Iron Ore",           "category": "metals"},
+        # ── ENERGY ──
+        {"ticker": "CL=F",  "name": "Crude Oil (WTI)",    "category": "energy"},
+        {"ticker": "BZ=F",  "name": "Brent Crude",        "category": "energy"},
+        {"ticker": "NG=F",  "name": "Natural Gas",        "category": "energy"},
+        {"ticker": "RB=F",  "name": "Gasoline (RBOB)",    "category": "energy"},
+        {"ticker": "HO=F",  "name": "Heating Oil",        "category": "energy"},
+        {"ticker": "QM=F",  "name": "E-mini Crude Oil",   "category": "energy"},
+        {"ticker": "NG=F",  "name": "Henry Hub Gas",      "category": "energy"},
+        {"ticker": "TTF=F", "name": "EU Natural Gas",     "category": "energy"},
+        {"ticker": "XRB=F", "name": "RBOB Gasoline",      "category": "energy"},
+        # ── AGRICULTURE — GRAINS ──
+        {"ticker": "ZC=F",  "name": "Corn",               "category": "agriculture"},
+        {"ticker": "ZW=F",  "name": "Wheat",              "category": "agriculture"},
+        {"ticker": "ZS=F",  "name": "Soybeans",           "category": "agriculture"},
+        {"ticker": "ZM=F",  "name": "Soybean Meal",       "category": "agriculture"},
+        {"ticker": "ZL=F",  "name": "Soybean Oil",        "category": "agriculture"},
+        {"ticker": "ZR=F",  "name": "Rough Rice",         "category": "agriculture"},
+        {"ticker": "ZO=F",  "name": "Oats",               "category": "agriculture"},
+        {"ticker": "KE=F",  "name": "Hard Red Wheat",     "category": "agriculture"},
+        {"ticker": "MWE=F", "name": "Spring Wheat",       "category": "agriculture"},
+        # ── AGRICULTURE — SOFT COMMODITIES ──
+        {"ticker": "KC=F",  "name": "Coffee (Arabica)",   "category": "softs"},
+        {"ticker": "SB=F",  "name": "Sugar No. 11",       "category": "softs"},
+        {"ticker": "CT=F",  "name": "Cotton",             "category": "softs"},
+        {"ticker": "CC=F",  "name": "Cocoa",              "category": "softs"},
+        {"ticker": "OJ=F",  "name": "Orange Juice",       "category": "softs"},
+        {"ticker": "LBS=F", "name": "Lumber",             "category": "softs"},
+        {"ticker": "RC=F",  "name": "Coffee (Robusta)",   "category": "softs"},
+        {"ticker": "RS=F",  "name": "Canola",             "category": "softs"},
+        # ── LIVESTOCK ──
+        {"ticker": "LE=F",  "name": "Live Cattle",        "category": "livestock"},
+        {"ticker": "GF=F",  "name": "Feeder Cattle",      "category": "livestock"},
+        {"ticker": "HE=F",  "name": "Lean Hogs",          "category": "livestock"},
+        {"ticker": "DA=F",  "name": "Class III Milk",     "category": "livestock"},
+        # ── CRYPTO ──
+        {"ticker": "BTC=F", "name": "Bitcoin Futures",    "category": "crypto"},
+        {"ticker": "ETH=F", "name": "Ethereum Futures",   "category": "crypto"},
+        {"ticker": "MBT=F", "name": "Micro Bitcoin",      "category": "crypto"},
+        {"ticker": "MET=F", "name": "Micro Ether",        "category": "crypto"},
+        # ── ENERGY — CLEAN/RENEWABLES (ETF proxies) ──
+        {"ticker": "UNG",   "name": "Natural Gas ETF",    "category": "clean_energy"},
+        {"ticker": "URA",   "name": "Uranium ETF",        "category": "clean_energy"},
+        {"ticker": "ICLN",  "name": "Clean Energy ETF",   "category": "clean_energy"},
+        {"ticker": "FSLR",  "name": "Solar (First Solar)","category": "clean_energy"},
+        {"ticker": "PLUG",  "name": "Hydrogen (Plug Power)","category": "clean_energy"},
+        {"ticker": "LIT",   "name": "Lithium ETF",        "category": "clean_energy"},
+        {"ticker": "REMX",  "name": "Rare Earth ETF",     "category": "clean_energy"},
+        # ── INDICES (commodity related) ──
+        {"ticker": "DJP",   "name": "Bloomberg Commodity","category": "indices"},
+        {"ticker": "GSG",   "name": "S&P GSCI Commodity", "category": "indices"},
+        {"ticker": "PDBC",  "name": "Commodity Index ETF","category": "indices"},
+        {"ticker": "DBC",   "name": "DB Commodity ETF",   "category": "indices"},
+        {"ticker": "COMT",  "name": "iShares Commodity",  "category": "indices"},
+        # ── AGRICULTURE — FERTILIZERS ──
+        {"ticker": "MOS",   "name": "Mosaic (Fertilizer)","category": "agriculture"},
+        {"ticker": "NTR",   "name": "Nutrien (Potash)",   "category": "agriculture"},
+        {"ticker": "CF",    "name": "CF Industries (N)",  "category": "agriculture"},
+        {"ticker": "IPI",   "name": "Intrepid Potash",    "category": "agriculture"},
+        # ── WATER ──
+        {"ticker": "PHO",   "name": "Water ETF",          "category": "water"},
+        {"ticker": "AWK",   "name": "American Water Works","category": "water"},
+        {"ticker": "XYL",   "name": "Xylem (Water Tech)", "category": "water"},
+        {"ticker": "WTRG",  "name": "Essential Utilities","category": "water"},
+        {"ticker": "WM",    "name": "Waste Management",   "category": "water"},
+        # ── TIMBER & PAPER ──
+        {"ticker": "LBS=F", "name": "Lumber Futures",     "category": "timber"},
+        {"ticker": "WOOD",  "name": "Timber ETF",         "category": "timber"},
+        {"ticker": "PCH",   "name": "PotlatchDeltic",     "category": "timber"},
+        {"ticker": "RYN",   "name": "Rayonier (Timber)",  "category": "timber"},
+        {"ticker": "WY",    "name": "Weyerhaeuser",        "category": "timber"},
+        # ── SHIPPING & FREIGHT ──
+        {"ticker": "BDRY",  "name": "Dry Bulk Shipping",  "category": "shipping"},
+        {"ticker": "ZIM",   "name": "ZIM Shipping",        "category": "shipping"},
+        {"ticker": "SBLK",  "name": "Star Bulk Carriers", "category": "shipping"},
+        {"ticker": "GOGL",  "name": "Golden Ocean Group", "category": "shipping"},
+        {"ticker": "DHT",   "name": "DHT Holdings",        "category": "shipping"},
+        # ── CARBON & SUSTAINABILITY ──
+        {"ticker": "KRBN",  "name": "Carbon Credits ETF", "category": "carbon"},
+        {"ticker": "KCCA",  "name": "California Carbon",  "category": "carbon"},
+        {"ticker": "NETZ",  "name": "Net Zero ETF",        "category": "carbon"},
+        {"ticker": "SMOG",  "name": "Clean Cars ETF",      "category": "carbon"},
+        # ── PHYSICAL AI & ROBOTICS ──
+        {"ticker": "BOTZ",  "name": "Robotics & AI ETF",  "category": "physical_ai"},
+        {"ticker": "ROBO",  "name": "Robo Global ETF",    "category": "physical_ai"},
+        {"ticker": "IRBO",  "name": "iShares Robotics",   "category": "physical_ai"},
+        {"ticker": "ARKQ",  "name": "ARK Autonomous ETF", "category": "physical_ai"},
+        {"ticker": "ISRG",  "name": "Intuitive Surgical", "category": "physical_ai"},
+        {"ticker": "ABB",   "name": "ABB Robotics",        "category": "physical_ai"},
+        {"ticker": "TER",   "name": "Teradyne (Robots)",  "category": "physical_ai"},
+        {"ticker": "CGNX",  "name": "Cognex (Machine Vision)","category": "physical_ai"},
+        # ── FOOD & BEVERAGE ──
+        {"ticker": "CORN",  "name": "Corn ETF",            "category": "food"},
+        {"ticker": "WEAT",  "name": "Wheat ETF",           "category": "food"},
+        {"ticker": "SOYB",  "name": "Soybean ETF",         "category": "food"},
+        {"ticker": "CANE",  "name": "Sugar ETF",           "category": "food"},
+        {"ticker": "JO",    "name": "Coffee ETF",          "category": "food"},
+        {"ticker": "NIB",   "name": "Cocoa ETF",           "category": "food"},
+        {"ticker": "BAL",   "name": "Cotton ETF",          "category": "food"},
     ]
     result = []
     for com in commodities:
@@ -935,6 +1144,8 @@ async def run_screener(request: ScreenerRequest):
 
 class RecommendRequest(BaseModel):
     query: str
+    portfolio_tickers: list = []
+    chat_history: list = []
 
 class PortfolioRequest(BaseModel):
     tickers: List[str]
@@ -946,7 +1157,11 @@ class ExplainRequest(BaseModel):
 @app.post("/agent/recommend")
 async def agent_recommend(request: RecommendRequest):
     try:
-        result = run_agent(user_query=request.query)
+        result = run_agent(
+            user_query=request.query,
+            portfolio_tickers=request.portfolio_tickers,
+            chat_history=request.chat_history
+        )
         return {
             "status": "success",
             "query": request.query,

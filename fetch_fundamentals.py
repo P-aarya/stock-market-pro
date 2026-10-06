@@ -6,13 +6,20 @@ import mysql.connector
 from datetime import datetime
 import time
 
+load_dotenv()
+
 # Database connection
-conn = mysql.connector.connect(
-    host=os.getenv("DB_HOST", "localhost"),
-    user=os.getenv("DB_USER", "root"),
-    password=os.getenv("DB_PASSWORD", "Aroot092325"),
-    database=os.getenv("DB_NAME", "stock_market_pro_db")
-)
+db_config = {
+    "host": os.getenv("DB_HOST", "localhost"),
+    "port": int(os.getenv("DB_PORT", 3306)),
+    "user": os.getenv("DB_USER", "root"),
+    "password": os.getenv("DB_PASSWORD", "Aroot092325"),
+    "database": os.getenv("DB_NAME", "stock_market_pro_db")
+}
+if os.getenv("DB_SSL", "false").lower() == "true":
+    db_config["ssl_disabled"] = False
+
+conn = mysql.connector.connect(**db_config)
 cursor = conn.cursor()
 
 # Get all tickers from your existing table
@@ -41,28 +48,36 @@ for i, ticker in enumerate(tickers):
             category = None
 
         cursor.execute("""
-            UPDATE stocks_fundamentals SET
-                market_cap = %s,
-                market_cap_category = %s,
-                revenue_growth = %s,
-                earnings_growth = %s,
-                operating_margin = %s,
-                gross_margin = %s,
-                free_cash_flow = %s,
-                dividend_yield = %s,
-                payout_ratio = %s,
-                beta = %s,
-                fifty_two_week_high = %s,
-                fifty_two_week_low = %s,
-                shares_outstanding = %s,
-                float_shares = %s,
-                short_ratio = %s,
-                recommendation_mean = %s,
-                target_mean_price = %s,
-                peg_ratio = %s,
-                last_updated = %s
-            WHERE ticker = %s
+            INSERT INTO stocks_fundamentals (
+                ticker, market_cap, market_cap_category, revenue_growth,
+                earnings_growth, operating_margin, gross_margin, free_cash_flow,
+                dividend_yield, payout_ratio, beta, fifty_two_week_high,
+                fifty_two_week_low, shares_outstanding, float_shares,
+                short_ratio, recommendation_mean, target_mean_price, peg_ratio,
+                last_updated
+            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            ON DUPLICATE KEY UPDATE
+                market_cap=VALUES(market_cap),
+                market_cap_category=VALUES(market_cap_category),
+                revenue_growth=VALUES(revenue_growth),
+                earnings_growth=VALUES(earnings_growth),
+                operating_margin=VALUES(operating_margin),
+                gross_margin=VALUES(gross_margin),
+                free_cash_flow=VALUES(free_cash_flow),
+                dividend_yield=VALUES(dividend_yield),
+                payout_ratio=VALUES(payout_ratio),
+                beta=VALUES(beta),
+                fifty_two_week_high=VALUES(fifty_two_week_high),
+                fifty_two_week_low=VALUES(fifty_two_week_low),
+                shares_outstanding=VALUES(shares_outstanding),
+                float_shares=VALUES(float_shares),
+                short_ratio=VALUES(short_ratio),
+                recommendation_mean=VALUES(recommendation_mean),
+                target_mean_price=VALUES(target_mean_price),
+                peg_ratio=VALUES(peg_ratio),
+                last_updated=VALUES(last_updated)
         """, (
+            ticker,
             market_cap,
             category,
             info.get("revenueGrowth"),
@@ -81,8 +96,7 @@ for i, ticker in enumerate(tickers):
             info.get("recommendationMean"),
             info.get("targetMeanPrice"),
             info.get("trailingPegRatio"),
-            datetime.now(),
-            ticker
+            datetime.now()
         ))
 
         conn.commit()
