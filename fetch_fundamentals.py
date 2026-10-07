@@ -3,23 +3,14 @@ from dotenv import load_dotenv
 load_dotenv()
 import yfinance as yf
 import mysql.connector
+import db
 from datetime import datetime
 import time
 
 load_dotenv()
 
 # Database connection
-db_config = {
-    "host": os.getenv("DB_HOST", "localhost"),
-    "port": int(os.getenv("DB_PORT", 3306)),
-    "user": os.getenv("DB_USER", "root"),
-    "password": os.getenv("DB_PASSWORD", "Aroot092325"),
-    "database": os.getenv("DB_NAME", "stock_market_pro_db")
-}
-if os.getenv("DB_SSL", "false").lower() == "true":
-    db_config["ssl_disabled"] = False
-
-conn = mysql.connector.connect(**db_config)
+conn = db.get_connection()
 cursor = conn.cursor()
 
 # Get all tickers from your existing table

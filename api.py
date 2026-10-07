@@ -15,7 +15,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = FastAPI(title="Stock Market Pro API")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(",") if o.strip()]
+app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 
 # ── Serve dashboard.html directly from port 8000 ──
 @app.get("/")
@@ -40,7 +41,7 @@ def get_db():
         "host": os.getenv("DB_HOST", "localhost"),
         "port": int(os.getenv("DB_PORT", 3306)),
         "user": os.getenv("DB_USER", "root"),
-        "password": os.getenv("DB_PASSWORD", "Aroot092325"),
+        "password": os.getenv("DB_PASSWORD", ""),
         "database": os.getenv("DB_NAME", "stock_market_pro_db")
     }
     if os.getenv("DB_SSL", "false").lower() == "true":
@@ -863,7 +864,7 @@ def get_divs(limit: int=12):
         SELECT l.ticker,l.company_name,l.sector,l.current_price,l.price_change_pct,d.dividend_yield,d.dividend_rate,a.analyst_rating
         FROM stocks_dividends d JOIN stocks_live l ON d.ticker=l.ticker
         LEFT JOIN stocks_analyst a ON d.ticker=a.ticker
-        WHERE d.dividend_yield IS NOT NULL AND d.dividend_yield>0 AND d.dividend_yield<0.5
+        WHERE d.dividend_yield IS NOT NULL AND d.dividend_yield>0 AND d.dividend_yield<50
         AND l.current_price IS NOT NULL AND (l.sector!='Indices' OR l.sector IS NULL)
         ORDER BY d.dividend_yield DESC LIMIT %s
     """, [limit])
@@ -1124,76 +1125,167 @@ def get_tx_summary():
 # ══════════════════════════════════════════════════════
 # AI AGENT ENDPOINTS
 # ══════════════════════════════════════════════════════
-from agent import run_agent, review_portfolio
-from screener import get_top_movers, get_sector_summary
-from pydantic import BaseModel
-from typing import List
+import logging
+import re
+import threading
+import time
+from collections import defaultdict, deque
+from typing import List, Literal
+
+import groq
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field, field_validator
+
+from agent import run_agent, review_portfolio, explain_single_stock, LLMUnavailable
+from screener import get_top_movers, get_sector_summary, screen_stocks
+
+log = logging.getLogger("uvicorn.error")
+
+TICKER_RE = re.compile(r"^[A-Za-z0-9.\-^=]{1,10}$")
+
+
+def _valid_tickers(values):
+    return [t.strip() for t in values if isinstance(t, str) and TICKER_RE.match(t.strip())]
+
+
+# ── Rate limit for the endpoints that spend LLM quota (per client, sliding 60s window) ──
+AGENT_RATE_LIMIT = int(os.getenv("AGENT_RATE_LIMIT", "20"))
+_agent_hits = defaultdict(deque)
+_agent_hits_lock = threading.Lock()
+
+
+def _client_id(request: Request) -> str:
+    # Behind a proxy or tunnel every request comes from the proxy, so trust its forwarded header
+    forwarded = request.headers.get("cf-connecting-ip") or request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    return forwarded or (request.client.host if request.client else "unknown")
+
+
+def agent_error(status_code: int, message: str) -> JSONResponse:
+    return JSONResponse({"status": "error", "message": message}, status_code=status_code)
+
+
+def check_rate_limit(request: Request):
+    """Returns an error response when the client is over the limit, else None."""
+    now = time.time()
+    key = _client_id(request)
+    with _agent_hits_lock:
+        hits = _agent_hits[key]
+        while hits and now - hits[0] > 60:
+            hits.popleft()
+        if len(hits) >= AGENT_RATE_LIMIT:
+            return agent_error(429, f"You're sending messages too quickly. Please wait a moment (limit {AGENT_RATE_LIMIT} per minute).")
+        hits.append(now)
+        if len(_agent_hits) > 5000:  # drop clients with no recent activity
+            for k in [k for k, v in _agent_hits.items() if not v or now - v[-1] > 60]:
+                del _agent_hits[k]
+    return None
+
+
+def run_ai(call):
+    """Run an AI call and turn failures into short, safe messages (details go to the server log)."""
+    try:
+        return call()
+    except LLMUnavailable:
+        return agent_error(503, "The AI assistant isn't available right now.")
+    except groq.RateLimitError:
+        return agent_error(429, "The AI service is busy. Please try again in a minute.")
+    except groq.APIConnectionError:  # includes timeouts
+        return agent_error(504, "I couldn't reach the AI service in time. Please try again.")
+    except Exception:
+        log.exception("AI endpoint failed")
+        return agent_error(500, "Something went wrong on our side. Please try again.")
+
 
 class ScreenerRequest(BaseModel):
     filters: dict = {}
-    limit: int = 50
+    limit: int = Field(default=50, ge=1, le=200)
 
+
+# Plain `def` endpoints run in FastAPI's thread pool, so slow LLM / database calls
+# do not freeze every other request the way they did inside `async def`.
 @app.post("/api/screener")
-async def run_screener(request: ScreenerRequest):
+def run_screener(request: ScreenerRequest):
     try:
-        from screener import screen_stocks
         results = screen_stocks(request.filters, limit=request.limit)
         return results or []
-    except Exception as e:
+    except Exception:
+        log.exception("Screener failed")
         return []
 
+
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(max_length=2000)
+
+
 class RecommendRequest(BaseModel):
-    query: str
-    portfolio_tickers: list = []
-    chat_history: list = []
+    query: str = Field(min_length=1, max_length=500)
+    portfolio_tickers: List[str] = Field(default_factory=list, max_length=30)
+    chat_history: List[ChatMessage] = Field(default_factory=list, max_length=20)
+    reply_to: str = Field(default="", max_length=300)
+
+    @field_validator("portfolio_tickers")
+    @classmethod
+    def only_valid_tickers(cls, v):
+        return _valid_tickers(v)
+
 
 class PortfolioRequest(BaseModel):
-    tickers: List[str]
+    tickers: List[str] = Field(max_length=30)
+
+    @field_validator("tickers")
+    @classmethod
+    def only_valid_tickers(cls, v):
+        return _valid_tickers(v)
+
 
 class ExplainRequest(BaseModel):
-    ticker: str
-    query: str = ""
+    ticker: str = Field(pattern=r"^[A-Za-z0-9.\-^=]{1,10}$")
+    query: str = Field(default="", max_length=500)
+
 
 @app.post("/agent/recommend")
-async def agent_recommend(request: RecommendRequest):
-    try:
+def agent_recommend(request: Request, body: RecommendRequest):
+    limited = check_rate_limit(request)
+    if limited:
+        return limited
+
+    def call():
         result = run_agent(
-            user_query=request.query,
-            portfolio_tickers=request.portfolio_tickers,
-            chat_history=request.chat_history
+            user_query=body.query.strip(),
+            portfolio_tickers=body.portfolio_tickers,
+            chat_history=[m.model_dump() for m in body.chat_history],
+            reply_to=body.reply_to.strip(),
         )
         return {
             "status": "success",
-            "query": request.query,
+            "query": body.query,
             "intent": result.get("intent"),
             "stocks_found": result["stocks_found"],
             "recommendation": result["recommendation"],
             "top_stocks": result["top_stocks"],
             "all_stocks": result["all_stocks"]
         }
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+    return run_ai(call)
+
 
 @app.post("/agent/explain-stock")
-async def agent_explain_stock(request: ExplainRequest):
-    try:
-        from agent import explain_single_stock
-        explanation = explain_single_stock(request.ticker, request.query)
-        return {"status": "success", "ticker": request.ticker, "explanation": explanation}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+def agent_explain_stock(request: Request, body: ExplainRequest):
+    limited = check_rate_limit(request)
+    if limited:
+        return limited
+    return run_ai(lambda: {"status": "success", "ticker": body.ticker,
+                           "explanation": explain_single_stock(body.ticker, body.query)})
+
 
 @app.post("/agent/portfolio-review")
-async def agent_portfolio_review(request: PortfolioRequest):
-    try:
-        review = review_portfolio(tickers=request.tickers)
-        return {
-            "status": "success",
-            "tickers_reviewed": request.tickers,
-            "review": review
-        }
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+def agent_portfolio_review(request: Request, body: PortfolioRequest):
+    limited = check_rate_limit(request)
+    if limited:
+        return limited
+    return run_ai(lambda: {"status": "success", "tickers_reviewed": body.tickers,
+                           "review": review_portfolio(tickers=body.tickers)})
 
 @app.get("/api/market/signals")
 async def market_signals():
@@ -1202,9 +1294,9 @@ async def market_signals():
         cursor = conn.cursor(dictionary=True)
         cursor.execute("""
             SELECT l.sector,
-                SUM(CASE WHEN p.buy_signal = 'BUY' THEN 1 ELSE 0 END) as buy_count,
-                SUM(CASE WHEN p.buy_signal = 'HOLD' THEN 1 ELSE 0 END) as hold_count,
-                SUM(CASE WHEN p.buy_signal = 'SELL' THEN 1 ELSE 0 END) as sell_count
+                SUM(CASE WHEN p.buy_signal IN ('Buy','Strong Buy') THEN 1 ELSE 0 END) as buy_count,
+                SUM(CASE WHEN p.buy_signal = 'Hold' THEN 1 ELSE 0 END) as hold_count,
+                SUM(CASE WHEN p.buy_signal IN ('Sell','Strong Sell') THEN 1 ELSE 0 END) as sell_count
             FROM stocks_live l
             JOIN stocks_predictions p ON l.ticker = p.ticker
             WHERE l.sector IS NOT NULL

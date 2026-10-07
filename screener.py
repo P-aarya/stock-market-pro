@@ -7,7 +7,7 @@ def get_db_connection():
     config = {
         "host": os.getenv("DB_HOST", "localhost"),
         "user": os.getenv("DB_USER", "root"),
-        "password": os.getenv("DB_PASSWORD", "Aroot092325"),
+        "password": os.getenv("DB_PASSWORD", ""),
         "database": os.getenv("DB_NAME", "stock_market_pro_db"),
         "port": int(os.getenv("DB_PORT", 3306))
     }
@@ -15,7 +15,48 @@ def get_db_connection():
         config["ssl_disabled"] = False
     return mysql.connector.connect(**config)
 
+# The prediction model stores Strong Buy / Buy / Hold / Sell / Strong Sell.
+# A filter of BUY or SELL should match both strengths of that direction.
+SIGNAL_GROUPS = {
+    "BUY": ["Buy", "Strong Buy"],
+    "SELL": ["Sell", "Strong Sell"],
+    "HOLD": ["Hold"],
+}
+
+RANGE_FILTERS = {
+    "current_price", "market_cap", "pe_ratio", "forward_pe", "peg_ratio", "revenue_growth",
+    "earnings_growth", "profit_margin", "operating_margin", "roe", "debt_to_equity",
+    "dividend_yield", "beta", "price_change_pct",
+}
+TEXT_FILTERS = {"sector", "market_cap_category", "buy_signal", "trend"}
+FLAG_FILTERS = {"positive_fcf", "pays_dividend"}
+
+
+def clean_filters(filters) -> dict:
+    """Keep only well-formed filters. The filters usually come from an LLM, so never trust their shape."""
+    if not isinstance(filters, dict):
+        return {}
+    cleaned = {}
+    for key, value in filters.items():
+        if key in RANGE_FILTERS and isinstance(value, dict):
+            bounds = {}
+            for bound in ("min", "max"):
+                try:
+                    if value.get(bound) is not None:
+                        bounds[bound] = float(value[bound])
+                except (TypeError, ValueError):
+                    pass
+            if bounds:
+                cleaned[key] = bounds
+        elif key in TEXT_FILTERS and isinstance(value, str) and value.strip():
+            cleaned[key] = value.strip()
+        elif key in FLAG_FILTERS and value:
+            cleaned[key] = True
+    return cleaned
+
+
 def screen_stocks(filters: dict, limit: int = 30):
+    filters = clean_filters(filters)
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
 
@@ -56,7 +97,9 @@ def screen_stocks(filters: dict, limit: int = 30):
             COALESCE(p.momentum_score, 0) as momentum_score,
             COALESCE(p.confidence_pct, 0) as confidence_pct,
             COALESCE(p.prob_up_1w, 0.5) as prob_up_1w,
-            COALESCE(p.risk_level, 'Medium') as risk_level
+            COALESCE(p.risk_level, 'Medium') as risk_level,
+            l.last_updated as price_updated,
+            p.run_date as prediction_date
         FROM stocks_fundamentals f
         JOIN stocks_live l ON f.ticker = l.ticker
         LEFT JOIN stocks_predictions p ON f.ticker = p.ticker
@@ -204,8 +247,9 @@ def screen_stocks(filters: dict, limit: int = 30):
 
     # Buy signal
     if "buy_signal" in filters:
-        query += " AND p.buy_signal = %s"
-        params.append(filters["buy_signal"])
+        signals = SIGNAL_GROUPS.get(str(filters["buy_signal"]).strip().upper(), [filters["buy_signal"]])
+        query += " AND p.buy_signal IN (" + ",".join(["%s"] * len(signals)) + ")"
+        params.extend(signals)
 
     # Trend
     if "trend" in filters:
@@ -216,38 +260,37 @@ def screen_stocks(filters: dict, limit: int = 30):
     if filters.get("positive_fcf"):
         query += " AND f.free_cash_flow > 0"
 
-    # Pays dividends
-    if filters.get("pays_dividend"):
+    # Pays dividends (a dividend_yield minimum of 0 also means "must pay one")
+    dy_min = (filters.get("dividend_yield") or {}).get("min")
+    if filters.get("pays_dividend") or (dy_min is not None and dy_min <= 0):
         query += " AND f.dividend_yield > 0"
 
     # Order: prioritise stocks with prediction data, then by momentum, then price change
-    query += """
+    # When asked for BUY or SELL, put the strongest conviction first
+    # (Strong Buy before Buy, Strong Sell before Sell), then rank by momentum.
+    signal_rank = ""
+    direction = str(filters.get("buy_signal", "")).strip().upper()
+    if direction in ("BUY", "SELL"):
+        strong = "Strong Buy" if direction == "BUY" else "Strong Sell"
+        signal_rank = f"CASE WHEN p.buy_signal = '{strong}' THEN 0 ELSE 1 END,"
+
+    query += f"""
         ORDER BY 
+            {signal_rank}
             CASE WHEN p.momentum_score IS NOT NULL THEN 0 ELSE 1 END,
             COALESCE(p.momentum_score, 0) DESC,
             l.price_change_pct DESC
     """
 
-    query += f" LIMIT {limit}"
+    query += " LIMIT %s"
+    params.append(int(limit))
 
     cursor.execute(query, params)
     results = cursor.fetchall()
 
     # Auto-broaden: if fewer than 5 results, retry with relaxed filters
     if len(results) < 5 and filters:
-        relaxed = {}
-        # Keep only the most important filter
-        for key in ["current_price", "sector", "market_cap_category"]:
-            if key in filters:
-                relaxed[key] = filters[key]
-                break
-        if relaxed != filters:
-            cursor.execute(query.replace(
-                "WHERE l.current_price IS NOT NULL\n        AND l.current_price > 0",
-                "WHERE l.current_price IS NOT NULL AND l.current_price > 0"
-            ), params)
-
-        # Full fallback — just return best stocks broadly
+        # Fallback — just return best stocks broadly
         cursor.execute("""
             SELECT 
                 f.ticker, l.company_name, l.sector, l.current_price, l.price_change_pct,
@@ -264,7 +307,9 @@ def screen_stocks(filters: dict, limit: int = 30):
                 COALESCE(p.momentum_score, 0) as momentum_score,
                 COALESCE(p.confidence_pct, 0) as confidence_pct,
                 COALESCE(p.prob_up_1w, 0.5) as prob_up_1w,
-                COALESCE(p.risk_level, 'Medium') as risk_level
+                COALESCE(p.risk_level, 'Medium') as risk_level,
+                l.last_updated as price_updated,
+                p.run_date as prediction_date
             FROM stocks_fundamentals f
             JOIN stocks_live l ON f.ticker = l.ticker
             LEFT JOIN stocks_predictions p ON f.ticker = p.ticker
@@ -362,7 +407,9 @@ def get_stock_snapshot(ticker: str):
                COALESCE(p.confidence_pct,0) as confidence_pct,
                COALESCE(p.prob_up_1w,0.5) as prob_up_1w,
                COALESCE(p.risk_level,'Medium') as risk_level,
-               p.key_factors
+               p.key_factors,
+               l.last_updated as price_updated,
+               p.run_date as prediction_date
         FROM stocks_fundamentals f
         JOIN stocks_live l ON f.ticker = l.ticker
         LEFT JOIN stocks_predictions p ON f.ticker = p.ticker

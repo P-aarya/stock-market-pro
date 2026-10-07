@@ -232,7 +232,12 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 .ai-result{background:var(--bg3);border:1px solid var(--b2);border-radius:10px;padding:16px 18px;margin-top:12px;display:none;}
 .ai-result.show{display:block;}
 .ai-result-title{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--cyan);margin-bottom:10px;}
-.ai-result-text{font-size:13px;font-weight:500;color:var(--t2);line-height:1.7;white-space:pre-wrap;}
+.ai-result-text{font-size:13px;font-weight:500;color:var(--t2);line-height:1.7;}
+.ai-result-text p,#explain-result-text p,.bm-bubble p{margin:0 0 8px;}
+.ai-result-text p:last-child,#explain-result-text p:last-child,.bm-bubble p:last-child{margin-bottom:0;}
+.ai-result-text ul,#explain-result-text ul,.bm-bubble ul{margin:0 0 8px 18px;padding:0;}
+.ai-result-text li,#explain-result-text li,.bm-bubble li{margin:2px 0;}
+.ai-result-text strong,#explain-result-text strong,.bm-bubble strong{color:var(--t1);font-weight:700;}
 .ai-meta{display:flex;gap:12px;margin-top:10px;flex-wrap:wrap;}
 .ai-meta-item{font-size:11px;font-weight:600;color:var(--t3);background:var(--bg2);border-radius:5px;padding:4px 10px;}
 .ai-stocks-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-top:12px;}
@@ -343,7 +348,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
         <div class="ai-loading" id="explain-loading" style="margin-top:10px;"><div class="spin"></div>AI is analysing this stock...</div>
         <div id="explain-result" style="display:none;margin-top:12px;background:var(--bg2);border:1px solid var(--b2);border-radius:10px;padding:16px 18px;">
           <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--cyan);margin-bottom:10px;">🤖 Stock Explanation</div>
-          <div id="explain-result-text" style="font-size:13px;font-weight:500;color:var(--t2);line-height:1.7;white-space:pre-wrap;"></div>
+          <div id="explain-result-text" style="font-size:13px;font-weight:500;color:var(--t2);line-height:1.7;"></div>
         </div>
       </div>
     </div>
@@ -1281,7 +1286,7 @@ async function loadCharts(){
   try {
 
   if(divs&&divs.length){
-    mkC('div-c',{type:'bar',data:{labels:divs.map(d=>d.ticker),datasets:[{data:divs.map(d=>+(d.dividend_yield*100).toFixed(2)),backgroundColor:'rgba(0,230,118,0.65)',borderRadius:4,borderWidth:0}]},
+    mkC('div-c',{type:'bar',data:{labels:divs.map(d=>d.ticker),datasets:[{data:divs.map(d=>+(+d.dividend_yield).toFixed(2)),backgroundColor:'rgba(0,230,118,0.65)',borderRadius:4,borderWidth:0}]},
       options:{responsive:true,maintainAspectRatio:false,onClick:(_,els)=>{if(els[0])openStock(divs[els[0].index].ticker);},
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw+'% yield'}}},
       scales:{x:{ticks:{color:'#c0cce0',font:{size:10}},grid:{display:false}},y:{ticks:{color:'#58697a',callback:v=>v+'%'},grid:{color:'rgba(28,28,48,0.7)'}}}}});
@@ -1822,7 +1827,7 @@ async function openStock(ticker){
   ].join('');
 
   document.getElementById('fs-div').innerHTML=[
-    mi('Div Yield',d.dividend_yield?f2(d.dividend_yield*100)+'%':'--','g'),
+    mi('Div Yield',d.dividend_yield?f2(d.dividend_yield)+'%':'--','g'),
     mi('Div Rate',d.dividend_rate?'$'+f2(d.dividend_rate):'--'),
     mi('Payout Ratio',d.payout_ratio?f2(d.payout_ratio*100)+'%':'--'),
     mi('Ex-Div Date',d.ex_dividend_date||'N/A'),
@@ -2944,7 +2949,7 @@ async function runManualScreener(){
   if(revMin) filters.revenue_growth = {min: parseFloat(revMin)/100};
   if(marginMin) filters.profit_margin = {min: parseFloat(marginMin)/100};
   if(debtMax) filters.debt_to_equity = {max: parseFloat(debtMax)};
-  if(divMin) filters.dividend_yield = {min: parseFloat(divMin)/100};
+  if(divMin) filters.dividend_yield = {min: parseFloat(divMin)};
   if(betaMax) filters.beta = {max: parseFloat(betaMax)};
 
   try {
@@ -3043,9 +3048,9 @@ async function runAI() {
     });
     const data = await res.json();
 
-    if (data.status === 'error') throw new Error(data.message);
+    if (!res.ok || data.status === 'error') throw new Error(data.message || 'Please try again with a shorter question.');
 
-    document.getElementById('ai-result-text').textContent = data.recommendation;
+    document.getElementById('ai-result-text').innerHTML = renderMarkdown(data.recommendation);
 
     // Meta info
     const meta = document.getElementById('ai-meta');
@@ -3121,8 +3126,8 @@ async function explainSelectedStock() {
       body: JSON.stringify({ ticker, query: aiLastQuery })
     });
     const data = await res.json();
-    if (data.status === 'error') throw new Error(data.message);
-    resultText.textContent = data.explanation;
+    if (!res.ok || data.status === 'error') throw new Error(data.message || 'Please try again with a shorter question.');
+    resultText.innerHTML = renderMarkdown(data.explanation);
     result.style.display = 'block';
   } catch (e) {
     resultText.textContent = 'Error: ' + e.message;
@@ -3153,9 +3158,9 @@ async function runPfReview() {
     });
     const data = await res.json();
 
-    if (data.status === 'error') throw new Error(data.message);
+    if (!res.ok || data.status === 'error') throw new Error(data.message || 'Please try again with a shorter question.');
 
-    document.getElementById('pf-ai-result-text').textContent = data.review;
+    document.getElementById('pf-ai-result-text').innerHTML = renderMarkdown(data.review);
     result.classList.add('show');
   } catch (e) {
     document.getElementById('pf-ai-result-text').textContent = 'Error: ' + e.message;
@@ -3271,7 +3276,7 @@ function loadPortfolioTickers() {
     <button onclick="cancelEdit()">✕</button>
   </div>
   <div id="bounty-input-wrap">
-    <textarea id="bounty-input" placeholder="Ask Bounty anything about stocks, markets, commodities..." rows="2" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendBounty();}oninput="autoBountyResize(this)"></textarea>
+    <textarea id="bounty-input" placeholder="Ask Bounty anything about stocks, markets, commodities..." rows="2" onkeydown="bountyKey(event)" oninput="autoBountyResize(this)"></textarea>
     <div id="bounty-send-row">
       <span class="b-footer">Shift+Enter for new line</span>
       <button id="bounty-send" onclick="sendBounty()">Send ➤</button>
@@ -3327,12 +3332,76 @@ async function loadQuarterly(){
 }
 
 // ─── BOUNTY AI CHATBOT ─────────────────────────────────────
+const BOUNTY_STORE = 'bounty_chat_v1';
+const BOUNTY_MAX_SAVED = 40;
+const BOUNTY_TIMEOUT_MS = 60000;
+
 let bountyOpen = false;
-let bountyHistory = [];
-let bountyGreeted = false;
-let bountyReplyTo = null;
+let bountyMsgs = [];          // [{id, role:'user'|'ai', text, stocks, time, greeting?, error?}]
+let bountyReplyTo = null;     // text of the message being replied to
 let bountyEditId = null;
 let bountyMsgCounter = 0;
+let bountySending = false;
+
+function escapeHtml(str){
+  return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Safe mini-markdown for AI output: **bold**, *italic*, "- " bullets, "# " headings, paragraphs.
+// Everything is HTML-escaped first, so model or user text can never inject markup.
+function renderMarkdown(text){
+  const inline = s => escapeHtml(s)
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/(^|[^\w*])\*(?!\s)([^*\n]+?)\*(?![\w*])/g,'$1<em>$2</em>');
+  const out = [];
+  let inList = false;
+  const closeList = () => { if(inList){ out.push('</ul>'); inList = false; } };
+  for(const raw of String(text ?? '').split('\n')){
+    const line = raw.trimEnd();
+    let m;
+    if(!line.trim()){ closeList(); continue; }
+    if((m = line.match(/^\s*[-*•]\s+(.*)$/))){
+      if(!inList){ out.push('<ul>'); inList = true; }
+      out.push(`<li>${inline(m[1])}</li>`);
+    } else if((m = line.match(/^\s*#{1,4}\s+(.*)$/))){
+      closeList(); out.push(`<p><strong>${inline(m[1])}</strong></p>`);
+    } else {
+      closeList(); out.push(`<p>${inline(line.trim())}</p>`);
+    }
+  }
+  closeList();
+  return out.join('');
+}
+const formatBountyText = renderMarkdown;
+
+function bountyFindMsg(id){ return bountyMsgs.find(m => m.id === id); }
+
+function saveBounty(){
+  try {
+    const slim = bountyMsgs.slice(-BOUNTY_MAX_SAVED).map(m => ({
+      ...m,
+      stocks: (m.stocks || []).slice(0,8).map(s => ({
+        ticker:s.ticker, company_name:s.company_name, current_price:s.current_price, price_change_pct:s.price_change_pct
+      }))
+    }));
+    localStorage.setItem(BOUNTY_STORE, JSON.stringify(slim));
+  } catch(e) {}
+}
+
+function loadBounty(){
+  try {
+    const saved = JSON.parse(localStorage.getItem(BOUNTY_STORE) || '[]');
+    return Array.isArray(saved) ? saved.filter(m => m && typeof m.text === 'string' && (m.role === 'user' || m.role === 'ai')) : [];
+  } catch(e) { return []; }
+}
+
+// The conversation the backend sees: no greeting, no error bubbles, last 8 messages.
+function bountyHistoryForApi(){
+  return bountyMsgs
+    .filter(m => !m.greeting && !m.error)
+    .slice(-8)
+    .map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.text.slice(0, 2000) }));
+}
 
 function toggleBounty(){
   bountyOpen = !bountyOpen;
@@ -3342,16 +3411,28 @@ function toggleBounty(){
     win.classList.add('open');
     badge.style.display = 'none';
     document.getElementById('bounty-input').focus();
-    if(!bountyGreeted){ showBountyGreeting(); bountyGreeted = true; }
+    initBountyChat();
   } else {
     win.classList.remove('open');
+  }
+}
+
+function initBountyChat(){
+  if(document.getElementById('bounty-msgs').childElementCount > 0) return;
+  const saved = loadBounty();
+  if(saved.length){
+    bountyMsgs = saved;
+    bountyMsgCounter = Math.max(0, ...saved.map(m => parseInt(String(m.id).replace('bm-',''), 10) || 0));
+    saved.forEach(renderBountyMsg);
+  } else {
+    showBountyGreeting();
   }
 }
 
 function showBountyGreeting(){
   const h = new Date().getHours();
   const greet = h<12?'Good morning':h<17?'Good afternoon':'Good evening';
-  addBountyMsg('ai', `${greet}! 👋 I'm **Bounty**, your AI finance assistant.\n\nI can help you with:\n• 📈 Stock analysis and recommendations\n• 🏗️ Commodity prices and trends\n• 💼 Portfolio advice and strategy\n• 🌍 US market insights and news\n• 📚 Financial concepts explained simply\n\nWhat would you like to know today?`);
+  addBountyMsg('ai', `${greet}! 👋 I'm **Bounty**, your AI finance assistant.\n\nI can help you with:\n• 📈 Stock analysis and recommendations\n• ⚖️ Side-by-side stock comparisons\n• 🏗️ Commodity prices and linked stocks\n• 💼 Portfolio advice based on your watchlist\n• 🌍 Market and economy questions, using live indicators\n• 📚 Financial concepts explained simply\n\nWhat would you like to know today?`, [], {greeting:true});
 }
 
 function autoBountyResize(el){
@@ -3359,58 +3440,71 @@ function autoBountyResize(el){
   el.style.height = Math.min(el.scrollHeight, 120) + 'px';
 }
 
-function addBountyMsg(role, text, stocks=[], msgId=null){
+function bountyKey(e){
+  if(e.key === 'Enter' && !e.shiftKey && !e.isComposing){
+    e.preventDefault();
+    sendBounty();
+  }
+}
+
+function renderBountyMsg(m){
   const msgs = document.getElementById('bounty-msgs');
-  const id = msgId || 'bm-' + (++bountyMsgCounter);
-  const now = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
 
-  const formatted = text
-    .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
-    .replace(/\n/g,'<br>');
-
-  // Build stock list if any
   let stocksHtml = '';
-  if(stocks && stocks.length > 0 && role === 'ai'){
-    stocksHtml = `<div class="b-stock-list">${stocks.slice(0,8).map(s=>{
-      const chg = s.price_change_pct||0;
-      return `<div class="b-stock-item" onclick="openFS('${s.ticker}')">
+  if(m.stocks && m.stocks.length > 0 && m.role === 'ai'){
+    stocksHtml = `<div class="b-stock-list">${m.stocks.slice(0,8).map(s=>{
+      const chg = Number(s.price_change_pct) || 0;
+      const px = Number(s.current_price);
+      return `<div class="b-stock-item" data-ticker="${escapeHtml(s.ticker)}" onclick="openFS(this.dataset.ticker)">
         <div class="bsi-left">
-          <div class="bsi-ticker">${s.ticker}</div>
-          <div class="bsi-name">${(s.company_name||'').substring(0,22)}</div>
+          <div class="bsi-ticker">${escapeHtml(s.ticker)}</div>
+          <div class="bsi-name">${escapeHtml((s.company_name||'').substring(0,22))}</div>
         </div>
         <div class="bsi-right">
-          <div class="bsi-price">${s.current_price?'$'+s.current_price.toFixed(2):'--'}</div>
+          <div class="bsi-price">${px ? '$'+px.toFixed(2) : '--'}</div>
           <div class="bsi-chg ${chg>=0?'g':'r'}">${chg>=0?'▲ +':'▼ '}${Math.abs(chg).toFixed(2)}%</div>
         </div>
       </div>`;
     }).join('')}</div>`;
   }
 
-  const actionBtns = role === 'user'
-    ? `<button class="b-act" onclick="editBountyMsg('${id}')">✏️ Edit</button>
-       <button class="b-act" onclick="deleteBountyMsg('${id}')">🗑 Delete</button>
-       <button class="b-act" onclick="copyBountyMsg('${id}')">📋 Copy</button>`
-    : `<button class="b-act" onclick="replyBountyMsg('${id}','${text.substring(0,60).replace(/'/g,"\\'")}')">↩️ Reply</button>
-       <button class="b-act" onclick="copyBountyMsg('${id}')">📋 Copy</button>`;
+  // Buttons only carry the message id; the text is looked up when clicked.
+  const actionBtns = m.role === 'user'
+    ? `<button class="bm-act" onclick="editBountyMsg('${m.id}')">✏️ Edit</button>
+       <button class="bm-act" onclick="deleteBountyMsg('${m.id}')">🗑 Delete</button>
+       <button class="bm-act" onclick="copyBountyMsg('${m.id}', this)">📋 Copy</button>`
+    : `<button class="bm-act" onclick="replyBountyMsg('${m.id}')">↩️ Reply</button>
+       <button class="bm-act" onclick="copyBountyMsg('${m.id}', this)">📋 Copy</button>`;
 
   const div = document.createElement('div');
-  div.className = `bm ${role}`;
-  div.id = id;
-  div.dataset.text = text;
+  div.className = `bm ${m.role}`;
+  div.id = m.id;
   div.innerHTML = `
-    <div class="bm-av">${role==='ai'?'🤖':'👤'}</div>
+    <div class="bm-av">${m.role==='ai'?'🤖':'👤'}</div>
     <div class="bm-body">
-      <div class="bm-bubble" id="${id}-bubble">${formatted}${stocksHtml}</div>
-      <div class="bm-time">${now}</div>
+      <div class="bm-bubble" id="${m.id}-bubble"${m.error ? ' style="border:1px solid rgba(255,68,68,0.5)"' : ''}>${formatBountyText(m.text)}${stocksHtml}</div>
+      <div class="bm-time">${escapeHtml(m.time)}</div>
       <div class="bm-actions">${actionBtns}</div>
     </div>`;
-
   msgs.appendChild(div);
   msgs.scrollTop = msgs.scrollHeight;
-  return id;
+}
+
+function addBountyMsg(role, text, stocks=[], opts={}){
+  const m = {
+    id: 'bm-' + (++bountyMsgCounter),
+    role, text, stocks: stocks || [],
+    time: new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),
+    ...opts
+  };
+  bountyMsgs.push(m);
+  renderBountyMsg(m);
+  saveBounty();
+  return m.id;
 }
 
 function addBountyTyping(){
+  removeBountyTyping();
   const msgs = document.getElementById('bounty-msgs');
   const div = document.createElement('div');
   div.className = 'bm ai';
@@ -3425,71 +3519,101 @@ function removeBountyTyping(){
   if(t) t.remove();
 }
 
+function setBountySending(on){
+  bountySending = on;
+  const btn = document.getElementById('bounty-send');
+  btn.disabled = on;
+  btn.style.opacity = on ? '0.5' : '';
+  btn.textContent = on ? 'Thinking…' : (bountyEditId ? 'Update ✓' : 'Send ➤');
+}
+
 async function sendBounty(){
+  if(bountySending) return;
   const input = document.getElementById('bounty-input');
   const text = input.value.trim();
   if(!text) return;
 
-  // If editing — update message
+  let replyTo = '';
   if(bountyEditId){
+    // Editing re-asks the question: the edited message and everything after it are replaced.
+    const idx = bountyMsgs.findIndex(m => m.id === bountyEditId);
+    if(idx === -1){ cancelEdit(); return; }
+    bountyMsgs.slice(idx + 1).forEach(m => { const el = document.getElementById(m.id); if(el) el.remove(); });
+    bountyMsgs = bountyMsgs.slice(0, idx + 1);
+    bountyMsgs[idx].text = text;
     const bubble = document.getElementById(bountyEditId + '-bubble');
-    if(bubble) bubble.innerHTML = text.replace(/\n/g,'<br>');
-    document.getElementById(bountyEditId).dataset.text = text;
+    if(bubble) bubble.innerHTML = formatBountyText(text);
     cancelEdit();
-    input.value = '';
-    input.style.height = 'auto';
-    return;
+  } else {
+    replyTo = bountyReplyTo || '';
+    addBountyMsg('user', text);
   }
-
-  // Add user message
-  const replyContext = bountyReplyTo ? `[Replying to: "${bountyReplyTo.substring(0,50)}..."] ` : '';
-  const fullText = replyContext + text;
-  addBountyMsg('user', text);
-  bountyHistory.push({role:'user', content: fullText});
+  saveBounty();
   input.value = '';
   input.style.height = 'auto';
   cancelReply();
 
-  // Typing indicator
+  await askBounty(text, replyTo);
+}
+
+async function askBounty(text, replyTo){
+  setBountySending(true);
   addBountyTyping();
 
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), BOUNTY_TIMEOUT_MS);
   try {
+    // The question itself is the last message in the log; send only what came before it as history.
+    const history = bountyHistoryForApi().slice(0, -1);
     const res = await fetch(`${API}/agent/recommend`, {
       method:'POST',
       headers:{'Content-Type':'application/json'},
+      signal: controller.signal,
       body: JSON.stringify({
-        query: fullText,
-        chat_history: bountyHistory.slice(-8),
-        portfolio_tickers: watchlist || []
+        query: text.slice(0, 500),
+        chat_history: history,
+        portfolio_tickers: (watchlist || []).slice(0, 30),
+        reply_to: replyTo.slice(0, 300)
       })
     });
-    const data = await res.json();
+
+    let data = null;
+    try { data = await res.json(); } catch(e) {}
     removeBountyTyping();
 
-    const intent = data.intent || '';
-    let reply = data.recommendation || "I couldn't find an answer. Could you rephrase your question?";
-    
-    // Only show stocks for stock-discovery intents
-    const showStocks = ['filter_stocks','market_question','commodity_stocks'].includes(intent);
-    const stocks = showStocks ? (data.top_stocks || []) : [];
+    if(!res.ok || !data || data.status === 'error'){
+      const msg = (data && data.message) || (res.status === 422
+        ? "I couldn't process that message. Please keep it under 500 characters."
+        : "Something went wrong. Please try again.");
+      addBountyMsg('ai', '⚠️ ' + msg, [], {error:true});
+      return;
+    }
 
-    addBountyMsg('ai', reply, stocks);
-    bountyHistory.push({role:'assistant', content: reply});
-    if(bountyHistory.length > 24) bountyHistory = bountyHistory.slice(-24);
+    const intent = data.intent || '';
+    const reply = data.recommendation || "I couldn't find an answer. Could you rephrase your question?";
+
+    // Only show stock cards for intents that return a list of stocks
+    const showStocks = ['filter_stocks','market_question','commodity_stocks','commodity','compare'].includes(intent);
+    addBountyMsg('ai', reply, showStocks ? (data.top_stocks || []) : []);
 
   } catch(e){
     removeBountyTyping();
-    addBountyMsg('ai', "Sorry, I'm having trouble connecting right now. Please try again in a moment. 🙏");
+    addBountyMsg('ai', e.name === 'AbortError'
+      ? "⚠️ That took too long. Please try again."
+      : "⚠️ I'm having trouble connecting right now. Please try again in a moment.", [], {error:true});
+  } finally {
+    clearTimeout(timer);
+    setBountySending(false);
   }
 }
 
 function editBountyMsg(id){
-  const el = document.getElementById(id);
-  if(!el) return;
-  const text = el.dataset.text || '';
+  if(bountySending) return;
+  const m = bountyFindMsg(id);
+  if(!m) return;
   bountyEditId = id;
   const input = document.getElementById('bounty-input');
-  input.value = text;
+  input.value = m.text;
   input.focus();
   autoBountyResize(input);
   document.getElementById('b-edit-bar').style.display = 'flex';
@@ -3499,30 +3623,34 @@ function editBountyMsg(id){
 function cancelEdit(){
   bountyEditId = null;
   document.getElementById('b-edit-bar').style.display = 'none';
-  document.getElementById('bounty-send').textContent = 'Send ➤';
+  document.getElementById('bounty-send').textContent = bountySending ? 'Thinking…' : 'Send ➤';
   document.getElementById('bounty-input').value = '';
   document.getElementById('bounty-input').style.height = 'auto';
 }
 
 function deleteBountyMsg(id){
+  if(bountySending) return;
+  if(bountyEditId === id) cancelEdit();
+  bountyMsgs = bountyMsgs.filter(m => m.id !== id);
   const el = document.getElementById(id);
   if(el) el.remove();
+  saveBounty();
 }
 
-function copyBountyMsg(id){
-  const el = document.getElementById(id);
-  if(!el) return;
-  const text = el.dataset.text || el.querySelector('.bm-bubble')?.innerText || '';
-  navigator.clipboard.writeText(text).then(()=>{
-    const btn = el.querySelector('.b-act');
+function copyBountyMsg(id, btn){
+  const m = bountyFindMsg(id);
+  if(!m || !navigator.clipboard) return;
+  navigator.clipboard.writeText(m.text).then(()=>{
     if(btn){ const orig = btn.textContent; btn.textContent = '✅ Copied'; setTimeout(()=>btn.textContent=orig, 1500); }
-  });
+  }).catch(()=>{});
 }
 
-function replyBountyMsg(id, preview){
-  bountyReplyTo = preview;
+function replyBountyMsg(id){
+  const m = bountyFindMsg(id);
+  if(!m) return;
+  bountyReplyTo = m.text.slice(0, 300);
   document.getElementById('b-reply-bar').style.display = 'block';
-  document.getElementById('b-reply-text').textContent = '↩️ Replying to: ' + preview;
+  document.getElementById('b-reply-text').textContent = '↩️ Replying to: ' + m.text.slice(0, 60);
   document.getElementById('bounty-input').focus();
 }
 
@@ -3532,11 +3660,13 @@ function cancelReply(){
 }
 
 function clearBounty(){
+  if(bountySending) return;
   document.getElementById('bounty-msgs').innerHTML = '';
-  bountyHistory = [];
-  bountyGreeted = false;
+  bountyMsgs = [];
+  cancelEdit();
+  cancelReply();
+  try { localStorage.removeItem(BOUNTY_STORE); } catch(e) {}
   showBountyGreeting();
-  bountyGreeted = true;
 }
 
 // Show badge after 4 seconds

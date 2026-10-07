@@ -20,7 +20,7 @@ def get_db():
         "host": os.getenv("DB_HOST", "localhost"),
         "port": int(os.getenv("DB_PORT", 3306)),
         "user": os.getenv("DB_USER", "root"),
-        "password": os.getenv("DB_PASSWORD", "Aroot092325"),
+        "password": os.getenv("DB_PASSWORD", ""),
         "database": os.getenv("DB_NAME", "stock_market_pro_db")
     }
     if os.getenv("DB_SSL", "false").lower() == "true":
