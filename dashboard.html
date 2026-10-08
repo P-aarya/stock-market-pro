@@ -693,7 +693,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 <!-- ═══════════ COMMODITIES PAGE ═══════════ -->
 <div class="page" id="page-commodities">
   <div class="g4">
-    <div class="sc" style="--sc-t:var(--yellow)"><div class="sc-l">Commodities</div><div class="sc-v y" id="com-tot">20</div><div class="sc-s">Tracked live</div></div>
+    <div class="sc" style="--sc-t:var(--yellow)"><div class="sc-l">Commodities</div><div class="sc-v y" id="com-tot">--</div><div class="sc-s">Tracked live</div></div>
     <div class="sc" style="--sc-t:var(--green)"><div class="sc-l">Gainers</div><div class="sc-v g" id="com-gain">--</div><div class="sc-s">Today</div></div>
     <div class="sc" style="--sc-t:var(--red)"><div class="sc-l">Losers</div><div class="sc-v r" id="com-loss">--</div><div class="sc-s">Today</div></div>
     <div class="sc" style="--sc-t:var(--cyan)"><div class="sc-l">Avg Change</div><div class="sc-v c" id="com-avg">--</div><div class="sc-s">Today</div></div>
@@ -710,57 +710,69 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     </div>
   </div>
 
-  <!-- Commodities Table -->
+  <!-- Commodity Prices — KPI Cards with Dropdown Filter -->
   <div class="card" style="margin-bottom:16px;">
     <div class="chdr">
       <div class="ctitle">🏗️ Live Commodity Prices</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        <button class="fbtn on" onclick="filterCom('all',this)">All</button>
-        <button class="fbtn" onclick="filterComGroup(['precious_metals','metals'],this)">Metals</button>
-        <button class="fbtn" onclick="filterComGroup(['energy'],this)">Energy</button>
-        <button class="fbtn" onclick="filterComGroup(['agriculture','softs','livestock','food'],this)">Agriculture</button>
-        <button class="fbtn" onclick="filterComGroup(['crypto'],this)">Crypto</button>
-        <button class="fbtn" onclick="filterComGroup(['clean_energy','carbon','water'],this)">Clean Energy</button>
-        <button class="fbtn" onclick="filterComGroup(['physical_ai'],this)">Physical AI</button>
-        <button class="fbtn" onclick="filterComGroup(['shipping','timber','indices'],this)">Others</button>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select id="com-filter-select" onchange="filterComFromSelect(this.value)" style="background:var(--bg3);border:1px solid var(--b2);border-radius:8px;padding:6px 12px;color:var(--t1);font-size:12px;font-weight:700;outline:none;cursor:pointer;">
+          <option value="all">All Commodities</option>
+          <option value="precious_metals">Precious Metals</option>
+          <option value="metals">Industrial Metals</option>
+          <option value="energy">Energy</option>
+          <option value="agriculture">Agriculture</option>
+          <option value="softs">Softs</option>
+          <option value="livestock">Livestock</option>
+          <option value="crypto">Crypto</option>
+          <option value="clean_energy">Clean Energy</option>
+          <option value="water">Water</option>
+          <option value="timber">Timber</option>
+          <option value="shipping">Shipping</option>
+          <option value="carbon">Carbon</option>
+          <option value="physical_ai">Physical AI</option>
+          <option value="food">Food ETFs</option>
+          <option value="indices">Indices</option>
+        </select>
       </div>
     </div>
-    <div class="tw"><table>
-      <thead><tr><th>Commodity</th><th>Category</th><th>Price</th><th>Change</th><th>% Change</th><th>Updated</th></tr></thead>
-      <tbody id="tb-com"><tr><td colspan="6"><div class="load"><div class="spin"></div></div></td></tr></tbody>
-    </table></div>
+    <!-- KPI Cards Grid -->
+    <div id="com-kpi-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:12px;"></div>
+    <!-- Show All button -->
+    <div id="com-show-more-wrap" style="text-align:center;display:none;">
+      <button onclick="comShowAll=!comShowAll;renderCommodities()" id="com-show-all-btn" style="background:var(--bg3);border:1px solid var(--b2);border-radius:8px;padding:7px 20px;color:var(--cyan);font-size:12px;font-weight:700;cursor:pointer;">Show All ▼</button>
+    </div>
   </div>
 
-  <!-- Commodity-Linked Companies -->
+  <!-- Commodity-Linked Companies — KPI Cards -->
   <div class="card">
     <div class="chdr">
-      <div class="ctitle">🏢 Commodity-Linked Companies — Click to View Full Details</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        <button class="fbtn on" onclick="filterComCo('all',this)">All</button>
-        <button class="fbtn" onclick="filterComCo('gold',this)">Gold</button>
-        <button class="fbtn" onclick="filterComCo('silver',this)">Silver</button>
-        <button class="fbtn" onclick="filterComCo('copper',this)">Copper</button>
-        <button class="fbtn" onclick="filterComCo('steel',this)">Steel</button>
-        <button class="fbtn" onclick="filterComCo('lithium',this)">Lithium</button>
-        <button class="fbtn" onclick="filterComCo('uranium',this)">Uranium</button>
-        <button class="fbtn" onclick="filterComCo('oil',this)">Oil</button>
-        <button class="fbtn" onclick="filterComCo('gas',this)">Gas</button>
-        <button class="fbtn" onclick="filterComCo('agriculture',this)">Agriculture</button>
-        <button class="fbtn" onclick="filterComCo('softs',this)">Softs</button>
-        <button class="fbtn" onclick="filterComCo('livestock',this)">Livestock</button>
-        <button class="fbtn" onclick="filterComCo('crypto',this)">Crypto</button>
-        <button class="fbtn" onclick="filterComCo('clean_energy',this)">Clean Energy</button>
-        <button class="fbtn" onclick="filterComCo('water',this)">Water</button>
-        <button class="fbtn" onclick="filterComCo('shipping',this)">Shipping</button>
-        <button class="fbtn" onclick="filterComCo('timber',this)">Timber</button>
-        <button class="fbtn" onclick="filterComCo('physical_ai',this)">Physical AI</button>
-        <button class="fbtn" onclick="filterComCo('mining',this)">Mining</button>
-      </div>
+      <div class="ctitle">🏢 Commodity-Linked Companies</div>
+      <select id="comco-filter-select" onchange="filterComCoFromSelect(this.value)" style="background:var(--bg3);border:1px solid var(--b2);border-radius:8px;padding:6px 12px;color:var(--t1);font-size:12px;font-weight:700;outline:none;cursor:pointer;">
+        <option value="all">All Companies</option>
+        <option value="gold">Gold</option>
+        <option value="silver">Silver</option>
+        <option value="copper">Copper</option>
+        <option value="steel">Steel</option>
+        <option value="lithium">Lithium</option>
+        <option value="uranium">Uranium</option>
+        <option value="oil">Oil</option>
+        <option value="gas">Natural Gas</option>
+        <option value="agriculture">Agriculture</option>
+        <option value="softs">Softs</option>
+        <option value="livestock">Livestock</option>
+        <option value="crypto">Crypto</option>
+        <option value="clean_energy">Clean Energy</option>
+        <option value="water">Water</option>
+        <option value="shipping">Shipping</option>
+        <option value="timber">Timber</option>
+        <option value="physical_ai">Physical AI</option>
+        <option value="mining">Mining</option>
+      </select>
     </div>
-    <div class="tw"><table>
-      <thead><tr><th>Ticker</th><th>Company</th><th>Linked To</th><th>Price</th><th>Change</th><th>Signal</th><th>Market Cap</th></tr></thead>
-      <tbody id="tb-com-co"><tr><td colspan="7"><div class="load"><div class="spin"></div>Loading...</div></td></tr></tbody>
-    </table></div>
+    <div id="comco-kpi-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:12px;"><div class="load"><div class="spin"></div>Loading...</div></div>
+    <div id="comco-show-more-wrap" style="text-align:center;display:none;">
+      <button onclick="comCoShowAll=!comCoShowAll;renderComCo()" id="comco-show-all-btn" style="background:var(--bg3);border:1px solid var(--b2);border-radius:8px;padding:7px 20px;color:var(--cyan);font-size:12px;font-weight:700;cursor:pointer;">Show All ▼</button>
+    </div>
   </div>
 </div>
 
@@ -926,6 +938,11 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 </div>
 
 <script>
+// ─── COMPANY LOGO HELPER — defined first so available everywhere ───
+const DOMAIN_MAP={'AAPL':'apple.com','MSFT':'microsoft.com','GOOGL':'google.com','GOOG':'google.com','AMZN':'amazon.com','META':'meta.com','NFLX':'netflix.com','TSLA':'tesla.com','NVDA':'nvidia.com','AMD':'amd.com','INTC':'intel.com','CSCO':'cisco.com','ORCL':'oracle.com','IBM':'ibm.com','ADBE':'adobe.com','CRM':'salesforce.com','PYPL':'paypal.com','SQ':'block.xyz','SHOP':'shopify.com','UBER':'uber.com','LYFT':'lyft.com','ABNB':'airbnb.com','COIN':'coinbase.com','SPOT':'spotify.com','DIS':'disney.com','SBUX':'starbucks.com','MCD':'mcdonalds.com','NKE':'nike.com','KO':'coca-cola.com','PEP':'pepsico.com','WMT':'walmart.com','TGT':'target.com','COST':'costco.com','HD':'homedepot.com','LOW':'lowes.com','AMGN':'amgen.com','JPM':'jpmorganchase.com','BAC':'bankofamerica.com','WFC':'wellsfargo.com','GS':'goldmansachs.com','MS':'morganstanley.com','V':'visa.com','MA':'mastercard.com','AXP':'americanexpress.com','BLK':'blackrock.com','SCHW':'schwab.com','XOM':'exxonmobil.com','CVX':'chevron.com','COP':'conocophillips.com','SLB':'slb.com','HAL':'halliburton.com','OXY':'oxy.com','EOG':'eogresources.com','NEM':'newmont.com','GOLD':'barrick.com','AEM':'agnicoeagle.com','FNV':'franco-nevada.com','WPM':'wheatonpreciousmetals.com','AG':'firstmajestic.com','PAAS':'panamericansilver.com','FCX':'fcx.com','SCCO':'southerncopper.com','BHP':'bhp.com','RIO':'riotinto.com','VALE':'vale.com','TECK':'teck.com','NUE':'nucor.com','STLD':'steeldynamics.com','AA':'alcoa.com','ALB':'albemarle.com','MP':'mpmaterials.com','CCJ':'cameco.com','ADM':'adm.com','BG':'bunge.com','MOS':'mosaicco.com','DE':'deere.com','NTR':'nutrien.com','CF':'cfindustries.com','MSTR':'microstrategy.com','MARA':'marathondh.com','RIOT':'riotplatforms.com','NEE':'nexteraenergy.com','FSLR':'firstsolar.com','ENPH':'enphase.com','PLUG':'plugpower.com','BE':'bloomenergy.com','RUN':'sunrun.com','CHPT':'chargepoint.com','SEDG':'solaredge.com','AWK':'amwater.com','XYL':'xylem.com','WM':'wm.com','RSG':'rsg.com','ZIM':'zim.com','SBLK':'starbulk.com','GOGL':'goldenocean.com','ISRG':'intuitive.com','ABB':'abb.com','TER':'teradyne.com','CGNX':'cognex.com','ROK':'rockwellautomation.com','SYM':'symbotic.com','PATH':'uipath.com','PLTR':'palantir.com','SNOW':'snowflake.com','DDOG':'datadoghq.com','ZM':'zoom.us','DOCU':'docusign.com','TWLO':'twilio.com','NET':'cloudflare.com','NOW':'servicenow.com','WDAY':'workday.com','OKTA':'okta.com','CRWD':'crowdstrike.com','ZS':'zscaler.com'};
+function getLogoUrl(ticker){return DOMAIN_MAP[ticker]?`https://www.google.com/s2/favicons?domain=${DOMAIN_MAP[ticker]}&sz=32`:null;}
+function logoImg(ticker,companyName,size=20){const url=getLogoUrl(ticker);if(url){return `<img src="${url}" style="width:${size}px;height:${size}px;border-radius:4px;object-fit:contain;vertical-align:middle;margin-right:5px;" onerror="this.style.display='none'"/>`;}const colors=['#00c8ff','#6464ff','#00e676','#ff9800','#e040fb','#ff4081'];const col=colors[(ticker||'A').charCodeAt(0)%colors.length];return `<div style="width:${size}px;height:${size}px;border-radius:4px;background:${col};display:inline-flex;align-items:center;justify-content:center;font-size:${Math.floor(size*0.45)}px;font-weight:900;color:#000;vertical-align:middle;margin-right:5px;flex-shrink:0;">${(ticker||'?').charAt(0)}</div>`;}
+
 const API=window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'?'http://localhost:8000':window.location.origin;
 const C=['#4f8ef7','#00d4ff','#00e676','#a55eea','#ffc800','#ff4444','#ff4fa3','#ff6b35','#00c8a0','#b8ff5b','#c084fc','#ff8fab','#38d9f5','#57ff8f','#ffe066','#f97316'];
 let aStocks=[],fStocks=[],pg=1,SZ=50,sortK='market_cap',sortA=false;
@@ -1762,10 +1779,11 @@ async function openStock(ticker){
   document.getElementById('fs-badges').innerHTML=mkRat(d.analyst_rating);
   // Load company logo via Clearbit
   const logoEl = document.getElementById('fs-logo');
-  if(d.website){
-    const domain = d.website.replace(/https?:\/\//,'').replace(/\/.*/,'').replace(/^www\./,'');
-    logoEl.src = `https://logo.clearbit.com/${domain}`;
+  const logoUrl = getLogoUrl(curTick, d.company_name);
+  if(logoUrl){
+    logoEl.src = logoUrl;
     logoEl.style.display = 'inline-block';
+    logoEl.onerror = () => { logoEl.style.display='none'; };
   } else {
     logoEl.style.display = 'none';
   }
@@ -1915,55 +1933,170 @@ async function loadPxChart(){
   const totalChg=lastPx&&firstPx?((lastPx-firstPx)/firstPx*100):0;
   const lineCol=totalChg>=0?'#00e676':'#ff4444';
   document.getElementById('px-wrap').innerHTML='<canvas id="px-c"></canvas>';
-  document.getElementById('px-wrap').style.cssText='height:320px;';
+  document.getElementById('px-wrap').style.cssText='height:400px;';
 
   if(curChartType === 'candle'){
-    // Candlestick chart using bar chart simulation
-    const upCol = 'rgba(0,230,118,0.85)';
-    const dnCol = 'rgba(255,68,68,0.85)';
+    const upCol = '#00e676';
+    const upFill = 'rgba(0,230,118,0.85)';
+    const dnCol = '#ff4444';
+    const dnFill = 'rgba(255,68,68,0.85)';
+    const canvas = document.getElementById('px-c');
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const displayW = canvas.parentElement.offsetWidth || 900;
+    const displayH = 420;
+    canvas.width = displayW * dpr;
+    canvas.height = displayH * dpr;
+    canvas.style.width = displayW + 'px';
+    canvas.style.height = displayH + 'px';
+    ctx.scale(dpr, dpr);
+
     const opens = fd.map(x=>x.open||x.close);
     const highs = fd.map(x=>x.high||x.close);
     const lows = fd.map(x=>x.low||x.close);
     const closes2 = fd.map(x=>x.close);
+    const n = fd.length;
 
-    // Use floating bars for OHLC candles
-    mkC('px-c',{
-      type:'bar',
-      data:{
-        labels:fd.map(x=>x.date),
-        datasets:[
-          // Body (open to close)
-          {label:'Body',
-           data:fd.map((x,i)=>[opens[i],closes2[i]]),
-           backgroundColor:fd.map(x=>x.close>=(x.open||x.close)?upCol:dnCol),
-           borderColor:fd.map(x=>x.close>=(x.open||x.close)?'rgba(0,230,118,1)':'rgba(255,68,68,1)'),
-           borderWidth:1,barPercentage:0.6,categoryPercentage:0.8,order:2},
-          // High-Low line
-          {label:'High/Low',
-           data:fd.map((x,i)=>[lows[i],highs[i]]),
-           backgroundColor:fd.map(x=>x.close>=(x.open||x.close)?upCol:dnCol),
-           borderColor:fd.map(x=>x.close>=(x.open||x.close)?'rgba(0,230,118,0.8)':'rgba(255,68,68,0.8)'),
-           borderWidth:1,barPercentage:0.1,categoryPercentage:0.8,order:1},
-        ]
-      },
-      options:{
-        responsive:true,maintainAspectRatio:false,
-        plugins:{
-          legend:{display:false},
-          tooltip:{mode:'index',intersect:false,callbacks:{
-            title:items=>items[0]?.label||'',
-            label:(c)=>{
-              const i=c.dataIndex;
-              return `O:${fp(opens[i])} H:${fp(highs[i])} L:${fp(lows[i])} C:${fp(closes2[i])}`;
-            }
-          }}
-        },
-        scales:{
-          x:{ticks:{color:'#58697a',maxTicksLimit:10,font:{size:10}},grid:{color:'rgba(28,28,48,0.6)'}},
-          y:{ticks:{color:'#58697a',callback:v=>fp(v)},grid:{color:'rgba(28,28,48,0.6)'}}
-        }
-      }
+    // Zoom Y axis to actual price range
+    const minP = Math.min(...lows) * 0.997;
+    const maxP = Math.max(...highs) * 1.003;
+    const padL = 80, padR = 15, padT = 25, padB = 40;
+    const W = displayW - padL - padR;
+    const H = displayH - padT - padB;
+
+    const toY = v => padT + H - ((v - minP) / (maxP - minP)) * H;
+    const toX = i => padL + (i + 0.5) * (W / n);
+    // Make candles wider — minimum 4px, max based on available space
+    const candleW = Math.max(4, Math.min(16, Math.floor(W / n * 0.7)));
+
+    // Background
+    ctx.fillStyle = '#0a0e1a';
+    ctx.fillRect(0, 0, displayW, displayH);
+
+    // Grid lines — horizontal
+    ctx.lineWidth = 0.5;
+    for(let i=0; i<=6; i++){
+      const y = padT + (H/6)*i;
+      const val = maxP - ((maxP-minP)/6)*i;
+      ctx.strokeStyle = 'rgba(88,105,122,0.25)';
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(displayW-padR, y); ctx.stroke();
+      ctx.fillStyle = '#58697a'; ctx.font = `${Math.min(11,Math.max(9,11))}px monospace`;
+      ctx.textAlign = 'right';
+      ctx.fillText(fp(val), padL-6, y+4);
+    }
+
+    // X axis labels
+    const step = Math.max(1, Math.floor(n/10));
+    ctx.fillStyle = '#58697a'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+    for(let i=0; i<n; i+=step){
+      ctx.fillText(fd[i].date.slice(5), toX(i), displayH-8);
+    }
+
+    // Draw candles
+    fd.forEach((d,i)=>{
+      const x = toX(i);
+      const isUp = closes2[i] >= opens[i];
+      const bodyTop = toY(Math.max(opens[i], closes2[i]));
+      const bodyBot = toY(Math.min(opens[i], closes2[i]));
+      const bodyH = Math.max(2, bodyBot - bodyTop);
+      const wickTop = toY(highs[i]);
+      const wickBot = toY(lows[i]);
+
+      // Wick (high-low line)
+      ctx.strokeStyle = isUp ? upCol : dnCol;
+      ctx.lineWidth = Math.max(1, candleW * 0.15);
+      ctx.beginPath();
+      ctx.moveTo(x, wickTop);
+      ctx.lineTo(x, wickBot);
+      ctx.stroke();
+
+      // Body
+      ctx.fillStyle = isUp ? upFill : dnFill;
+      ctx.fillRect(x - candleW/2, bodyTop, candleW, bodyH);
+
+      // Body border
+      ctx.strokeStyle = isUp ? upCol : dnCol;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x - candleW/2, bodyTop, candleW, bodyH);
     });
+
+    // Crosshair + tooltip on hover
+    canvas.style.cursor = 'crosshair';
+    canvas.onmousemove = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mx = (e.clientX - rect.left);
+      const my = (e.clientY - rect.top);
+      const idx = Math.round((mx - padL) / (W / n) - 0.5);
+      if(idx < 0 || idx >= n) return;
+
+      // Redraw base
+      ctx.clearRect(0, 0, displayW, displayH);
+      ctx.fillStyle = '#0a0e1a';
+      ctx.fillRect(0, 0, displayW, displayH);
+
+      // Redraw grid
+      for(let i=0; i<=6; i++){
+        const y = padT + (H/6)*i;
+        const val = maxP - ((maxP-minP)/6)*i;
+        ctx.strokeStyle = 'rgba(88,105,122,0.25)'; ctx.lineWidth=0.5;
+        ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(displayW-padR,y); ctx.stroke();
+        ctx.fillStyle='#58697a'; ctx.font='11px monospace'; ctx.textAlign='right';
+        ctx.fillText(fp(val), padL-6, y+4);
+      }
+      for(let i=0; i<n; i+=step){
+        ctx.fillStyle='#58697a'; ctx.font='10px sans-serif'; ctx.textAlign='center';
+        ctx.fillText(fd[i].date.slice(5), toX(i), displayH-8);
+      }
+
+      // Redraw candles
+      fd.forEach((d2,i)=>{
+        const x2=toX(i), isUp2=closes2[i]>=opens[i];
+        const bt=toY(Math.max(opens[i],closes2[i])), bb=toY(Math.min(opens[i],closes2[i]));
+        const bh=Math.max(2,bb-bt);
+        ctx.strokeStyle=isUp2?upCol:dnCol; ctx.lineWidth=Math.max(1,candleW*0.15);
+        ctx.beginPath(); ctx.moveTo(x2,toY(highs[i])); ctx.lineTo(x2,toY(lows[i])); ctx.stroke();
+        ctx.fillStyle=isUp2?upFill:dnFill;
+        ctx.fillRect(x2-candleW/2,bt,candleW,bh);
+        ctx.strokeStyle=isUp2?upCol:dnCol; ctx.lineWidth=1;
+        ctx.strokeRect(x2-candleW/2,bt,candleW,bh);
+      });
+
+      // Crosshair
+      const cx = toX(idx);
+      ctx.strokeStyle = 'rgba(0,200,255,0.4)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+      ctx.beginPath(); ctx.moveTo(cx,padT); ctx.lineTo(cx,padT+H); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(padL,my); ctx.lineTo(displayW-padR,my); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Price label on Y axis
+      const hoverPrice = minP + ((padT+H-my)/H)*(maxP-minP);
+      ctx.fillStyle='#00c8ff'; ctx.fillRect(0,my-10,padL-2,20);
+      ctx.fillStyle='#000'; ctx.font='bold 10px monospace'; ctx.textAlign='center';
+      ctx.fillText(fp(hoverPrice), (padL-2)/2, my+4);
+
+      // OHLC tooltip box
+      const d = fd[idx];
+      const isUp3 = closes2[idx] >= opens[idx];
+      const ttx = cx > displayW/2 ? cx-190 : cx+10;
+      ctx.fillStyle = 'rgba(13,17,27,0.95)';
+      ctx.strokeStyle = isUp3?upCol:dnCol; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.roundRect(ttx, padT+5, 180, 80, 6); ctx.fill(); ctx.stroke();
+      ctx.fillStyle='#c0cce0'; ctx.font='bold 11px sans-serif'; ctx.textAlign='left';
+      ctx.fillText(fd[idx].date, ttx+10, padT+22);
+      ctx.fillStyle=isUp3?upCol:dnCol;
+      ctx.fillText(`O: ${fp(opens[idx])}  C: ${fp(closes2[idx])}`, ttx+10, padT+40);
+      ctx.fillText(`H: ${fp(highs[idx])}  L: ${fp(lows[idx])}`, ttx+10, padT+57);
+      const chgPct = ((closes2[idx]-opens[idx])/opens[idx]*100).toFixed(2);
+      ctx.fillText(`${isUp3?'▲ +':'▼ '}${Math.abs(chgPct)}%`, ttx+10, padT+74);
+
+      // Update header
+      document.getElementById('fs-tick-lbl').textContent =
+        `${curTick}  O:${fp(opens[idx])}  H:${fp(highs[idx])}  L:${fp(lows[idx])}  C:${fp(closes2[idx])}  ${isUp3?'▲ +':'▼ '}${Math.abs(chgPct)}%`;
+    };
+
+    canvas.onmouseleave = () => {
+      document.getElementById('fs-tick-lbl').textContent = curTick;
+    };
   } else {
     // Line chart (default)
     mkC('px-c',{type:'line',data:{labels:fd.map(x=>x.date),datasets:[{
@@ -2635,23 +2768,33 @@ let comCoData = [];
 let comCoFilter = 'all';
 
 async function loadComCo(){
-  const tbody = document.getElementById('tb-com-co');
-  if(!tbody) return;
-  tbody.innerHTML='<tr><td colspan="7"><div class="load"><div class="spin"></div>Loading commodity companies...</div></td></tr>';
+  const grid = document.getElementById('comco-kpi-grid');
+  if(!grid) return;
+  grid.innerHTML='<div class="load"><div class="spin"></div>Loading commodity companies...</div>';
   try {
-    // Fetch each company individually using existing endpoint
-    const results = await Promise.all(
-      COM_COMPANIES.map(c => 
-        fetch(`${API}/api/stocks/${c.ticker}`)
-          .then(r=>r.json())
-          .then(d=>({...c, current_price:d.current_price, price_change_pct:d.price_change_pct, market_cap:d.market_cap, analyst_rating:d.analyst_rating}))
-          .catch(()=>c)
-      )
-    );
-    comCoData = results;
+    // Single batch request instead of 90 individual requests
+    const tickers = [...new Set(COM_COMPANIES.map(c=>c.ticker))];
+    const res = await fetch(`${API}/api/stocks/batch_commodity`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({tickers})
+    });
+    const stockData = await res.json();
+    // Map stock data back to COM_COMPANIES
+    const dataMap = {};
+    stockData.forEach(s => dataMap[s.ticker] = s);
+    comCoData = COM_COMPANIES.map(c => ({
+      ...c,
+      current_price: dataMap[c.ticker]?.current_price || null,
+      price_change_pct: dataMap[c.ticker]?.price_change_pct || 0,
+      market_cap: dataMap[c.ticker]?.market_cap || null,
+      market_cap_category: dataMap[c.ticker]?.market_cap_category || null,
+      buy_signal: dataMap[c.ticker]?.buy_signal || 'N/A',
+      analyst_rating: dataMap[c.ticker]?.analyst_rating || 'N/A',
+    }));
     renderComCo();
   } catch(e){
-    tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--t3);padding:20px;">Error loading companies</td></tr>';
+    grid.innerHTML='<div style="color:var(--t3);padding:20px;">Error loading companies.</div>';
   }
 }
 
@@ -2667,46 +2810,40 @@ function filterComCo(cat, btn){
 }
 
 let comCoShowAll = false;
+function filterComCoFromSelect(val){ comCoFilter=val; comCoShowAll=false; renderComCo(); }
 function renderComCo(){
-  const tbody = document.getElementById('tb-com-co');
-  if(!tbody) return;
+  const grid = document.getElementById('comco-kpi-grid');
+  if(!grid) return;
   const filtered = comCoFilter==='all' ? comCoData : comCoData.filter(c=>c.commodity===comCoFilter);
-  if(!filtered.length){
-    tbody.innerHTML=`<tr><td colspan="7" style="text-align:center;color:var(--t3);padding:20px;">No companies found</td></tr>`;
-    return;
-  }
+  if(!filtered.length){ grid.innerHTML='<div style="color:var(--t3);padding:20px;">No companies found.</div>'; return; }
   const display = comCoShowAll ? filtered : filtered.slice(0,10);
-  tbody.innerHTML = display.map(c=>{
-    const chg = c.price_change_pct||0;
-    const signal = c.buy_signal||c.analyst_rating||'N/A';
-    const sigColor = signal==='BUY'||signal==='STRONG BUY'?'var(--green)':signal==='SELL'?'var(--red)':'var(--yellow)';
-    const mcap = c.market_cap;
-    const mcapStr = mcap?mcap>=1e12?'$'+(mcap/1e12).toFixed(1)+'T':mcap>=1e9?'$'+(mcap/1e9).toFixed(1)+'B':'$'+(mcap/1e6).toFixed(0)+'M':'--';
-    return `<tr onclick="openFS('${c.ticker}')" style="cursor:pointer;">
-      <td class="sym">${c.ticker}</td>
-      <td style="color:var(--t2);font-weight:600;">${c.name}</td>
-      <td><span style="font-size:10px;background:var(--bg3);border:1px solid var(--b2);border-radius:5px;padding:2px 7px;color:var(--cyan);font-weight:700;">${c.label}</span></td>
-      <td class="mono">${c.current_price?'$'+c.current_price.toFixed(2):'--'}</td>
-      <td class="mono ${chg>=0?'g':'r'}">${chg>=0?'+':''}${chg.toFixed(2)}%</td>
-      <td style="color:${sigColor};font-weight:800;font-size:11px;">${signal}</td>
-      <td style="font-size:11px;color:var(--t3);">${mcapStr}</td>
-    </tr>`;
+  grid.innerHTML = display.map(c=>{
+    const chg=c.price_change_pct||0;
+    const signal=c.buy_signal||c.analyst_rating||'N/A';
+    const sigCol=signal==='BUY'||signal==='STRONG BUY'?'var(--green)':signal==='SELL'||signal==='STRONG SELL'?'var(--red)':'var(--yellow)';
+    const mcap=c.market_cap;
+    const mcapStr=mcap?mcap>=1e12?'$'+(mcap/1e12).toFixed(1)+'T':mcap>=1e9?'$'+(mcap/1e9).toFixed(1)+'B':'$'+(mcap/1e6).toFixed(0)+'M':'--';
+    return `<div onclick="openFS('${c.ticker}')" style="background:var(--bg3);border:1px solid var(--b2);border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--cyan)'" onmouseout="this.style.borderColor='var(--b2)'">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          ${logoImg(c.ticker, c.name, 20)}
+          <span style="font-size:13px;font-weight:900;color:var(--cyan);font-family:monospace;">${c.ticker}</span>
+        </div>
+        <span style="font-size:10px;font-weight:800;color:${sigCol};">${signal}</span>
+      </div>
+      <div style="font-size:11px;color:var(--t2);font-weight:600;margin-bottom:6px;">${c.name.substring(0,22)}</div>
+      <div style="font-size:10px;background:var(--bg2);border-radius:4px;padding:2px 6px;color:var(--cyan);font-weight:700;display:inline-block;margin-bottom:6px;">${c.label}</div>
+      <div style="font-size:18px;font-weight:900;color:var(--t1);font-family:monospace;">${c.current_price?'$'+c.current_price.toFixed(2):'--'}</div>
+      <div style="font-size:12px;font-weight:700;color:${chg>=0?'var(--green)':'var(--red)'};">${chg>=0?'▲ +':'▼ '}${Math.abs(chg).toFixed(2)}%</div>
+      <div style="font-size:10px;color:var(--t3);margin-top:3px;">${mcapStr}</div>
+    </div>`;
   }).join('');
-
-  // Show All / Show Less button
-  const existingBtn = document.getElementById('comco-show-more');
-  if(existingBtn) existingBtn.remove();
-  if(filtered.length > 10){
-    const btn = document.createElement('tr');
-    btn.id = 'comco-show-more';
-    btn.innerHTML = `<td colspan="7" style="text-align:center;padding:10px;">
-      <button onclick="comCoShowAll=!comCoShowAll;renderComCo()" style="background:var(--bg3);border:1px solid var(--b2);border-radius:8px;padding:7px 20px;color:var(--cyan);font-size:12px;font-weight:700;cursor:pointer;">
-        ${comCoShowAll?'Show Less ▲':'Show All '+filtered.length+' Companies ▼'}
-      </button>
-    </td>`;
-    tbody.appendChild(btn);
-  }
+  const wrap=document.getElementById('comco-show-more-wrap');
+  const btn=document.getElementById('comco-show-all-btn');
+  if(filtered.length>10){ wrap.style.display='block'; btn.textContent=comCoShowAll?'Show Less ▲':'Show All '+filtered.length+' Companies ▼'; }
+  else { wrap.style.display='none'; }
 }
+
 
 // ─── COMMODITIES ──────────────────────────────────────
 const COMMODITIES = [
@@ -2771,36 +2908,45 @@ function filterComGroup(cats, btn){
 }
 
 let comShowAll = false;
+function filterComFromSelect(val){
+  comFilter = val;
+  comFilterCategories = [];
+  comShowAll = false;
+  renderCommodities();
+}
 function renderCommodities(){
-  const tbody = document.getElementById('tb-com');
-  if(!tbody||!comData.length)return;
-  const filtered = comFilter==='all' ? comData : comFilter==='group' ? comData.filter(c=>comFilterCategories.includes(c.category)) : comData.filter(c=>c.category===comFilter);
+  const grid = document.getElementById('com-kpi-grid');
+  if(!grid||!comData.length) return;
+  const filtered = comFilter==='all' ? comData :
+    comFilter==='group' ? comData.filter(c=>comFilterCategories.includes(c.category)) :
+    comData.filter(c=>c.category===comFilter);
   const display = comShowAll ? filtered : filtered.slice(0,10);
-  tbody.innerHTML = display.map(c=>{
-    const chg = c.change_pct||0;
-    return `<tr>
-      <td style="font-weight:700;color:var(--cyan)">${c.name}</td>
-      <td style="font-size:10px;color:var(--t3);text-transform:capitalize">${c.category.replace(/_/g,' ')}</td>
-      <td class="mono">${c.price!=null?'$'+c.price.toFixed(2):'--'}</td>
-      <td class="mono ${chg>=0?'g':'r'}">${chg>=0?'+':''}${(c.change||0).toFixed(2)}</td>
-      <td class="${chg>=0?'g':'r'}">${chg>=0?'+':''}${chg.toFixed(2)}%</td>
-      <td style="font-size:10px;color:var(--t3)">${c.updated||'--'}</td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--t3)">No data</td></tr>';
 
-  // Show All / Show Less button
-  const existing = document.getElementById('com-show-more');
-  if(existing) existing.remove();
+  grid.innerHTML = display.map(c=>{
+    const chg = c.change_pct||0;
+    const chgStr = (chg>=0?'+':'')+chg.toFixed(2)+'%';
+    const price = c.price!=null?(c.price>100?'$'+c.price.toFixed(2):'$'+c.price.toFixed(4)):'--';
+    return `<div style="background:var(--bg3);border:1px solid var(--b2);border-radius:10px;padding:12px 14px;cursor:default;transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--cyan)'" onmouseout="this.style.borderColor='var(--b2)'">
+      <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">${c.category.replace(/_/g,' ')}</div>
+      <div style="font-size:13px;font-weight:800;color:var(--t1);margin-bottom:6px;">${c.name}</div>
+      <div style="font-size:18px;font-weight:900;color:var(--cyan);font-family:monospace;margin-bottom:4px;">${price}</div>
+      <div style="font-size:12px;font-weight:700;color:${chg>=0?'var(--green)':'var(--red)'};">${chg>=0?'▲':'▼'} ${chgStr}</div>
+    </div>`;
+  }).join('');
+
+  // Show All button
+  const wrap = document.getElementById('com-show-more-wrap');
+  const btn = document.getElementById('com-show-all-btn');
   if(filtered.length > 10){
-    const btn = document.createElement('tr');
-    btn.id = 'com-show-more';
-    btn.innerHTML = `<td colspan="6" style="text-align:center;padding:10px;">
-      <button onclick="comShowAll=!comShowAll;renderCommodities()" style="background:var(--bg3);border:1px solid var(--b2);border-radius:8px;padding:7px 20px;color:var(--cyan);font-size:12px;font-weight:700;cursor:pointer;">
-        ${comShowAll?'Show Less ▲':'Show All '+filtered.length+' ▼'}
-      </button>
-    </td>`;
-    tbody.appendChild(btn);
+    wrap.style.display = 'block';
+    btn.textContent = comShowAll ? 'Show Less ▲' : `Show All ${filtered.length} ▼`;
+  } else {
+    wrap.style.display = 'none';
   }
+
+  // Update KPI count
+  const el = document.getElementById('com-tot');
+  if(el) el.textContent = comData.length;
 }
 
 // ─── MACRO INDICATORS ──────────────────────────────────
@@ -3064,7 +3210,10 @@ async function runAI() {
       const signalColor = signal === 'BUY' ? 'var(--green)' : signal === 'SELL' ? 'var(--red)' : 'var(--yellow)';
       grid.innerHTML += `
         <div class="ai-stock-card" onclick="openFS('${s.ticker}')">
-          <div class="ai-stock-sym">${s.ticker}</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+            ${logoImg(s.ticker, s.company_name, 20)}
+            <span class="ai-stock-sym">${s.ticker}</span>
+          </div>
           <div class="ai-stock-name">${s.company_name || ''}</div>
           <div class="ai-stock-px ${chg >= 0 ? 'g' : 'r'}">$${(s.current_price || 0).toFixed(2)}</div>
           <div style="font-size:11px;font-family:var(--mono);font-weight:600;" class="${chg >= 0 ? 'g' : 'r'}">${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%</div>
@@ -3271,7 +3420,7 @@ function loadPortfolioTickers() {
     <button onclick="cancelEdit()">✕</button>
   </div>
   <div id="bounty-input-wrap">
-    <textarea id="bounty-input" placeholder="Ask Bounty anything about stocks, markets, commodities..." rows="2" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendBounty();}oninput="autoBountyResize(this)"></textarea>
+    <textarea id="bounty-input" placeholder="Ask Bounty anything about stocks, markets, commodities..." rows="2" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendBounty();}" oninput="autoBountyResize(this)"></textarea>
     <div id="bounty-send-row">
       <span class="b-footer">Shift+Enter for new line</span>
       <button id="bounty-send" onclick="sendBounty()">Send ➤</button>

@@ -1,7 +1,7 @@
 # ============================================================
 # STOCK MARKET PRO - api.py (Final Clean Version)
 # ============================================================
-from fastapi import FastAPI
+from fastapi import FastAPI, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import mysql.connector
@@ -256,6 +256,31 @@ def get_sectors():
         FROM stocks_live WHERE sector IS NOT NULL AND sector!='Indices' AND current_price IS NOT NULL
         GROUP BY sector ORDER BY avg_change_pct DESC
     """)
+
+@app.post("/api/stocks/batch_commodity")
+def batch_commodity_companies(request: dict = Body(...)):
+    """Fetch all commodity company data in one query."""
+    try:
+        tickers = request.get("tickers", [])
+        if not tickers:
+            return []
+        placeholders = ','.join(['%s'] * len(tickers))
+        results = query(f"""
+            SELECT l.ticker, l.company_name, l.sector, l.current_price,
+                   l.price_change_pct, l.market_cap, l.market_cap_category,
+                   COALESCE(p.buy_signal, 'N/A') as buy_signal,
+                   COALESCE(p.trend, 'NEUTRAL') as trend,
+                   COALESCE(a.analyst_rating, 'N/A') as analyst_rating
+            FROM stocks_live l
+            LEFT JOIN stocks_predictions p ON l.ticker = p.ticker
+            LEFT JOIN stocks_analyst a ON l.ticker = a.ticker
+            WHERE l.ticker IN ({placeholders})
+            AND l.current_price IS NOT NULL
+        """, tickers)
+        return results or []
+    except Exception as e:
+        print(f"Batch commodity error: {e}")
+        return []
 
 @app.get("/api/stocks/{ticker}/quarterly")
 def get_quarterly(ticker: str):
