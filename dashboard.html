@@ -863,6 +863,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <button class="fstab on" onclick="showFST('overview',this)">📊 Overview</button>
       <button class="fstab" onclick="showFST('charts',this)">📈 Price Chart</button>
       <button class="fstab" onclick="showFST('company',this)">🏢 Company</button>
+      <button class="fstab" onclick="showFST('peers',this)">👥 Peers</button>
       <button class="fstab" onclick="showFST('financials',this)">💰 Financials</button>
       <button class="fstab" onclick="showFST('intelligence',this)">🤖 Prediction Model</button>
       <button class="fstab" onclick="showFST('quarterly',this)">📆 Quarterly</button>
@@ -968,6 +969,19 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     </div>
 
     <!-- Company Tab -->
+    <div class="fssec" id="fss-peers">
+      <div class="info-note" id="peer-note">👥 Compare this stock with its closest competitors.</div>
+      <div class="peer-bar">
+        <div class="peer-chips" id="peer-chips"></div>
+        <div class="peer-add">
+          <input class="srch" id="peer-search" style="width:200px" placeholder="Add a stock to compare..." autocomplete="off" oninput="peerSearchDebounced()" onkeydown="if(event.key==='Escape')peerCloseSuggest()"/>
+          <div class="peer-suggest" id="peer-suggest" style="display:none"></div>
+        </div>
+        <button class="linkbtn" id="peer-reset" style="display:none" onclick="peerReset()">↺ Reset to suggested</button>
+      </div>
+      <div id="peer-body"><div class="load"><div class="spin"></div>Finding competitors...</div></div>
+    </div>
+
     <div class="fssec" id="fss-company">
       <div id="fs-company-content"><div class="load"><div class="spin"></div>Loading company data...</div></div>
     </div>
@@ -1050,6 +1064,7 @@ function showFST(t,btn){
   if(t==='financials')drawHistCharts();
   if(t==='intelligence')loadPrediction();
   if(t==='company')loadCompanyTab();
+  if(t==='peers')loadPeers();
   if(t==='quarterly')loadQuarterly();
 }
 
@@ -1639,6 +1654,108 @@ function renderEarnings(){
   document.getElementById('earn-pgn').innerHTML=h;
 }
 function goEarnPg(p){earnPg=p;renderEarnings();}
+
+// Peer comparison
+let peerState={target:null,suggested:[],list:[],source:'',names:{},loadSeq:0,cmpSeq:0,searchSeq:0};
+const PEER_MAX=5;
+let peerTimer=null;
+
+function peerFmt(m,v){
+  if(v==null)return'—';
+  if(m.format==='text')return escapeHtml(String(v).replace(/_/g,' '));
+  v=Number(v);if(!isFinite(v))return'—';
+  switch(m.format){
+    case'ratio':return v.toFixed(1)+'x';
+    case'pct':return(v*100).toFixed(1)+'%';
+    case'pp':return(m.key==='model_move_1w'&&v>0?'+':'')+v.toFixed(2)+'%';
+    case'usd':{const a=Math.abs(v),sg=v<0?'-':'';return a>=1e12?`${sg}$${(a/1e12).toFixed(2)}T`:a>=1e9?`${sg}$${(a/1e9).toFixed(2)}B`:a>=1e6?`${sg}$${(a/1e6).toFixed(1)}M`:`${sg}$${a.toFixed(0)}`;}
+    default:return v.toFixed(2);
+  }
+}
+function peerTextClass(v){const x=String(v||'').toLowerCase();return x.includes('buy')?'g':x.includes('sell')?'r':'';}
+
+async function loadPeers(){
+  const tk=curTick;
+  if(!tk)return;
+  if(peerState.target===tk&&peerState.list.length)return;       // already loaded for this stock
+  const seq=++peerState.loadSeq;
+  peerState.target=null;peerState.suggested=[];peerState.list=[];
+  renderPeerChips();
+  document.getElementById('peer-body').innerHTML='<div class="load"><div class="spin"></div>Finding competitors...</div>';
+  const d=await api('/api/peers/'+encodeURIComponent(tk));
+  if(seq!==peerState.loadSeq)return;                             // the user moved on to another stock
+  if(!d||d.status!=='success'){
+    document.getElementById('peer-body').innerHTML='<div class="empty">Could not find peers for this stock. <button class="linkbtn" onclick="loadPeers()">Retry</button></div>';
+    return;
+  }
+  peerState.target=tk;
+  peerState.suggested=d.peers.map(p=>p.ticker);
+  peerState.list=[...peerState.suggested];
+  peerState.source=d.source;
+  d.peers.forEach(p=>{peerState.names[p.ticker]=p.company_name;});
+  renderPeerChips();
+  await renderPeerTable();
+}
+function renderPeerChips(){
+  const el=document.getElementById('peer-chips');if(!el)return;
+  const t=peerState.target||curTick;
+  el.innerHTML=(t?`<span class="peer-chip target" title="The stock you are viewing">${escapeHtml(t)}</span>`:'')+
+    peerState.list.map(x=>`<span class="peer-chip" title="${escapeHtml(peerState.names[x]||'')}">${escapeHtml(x)}<button title="Remove" data-t="${escapeHtml(x)}" onclick="peerRemove(this.dataset.t)">✕</button></span>`).join('');
+  const changed=peerState.list.join()!==peerState.suggested.join();
+  document.getElementById('peer-reset').style.display=changed?'inline':'none';
+  document.getElementById('peer-note').textContent=peerState.source==='ai'
+    ?'👥 Peers were chosen by AI from companies in the same industry or sector. Remove any, or add your own (up to '+PEER_MAX+').'
+    :'👥 Peers were picked by industry and market-cap closeness (AI selection was unavailable). Remove any, or add your own (up to '+PEER_MAX+').';
+}
+function peerRemove(t){peerState.list=peerState.list.filter(x=>x!==t);renderPeerChips();renderPeerTable();}
+function peerReset(){peerState.list=[...peerState.suggested];renderPeerChips();renderPeerTable();}
+function peerAdd(t,name){
+  peerCloseSuggest();
+  if(!t||t===peerState.target||peerState.list.includes(t))return;
+  if(peerState.list.length>=PEER_MAX){document.getElementById('peer-note').textContent='⚠️ You can compare up to '+PEER_MAX+' peers. Remove one first.';return;}
+  peerState.list.push(t);peerState.names[t]=name||'';
+  document.getElementById('peer-search').value='';
+  renderPeerChips();renderPeerTable();
+}
+function peerCloseSuggest(){const s=document.getElementById('peer-suggest');if(s)s.style.display='none';}
+function peerSearchDebounced(){clearTimeout(peerTimer);peerTimer=setTimeout(peerSearch,250);}
+async function peerSearch(){
+  const q=document.getElementById('peer-search').value.trim(),box=document.getElementById('peer-suggest');
+  if(!q){box.style.display='none';return;}
+  const seq=++peerState.searchSeq;
+  const res=await api('/api/stocks/search?q='+encodeURIComponent(q)+'&limit=8');
+  if(seq!==peerState.searchSeq)return;
+  const rows=(Array.isArray(res)?res:[]).filter(r=>r.ticker!==peerState.target&&!peerState.list.includes(r.ticker)).slice(0,6);
+  box.innerHTML=rows.length?rows.map(r=>`<button data-t="${escapeHtml(r.ticker)}" data-n="${escapeHtml(r.company_name||'')}" onclick="peerAdd(this.dataset.t,this.dataset.n)"><span><span class="peer-sym">${escapeHtml(r.ticker)}</span> ${escapeHtml((r.company_name||'').slice(0,28))}</span><span style="color:var(--t3)">${escapeHtml(r.sector||'')}</span></button>`).join(''):'<div class="empty" style="padding:10px">No matching stocks</div>';
+  box.style.display='block';
+}
+async function renderPeerTable(){
+  const body=document.getElementById('peer-body');if(!body||!peerState.target)return;
+  if(!peerState.list.length){body.innerHTML='<div class="empty">Add at least one stock to compare against.</div>';return;}
+  const seq=++peerState.cmpSeq;
+  body.innerHTML='<div class="load"><div class="spin"></div>Comparing...</div>';
+  const d=await api('/api/compare?tickers='+encodeURIComponent([peerState.target,...peerState.list].join(',')));
+  if(seq!==peerState.cmpSeq)return;                              // a newer edit is already loading
+  if(!d||d.status!=='success'){
+    body.innerHTML='<div class="empty">Could not load the comparison. <button class="linkbtn" onclick="renderPeerTable()">Retry</button></div>';return;
+  }
+  const T=d.tickers,tgt=d.target,cols=T.length+2;
+  const head='<tr><th>Metric</th>'+T.map(t=>{
+    const c=d.companies[t]||{},chg=c.price_change_pct;
+    return`<th class="${t===tgt?'peer-target':''}">${escapeHtml(t)}<div class="peer-sub" title="${escapeHtml(c.company_name||'')}">${escapeHtml(c.company_name||'')}</div>
+      <div style="font-size:11px;font-weight:700;color:var(--t2)">${fp(c.current_price)} <span class="${gc(chg)}">${chg!=null?(chg>=0?'+':'')+f2(chg)+'%':''}</span></div></th>`;
+  }).join('')+'<th>Peer median</th></tr>';
+  const posMark={better:'<span class="peer-pos g" title="Better than the peer median">▲</span>',worse:'<span class="peer-pos r" title="Worse than the peer median">▼</span>',similar:'<span class="peer-pos" style="color:var(--t3)" title="In line with the peer median">≈</span>'};
+  const rows=d.groups.map(g=>`<tr class="peer-grp"><td colspan="${cols}">${escapeHtml(g.name)}</td></tr>`+g.metrics.map(m=>
+    `<tr><td style="color:var(--t2);font-weight:600">${escapeHtml(m.label)}</td>`+T.map(t=>{
+      const v=m.values[t],cls=[t===tgt?'peer-target':'',m.best===t?'peer-best':'',m.format==='text'?peerTextClass(v):''].filter(Boolean).join(' ');
+      return`<td class="num ${cls}">${peerFmt(m,v)}${m.best===t?' ★':''}${t===tgt&&m.position?posMark[m.position]||'':''}</td>`;
+    }).join('')+`<td class="num" style="color:var(--t3)">${m.median!=null?peerFmt(m,m.median):'—'}</td></tr>`).join('')).join('');
+  const missing=(d.missing||[]).length?`<div class="r" style="font-size:11px;margin-top:8px">Not found: ${d.missing.map(escapeHtml).join(', ')}</div>`:'';
+  body.innerHTML=`<div class="tw"><table class="peer-table"><thead>${head}</thead><tbody>${rows}</tbody></table></div>
+    <div class="peer-legend">★ best in row &nbsp;·&nbsp; ▲ ▼ ≈ ${escapeHtml(tgt)} better / worse / in line with the peer median &nbsp;·&nbsp; "—" = not available or not meaningful (for example a negative P/E)</div>${missing}
+    <div class="peer-legend">Prices as of ${d.prices_as_of?escapeHtml(new Date(d.prices_as_of).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})):'—'}. Fundamentals come from Yahoo Finance and may lag. Not investment advice.</div>`;
+}
 
 // IPO calendar
 let aIPO=[],ipoMeta=null,ipoFailed=false,ipoFetchedAt=0,ipoLoading=null;
@@ -3374,6 +3491,26 @@ function loadPortfolioTickers() {
 .b-stock-item .bsi-left .bsi-name{font-size:11px;color:var(--t3);}
 .b-stock-item .bsi-right .bsi-price{font-size:12px;font-weight:700;color:var(--t1);text-align:right;}
 .b-stock-item .bsi-right .bsi-chg{font-size:11px;font-weight:600;text-align:right;}
+/* ── Peer comparison ── */
+.peer-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px;}
+.peer-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.peer-chip{display:inline-flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--b1);border-radius:16px;padding:4px 10px;font-size:12px;font-weight:700;color:var(--t1);font-family:var(--mono);}
+.peer-chip.target{border-color:var(--cyan);color:var(--cyan);}
+.peer-chip button{background:none;border:none;color:var(--t3);cursor:pointer;font-size:13px;padding:0;line-height:1;}
+.peer-chip button:hover{color:var(--red);}
+.peer-add{position:relative;}
+.peer-suggest{position:absolute;top:100%;left:0;z-index:20;min-width:280px;background:var(--bg2);border:1px solid var(--b2);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.5);margin-top:4px;overflow:hidden;}
+.peer-suggest button{display:flex;justify-content:space-between;gap:12px;width:100%;background:none;border:none;border-bottom:1px solid var(--b1);padding:8px 12px;color:var(--t1);font-size:12px;font-weight:600;cursor:pointer;text-align:left;font-family:var(--sans);}
+.peer-suggest button:hover{background:var(--bg3);}
+.peer-suggest .peer-sym{font-family:var(--mono);font-weight:800;color:var(--cyan);}
+.peer-table th,.peer-table td{text-align:right;}
+.peer-table th:first-child,.peer-table td:first-child{text-align:left;}
+.peer-table .peer-target{background:rgba(0,200,255,0.06);}
+.peer-table .peer-best{color:var(--green);font-weight:800;}
+.peer-table .peer-grp td{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--t3);background:var(--bg3);padding:6px 12px;text-align:left;}
+.peer-table .peer-sub{font-size:10px;font-weight:600;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px;margin-left:auto;}
+.peer-pos{margin-left:5px;font-size:10px;}
+.peer-legend{font-size:11px;font-weight:600;color:var(--t3);margin-top:10px;}
 /* ── IPO calendar ── */
 .ipo-strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}
 .ipo-card{background:var(--bg3);border:1px solid var(--b1);border-radius:9px;padding:12px;}

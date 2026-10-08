@@ -134,6 +134,27 @@ def get_stocks(sector: Optional[str]=None, search: Optional[str]=None, limit: in
     params.extend([limit, offset])
     return query(sql, params)
 
+# Must be declared before /api/stocks/{ticker}, otherwise that route captures 'search'.
+@app.get("/api/stocks/search")
+def search_stocks(q: str = "", limit: int = 10):
+    """Search stocks by ticker or company name for autocomplete."""
+    if not q:
+        return []
+    try:
+        results = query("""
+            SELECT ticker, company_name, sector, current_price, price_change_pct
+            FROM stocks_live
+            WHERE (ticker LIKE %s OR LOWER(company_name) LIKE LOWER(%s))
+            AND current_price IS NOT NULL
+            ORDER BY
+                CASE WHEN ticker LIKE %s THEN 0 ELSE 1 END,
+                market_cap DESC
+            LIMIT %s
+        """, (f"{q.upper()}%", f"%{q}%", f"{q.upper()}%", limit))
+        return results or []
+    except:
+        return []
+
 @app.get("/api/stocks/{ticker}")
 def get_stock(ticker: str):
     r = query("""
@@ -515,26 +536,6 @@ def get_stocks_batch(tickers: str = ""):
         return result
     except Exception as e:
         print(f"Batch error: {e}")
-        return []
-
-@app.get("/api/stocks/search")
-def search_stocks(q: str = "", limit: int = 10):
-    """Search stocks by ticker or company name for autocomplete."""
-    if not q:
-        return []
-    try:
-        results = query("""
-            SELECT ticker, company_name, sector, current_price, price_change_pct
-            FROM stocks_live
-            WHERE (ticker LIKE %s OR LOWER(company_name) LIKE LOWER(%s))
-            AND current_price IS NOT NULL
-            ORDER BY
-                CASE WHEN ticker LIKE %s THEN 0 ELSE 1 END,
-                market_cap DESC
-            LIMIT %s
-        """, (f"{q.upper()}%", f"%{q}%", f"{q.upper()}%", limit))
-        return results or []
-    except:
         return []
 
 @app.get("/api/market/indices")
@@ -1133,12 +1134,13 @@ from collections import defaultdict, deque
 from typing import List, Literal
 
 import groq
-from fastapi import Query, Request
+from fastapi import Path, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
 from agent import run_agent, review_portfolio, explain_single_stock, LLMUnavailable
 import ipo_data
+import peers
 from screener import get_top_movers, get_sector_summary, screen_stocks
 
 log = logging.getLogger("uvicorn.error")
@@ -1298,6 +1300,41 @@ def get_ipo_calendar(days_back: int = Query(14, ge=0, le=30), days_ahead: int = 
     except Exception:
         log.exception("IPO calendar failed")
         return agent_error(500, "Something went wrong loading the IPO calendar.")
+
+
+@app.get("/api/peers/{ticker}")
+def get_stock_peers(request: Request, ticker: str = Path(pattern=r"^[A-Za-z0-9.\-^=]{1,10}$"), n: int = Query(4, ge=1, le=5)):
+    """Suggested competitors for a stock (database pool, closest picked by AI, cached for a week)."""
+    limited = check_rate_limit(request)  # an uncached lookup makes an LLM call
+    if limited:
+        return limited
+    try:
+        result = peers.suggest_peers(ticker, n)
+    except Exception:
+        log.exception("Peer lookup failed")
+        return agent_error(500, "Something went wrong finding peers.")
+    if result is None:
+        return agent_error(404, f"{ticker.upper()} isn't in our database.")
+    return {"status": "success", **result}
+
+
+@app.get("/api/compare")
+def compare_stocks(tickers: str = Query(..., min_length=1, max_length=120)):
+    """Side-by-side metrics. The first ticker is the stock the others are compared against."""
+    parts = [t.strip() for t in tickers.split(",") if t.strip()]
+    valid = _valid_tickers(parts)
+    if len(valid) != len(parts):
+        return agent_error(400, "One of the tickers is not valid.")
+    if not 2 <= len({t.upper() for t in valid}) <= peers.MAX_STOCKS:
+        return agent_error(400, f"Compare between 2 and {peers.MAX_STOCKS} different stocks.")
+    try:
+        result = peers.build_comparison(valid)
+    except Exception:
+        log.exception("Comparison failed")
+        return agent_error(500, "Something went wrong building the comparison.")
+    if valid[0].upper() not in result["tickers"] or len(result["tickers"]) < 2:
+        return agent_error(404, "We need at least two stocks we track, including the first one.")
+    return {"status": "success", **result}
 
 
 @app.get("/api/market/signals")
