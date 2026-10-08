@@ -266,6 +266,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   </div>
   <div class="ntabs">
     <button class="ntab on" onclick="showPage('market',this)">📊 Market</button>
+    <button class="ntab" id="ntab-ipos" onclick="showPage('ipos',this)">🚀 IPOs</button>
     <button class="ntab" onclick="showPage('watchlist',this)">⭐ Watchlist</button>
     <button class="ntab" onclick="showPage('commodities',this)">🏗️ Commodities</button>
     <button class="ntab" onclick="showPage('portfolio',this)">💼 Portfolio</button>
@@ -503,6 +504,15 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     <div id="mi-count" style="font-size:11px;color:var(--t3);font-weight:600;margin-top:8px"></div>
   </div>
 
+  <!-- Upcoming IPOs (summary; full calendar is on the IPOs tab) -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="chdr">
+      <div class="ctitle">🚀 Upcoming IPOs</div>
+      <button class="linkbtn" onclick="showPage('ipos',document.getElementById('ntab-ipos'))">See full calendar →</button>
+    </div>
+    <div id="ipo-mini"><div class="load"><div class="spin"></div>Loading...</div></div>
+  </div>
+
   <!-- Earnings Calendar — All sectors -->
   <div class="card" style="margin-bottom:16px">
     <div class="chdr">
@@ -596,6 +606,42 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     <div class="pgn" id="pgn"></div>
   </div>
   <div class="disclaimer">⚠️ Data sourced from Yahoo Finance. Analyst ratings are real Wall Street consensus. Technical signals calculated from live market data. For informational purposes only. Not financial advice.</div>
+</div>
+
+<!-- ═══════════ IPO PAGE ═══════════ -->
+<div class="page" id="page-ipos">
+  <div class="card" style="margin-bottom:16px">
+    <div class="chdr">
+      <div class="ctitle">🚀 Next 7 Days</div>
+      <span id="ipo-asof" style="font-size:11px;font-weight:600;color:var(--t3)"></span>
+    </div>
+    <div class="ipo-strip" id="ipo-week"><div class="load"><div class="spin"></div>Loading IPOs...</div></div>
+  </div>
+  <div class="card">
+    <div class="chdr">
+      <div class="ctitle">📅 US IPO Calendar</div>
+      <div class="ipo-filters">
+        <select class="sel" id="ipo-window" onchange="renderIPOs()">
+          <option value="upcoming">Upcoming</option><option value="7">Next 7 days</option>
+          <option value="30">Next 30 days</option><option value="past">Recently priced / past</option>
+          <option value="all">All</option>
+        </select>
+        <select class="sel" id="ipo-exch" onchange="renderIPOs()">
+          <option value="">All exchanges</option><option>Nasdaq</option><option>NYSE</option>
+          <option>NYSE American</option><option>NYSE Arca</option>
+        </select>
+        <label><input type="checkbox" id="ipo-terms" onchange="renderIPOs()"> Terms announced</label>
+        <label><input type="checkbox" id="ipo-nospac" onchange="renderIPOs()"> Hide SPACs</label>
+        <input class="srch" style="width:150px" placeholder="Search company..." id="ipo-srch" oninput="renderIPOs()"/>
+      </div>
+    </div>
+    <div class="info-note" id="ipo-note">🚀 IPO dates from Yahoo Finance; price range and share count from Nasdaq when announced. Terms are usually set only days before pricing, and dates change often. Not investment advice.</div>
+    <div class="tw"><table>
+      <thead><tr><th>Date</th><th>Company</th><th>Ticker</th><th>Exchange</th><th>Price range</th><th>Shares</th><th>Deal size</th><th>Status</th></tr></thead>
+      <tbody id="tb-ipo"><tr><td colspan="8"><div class="load"><div class="spin"></div>Loading...</div></td></tr></tbody>
+    </table></div>
+    <div id="ipo-count" style="font-size:11px;color:var(--t3);font-weight:600;margin-top:8px"></div>
+  </div>
 </div>
 
 <!-- ═══════════ PORTFOLIO PAGE ═══════════ -->
@@ -988,6 +1034,7 @@ function showPage(n,btn){
   if(n==='transactions')loadTx();
   if(n==='commodities'){loadCommodities();loadMacro();loadComCo();}
   if(n==='watchlist')loadWatchlist();
+  if(n==='ipos'&&(!ipoFetchedAt||Date.now()-ipoFetchedAt>IPO_REFRESH_MS))loadIPOs();
 }
 function showSub(g,t,btn){
   ['gainers','losers','active'].forEach(s=>{const el=document.getElementById(g+'-'+s);if(el)el.style.display=s===t?'block':'none';});
@@ -1592,6 +1639,88 @@ function renderEarnings(){
   document.getElementById('earn-pgn').innerHTML=h;
 }
 function goEarnPg(p){earnPg=p;renderEarnings();}
+
+// IPO calendar
+let aIPO=[],ipoMeta=null,ipoFailed=false,ipoFetchedAt=0,ipoLoading=null;
+const IPO_REFRESH_MS=10*60*1000;
+function loadIPOs(){
+  if(ipoLoading)return ipoLoading;
+  ipoLoading=(async()=>{
+    const d=await api('/api/ipos');
+    if(d&&Array.isArray(d.ipos)){aIPO=d.ipos;ipoMeta=d;ipoFailed=false;ipoFetchedAt=Date.now();}
+    else if(!aIPO.length){ipoFailed=true;}
+    renderIPOs();renderIPOMini();
+  })().finally(()=>{ipoLoading=null;});
+  return ipoLoading;
+}
+function ipoWhen(r){const n=r.days_until;return n===0?'Today':n===1?'Tomorrow':n>1?`in ${n} days`:`${-n} day${n===-1?'':'s'} ago`;}
+function ipoDate(r){const[y,m,d]=r.date.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});}
+function ipoPrice(r){if(r.price_low==null)return'—';return r.price_high!=null&&r.price_high!==r.price_low?`$${f2(r.price_low)} – $${f2(r.price_high)}`:`$${f2(r.price_low)}`;}
+function ipoMoney(n){if(!n)return'—';return n>=1e9?`$${(n/1e9).toFixed(2)}B`:n>=1e6?`$${(n/1e6).toFixed(1)}M`:`$${Number(n).toLocaleString('en-US')}`;}
+function ipoExchGroup(r){const x=(r.exchange||'').toLowerCase();return x.includes('nasdaq')?'Nasdaq':x.includes('american')?'NYSE American':x.includes('arca')?'NYSE Arca':x.includes('nyse')?'NYSE':'';}
+function ipoStatus(r){
+  if(r.status==='Priced')return'<span class="badge bg">Priced</span>';
+  if(r.days_until<0)return'<span class="badge bp" title="The expected date has passed; check whether it has listed">Date passed</span>';
+  if(r.days_until===0)return'<span class="badge by">Today</span>';
+  return'<span class="badge bc">Expected</span>';
+}
+function ipoTicker(r){
+  if(!r.ticker)return'—';
+  const t=escapeHtml(r.ticker);
+  return r.in_database?`<span class="sym" style="cursor:pointer" data-t="${t}" onclick="openStock(this.dataset.t)">${t}</span>`:`<span class="sym">${t}</span>`;
+}
+function renderIPOs(){
+  const tb=document.getElementById('tb-ipo'),week=document.getElementById('ipo-week'),cnt=document.getElementById('ipo-count');
+  if(!tb)return;
+  if(ipoFailed){
+    const msg='<div class="empty">The IPO calendar is unavailable right now. <button class="linkbtn" onclick="loadIPOs()">Retry</button></div>';
+    tb.innerHTML=`<tr><td colspan="8">${msg}</td></tr>`;week.innerHTML=msg;cnt.textContent='';return;
+  }
+  const asof=document.getElementById('ipo-asof');
+  if(ipoMeta&&ipoMeta.as_of)asof.textContent='Updated '+new Date(ipoMeta.as_of).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  const note=document.getElementById('ipo-note');
+  const warn=(ipoMeta&&ipoMeta.warnings||[]).map(escapeHtml).join(' ');
+  note.innerHTML='🚀 IPO dates from Yahoo Finance; price range and share count from Nasdaq when announced. Terms are usually set only days before pricing, and dates change often. Not investment advice.'+(warn?` <span class="r">⚠️ ${warn}</span>`:'');
+
+  // Next 7 days strip (ignores the filters)
+  const soon=aIPO.filter(r=>r.days_until>=0&&r.days_until<=7).slice(0,12);
+  week.innerHTML=soon.length?soon.map(r=>`<div class="ipo-card">
+      <div class="ipo-d">${escapeHtml(ipoDate(r))} · ${ipoWhen(r)}</div>
+      <div class="ipo-n">${escapeHtml(r.company||r.ticker)}</div>
+      <div class="ipo-m">${escapeHtml(r.ticker||'')}${r.exchange?' · '+escapeHtml(r.exchange):''}</div>
+      <div class="ipo-m" style="margin-top:4px">${r.price_low!=null?ipoPrice(r)+(r.shares?' · '+Number(r.shares).toLocaleString('en-US')+' shares':''):'Terms not announced yet'}</div>
+    </div>`).join(''):'<div class="empty" style="grid-column:1/-1">No IPOs scheduled in the next 7 days.</div>';
+
+  const win=document.getElementById('ipo-window').value,ex=document.getElementById('ipo-exch').value;
+  const terms=document.getElementById('ipo-terms').checked,noSpac=document.getElementById('ipo-nospac').checked;
+  const q=document.getElementById('ipo-srch').value.trim().toLowerCase();
+  const rows=aIPO.filter(r=>
+    (win==='all'||(win==='past'?r.days_until<0:win==='upcoming'?r.days_until>=0:r.days_until>=0&&r.days_until<=Number(win)))&&
+    (!ex||ipoExchGroup(r)===ex)&&(!terms||r.price_low!=null)&&(!noSpac||!r.is_spac)&&
+    (!q||(r.company||'').toLowerCase().includes(q)||(r.ticker||'').toLowerCase().includes(q)));
+  if(win==='past')rows.reverse();
+  tb.innerHTML=rows.length?rows.map(r=>`<tr>
+      <td style="font-weight:700;color:var(--t1)">${escapeHtml(ipoDate(r))}<div style="font-size:10px;color:var(--t3);font-weight:600">${ipoWhen(r)}</div></td>
+      <td style="color:var(--t2);font-weight:600">${escapeHtml(r.company||'--')}${r.is_spac?' <span class="badge bb" title="Special purpose acquisition company (blank check)">SPAC</span>':''}</td>
+      <td>${ipoTicker(r)}</td>
+      <td style="font-size:11px;color:var(--t3);font-weight:700">${escapeHtml(r.exchange||'—')}</td>
+      <td class="num">${ipoPrice(r)}</td>
+      <td class="num">${r.shares?Number(r.shares).toLocaleString('en-US'):'—'}</td>
+      <td class="num">${ipoMoney(r.deal_value)}</td>
+      <td>${ipoStatus(r)}</td>
+    </tr>`).join(''):'<tr><td colspan="8" class="empty">No IPOs match these filters.</td></tr>';
+  cnt.textContent=`${rows.length} of ${aIPO.length} IPOs shown`;
+}
+function renderIPOMini(){
+  const el=document.getElementById('ipo-mini');
+  if(!el)return;
+  if(ipoFailed){el.innerHTML='<div class="empty">IPO calendar unavailable right now.</div>';return;}
+  const next=aIPO.filter(r=>r.days_until>=0).slice(0,5);
+  el.innerHTML=next.length?next.map(r=>`<div class="ipo-mini">
+      <div><span class="ipo-mn">${escapeHtml(r.company||r.ticker)}</span> <span style="color:var(--t3);font-size:11px;font-weight:600">${escapeHtml(r.ticker||'')}</span></div>
+      <div class="ipo-mm">${escapeHtml(ipoDate(r))} · ${r.price_low!=null?ipoPrice(r):'terms TBA'}</div>
+    </div>`).join(''):'<div class="empty">No upcoming IPOs on the calendar.</div>';
+}
 
 // News — Sector → Company cascade
 function onNewsSectorChange(){
@@ -2437,6 +2566,7 @@ async function checkConn(){
 }
 
 async function init(){
+  loadIPOs(); // independent of the rest of the page
   await Promise.all([loadSummary(),loadIndices(),loadSentiment(),loadSectors(),loadGL(),loadEarnings(),loadMarketNews(),loadStocks(),loadPredictions(),loadCurrencies()]);
 }
 
@@ -3244,6 +3374,19 @@ function loadPortfolioTickers() {
 .b-stock-item .bsi-left .bsi-name{font-size:11px;color:var(--t3);}
 .b-stock-item .bsi-right .bsi-price{font-size:12px;font-weight:700;color:var(--t1);text-align:right;}
 .b-stock-item .bsi-right .bsi-chg{font-size:11px;font-weight:600;text-align:right;}
+/* ── IPO calendar ── */
+.ipo-strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}
+.ipo-card{background:var(--bg3);border:1px solid var(--b1);border-radius:9px;padding:12px;}
+.ipo-card .ipo-d{font-size:10px;font-weight:800;color:var(--cyan);text-transform:uppercase;letter-spacing:.8px;}
+.ipo-card .ipo-n{font-size:13px;font-weight:700;color:var(--t1);margin:5px 0 3px;}
+.ipo-card .ipo-m{font-size:11px;font-weight:600;color:var(--t3);}
+.ipo-filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.ipo-filters label{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--t2);cursor:pointer;}
+.ipo-mini{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--b1);font-size:12px;}
+.ipo-mini:last-child{border-bottom:none;}
+.ipo-mini .ipo-mn{font-weight:700;color:var(--t1);}
+.ipo-mini .ipo-mm{color:var(--t3);font-weight:600;white-space:nowrap;}
+.linkbtn{background:none;border:none;color:var(--cyan);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);padding:0;}
 @media(max-width:480px){#bounty-win{width:calc(100vw - 16px);right:8px;height:75vh;bottom:80px;}}
 </style>
 
@@ -3432,7 +3575,7 @@ function initBountyChat(){
 function showBountyGreeting(){
   const h = new Date().getHours();
   const greet = h<12?'Good morning':h<17?'Good afternoon':'Good evening';
-  addBountyMsg('ai', `${greet}! 👋 I'm **Bounty**, your AI finance assistant.\n\nI can help you with:\n• 📈 Stock analysis and recommendations\n• ⚖️ Side-by-side stock comparisons\n• 🏗️ Commodity prices and linked stocks\n• 💼 Portfolio advice based on your watchlist\n• 🌍 Market and economy questions, using live indicators\n• 📚 Financial concepts explained simply\n\nWhat would you like to know today?`, [], {greeting:true});
+  addBountyMsg('ai', `${greet}! 👋 I'm **Bounty**, your AI finance assistant.\n\nI can help you with:\n• 📈 Stock analysis and recommendations\n• ⚖️ Side-by-side stock comparisons\n• 🏗️ Commodity prices and linked stocks\n• 💼 Portfolio advice based on your watchlist\n• 🚀 Upcoming US IPOs\n• 🌍 Market and economy questions, using live indicators\n• 📚 Financial concepts explained simply\n\nWhat would you like to know today?`, [], {greeting:true});
 }
 
 function autoBountyResize(el){

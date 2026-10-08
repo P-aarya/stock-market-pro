@@ -6,6 +6,8 @@ import groq
 from screener import screen_stocks, get_stock_snapshot, get_top_movers, get_sector_summary, get_trending_stocks, find_similar_stocks
 import json
 import re
+from datetime import datetime
+from ipo_data import get_ipos, IPOUnavailable
 
 # Groq API client. A missing key must not stop the whole API from starting.
 MODEL = "openai/gpt-oss-120b"
@@ -224,7 +226,7 @@ def detect_commodity(query: str) -> dict:
 # ─────────────────────────────────────────
 VALID_INTENTS = {
     "specific_stock", "filter_stocks", "market_question", "commodity", "commodity_stocks",
-    "portfolio", "economy_macro", "education", "compare", "irrelevant",
+    "portfolio", "economy_macro", "education", "compare", "ipo", "irrelevant",
 }
 EMPTY_ROUTE = {"intent": "filter_stocks", "ticker_hint": "", "company_name": "", "compare_items": [],
                "filters": {}, "answer": "", "commodity": ""}
@@ -294,6 +296,7 @@ INTENTS:
 - "economy_macro": Asking about economy, inflation, interest rates, Fed, GDP, VIX, DXY, recession
 - "education": Asking HOW something works, WHY something happens, WHAT a term means — needs explanation not stock list
 - "compare": Comparing two or more specific stocks or assets
+- "ipo": Asking about IPOs, new listings or companies about to go public (upcoming IPOs, IPO calendar, "what IPOs are coming this week")
 - "irrelevant": Not related to finance or investing at all
 
 STRICT RULES:
@@ -303,6 +306,7 @@ STRICT RULES:
 - Company name or stock ticker → "specific_stock"
 - Portfolio/investment strategy questions → "portfolio"
 - Inflation, interest rates, Fed, GDP, VIX, recession, economy → "economy_macro"
+- IPO, "going public", "new listing", "IPO calendar" questions → "ipo" (unless they name one company and ask about its stock → "specific_stock")
 - Unrelated to finance → "irrelevant"
 
 IMPORTANT: For "education", "commodity", "portfolio", "economy_macro" — write a helpful answer in the "answer" field (2-4 sentences, plain English).
@@ -829,6 +833,39 @@ def _run_agent(user_query: str, portfolio_tickers: list = None, chat_history: li
         if not answer:
             answer = llm_text(with_history(f"As a financial expert, explain this in simple plain English (3-5 sentences, no jargon): {user_query}", chat_history))
         return {"intent": "education", "stocks_found": 0, "recommendation": answer, "portfolio_review": None, "top_stocks": [], "all_stocks": []}
+
+    # ── IPO: upcoming and recent US IPOs, answered only from the calendar data ──
+    if intent == "ipo":
+        try:
+            calendar = get_ipos(days_back=7, days_ahead=45)
+        except IPOUnavailable:
+            return {"intent": "ipo", "stocks_found": 0, "recommendation": "I can't reach the IPO calendar right now. Please try again in a few minutes.",
+                    "portfolio_review": None, "top_stocks": [], "all_stocks": []}
+
+        def line(r):
+            terms = f"price range ${r['price_low']:.2f}" + (f"-${r['price_high']:.2f}" if r["price_high"] not in (None, r["price_low"]) else "") if r["price_low"] is not None else "terms not announced"
+            shares = f", {int(r['shares']):,} shares" if r["shares"] else ""
+            day = datetime.strptime(r["date"], "%Y-%m-%d").strftime("%A, %B %d, %Y")  # real weekday: the model must not work it out itself
+            return f"- {day} | {r['company']} ({r['ticker'] or 'no ticker yet'}) | {r['exchange'] or 'exchange TBA'} | {r['status']} | {terms}{shares}{' | SPAC' if r['is_spac'] else ''}"
+
+        upcoming = [r for r in calendar["ipos"] if r["days_until"] >= 0][:20]
+        recent = [r for r in calendar["ipos"] if r["days_until"] < 0][-8:]
+        data_block = "UPCOMING (soonest first):\n" + ("\n".join(map(line, upcoming)) or "- none on the calendar") + \
+                     "\n\nRECENT (last 7 days):\n" + ("\n".join(map(line, recent)) or "- none")
+        answer = llm_text(with_history(
+            f"""You are an IPO calendar assistant.
+
+The user asked: "{user_query}"
+
+Here is the complete US IPO calendar data you have:
+{data_block}
+
+Answer using ONLY this data, in plain English. Group by the dates shown (copy weekdays and dates exactly as given; do not work out or invent weekdays or week ranges), and mention price range and size where known; say "terms not announced yet" where they are not. Briefly say what a SPAC is if any are listed. Do not predict how an IPO will perform and do not invent companies, dates or prices. If nothing matches the question, say so.
+End with: "⚠️ IPO dates and terms change often. Not financial advice." """, chat_history))
+        stamp = calendar["as_of"][11:16]
+        return {"intent": "ipo", "stocks_found": len(upcoming),
+                "recommendation": f"{answer}\n\n🕒 IPO data retrieved {stamp} UTC (Yahoo Finance, Nasdaq)",
+                "portfolio_review": None, "top_stocks": [], "all_stocks": []}
 
     # ── IRRELEVANT ──
     if intent == "irrelevant":

@@ -1133,11 +1133,12 @@ from collections import defaultdict, deque
 from typing import List, Literal
 
 import groq
-from fastapi import Request
+from fastapi import Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
 from agent import run_agent, review_portfolio, explain_single_stock, LLMUnavailable
+import ipo_data
 from screener import get_top_movers, get_sector_summary, screen_stocks
 
 log = logging.getLogger("uvicorn.error")
@@ -1286,6 +1287,18 @@ def agent_portfolio_review(request: Request, body: PortfolioRequest):
         return limited
     return run_ai(lambda: {"status": "success", "tickers_reviewed": body.tickers,
                            "review": review_portfolio(tickers=body.tickers)})
+
+@app.get("/api/ipos")
+def get_ipo_calendar(days_back: int = Query(14, ge=0, le=30), days_ahead: int = Query(60, ge=0, le=90)):
+    """Upcoming and recently priced US IPOs (cached for 30 minutes)."""
+    try:
+        return ipo_data.get_ipos(days_back, days_ahead)
+    except ipo_data.IPOUnavailable:
+        return agent_error(503, "The IPO calendar is unavailable right now. Please try again shortly.")
+    except Exception:
+        log.exception("IPO calendar failed")
+        return agent_error(500, "Something went wrong loading the IPO calendar.")
+
 
 @app.get("/api/market/signals")
 async def market_signals():
