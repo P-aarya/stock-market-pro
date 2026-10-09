@@ -5,22 +5,30 @@
 
 import yfinance as yf
 import mysql.connector
+import db
 import pandas as pd
 import time
 from datetime import datetime
-from tickers import ALL_TICKERS, TICKER_SECTOR_MAP
+from tickers import ALL_TICKERS as _FILE_TICKERS, TICKER_SECTOR_MAP
+
+# tickers.py plus anything added to the database since
+ALL_TICKERS = list(dict.fromkeys(_FILE_TICKERS + db.get_db_tickers()))
+_DB_SECTORS = None
+
+def resolve_sector(ticker):
+    """Sector from tickers.py, else the one already stored, else Unknown."""
+    global _DB_SECTORS
+    if ticker in TICKER_SECTOR_MAP:
+        return TICKER_SECTOR_MAP[ticker]
+    if _DB_SECTORS is None:
+        _DB_SECTORS = db.get_db_sectors()
+    return _DB_SECTORS.get(ticker, "Unknown")
 
 # ─────────────────────────────────────────
 # MySQL Connection
 # ─────────────────────────────────────────
 def get_connection():
-    return mysql.connector.connect(
-        host="localhost",
-        port=3306,
-        user="root",
-        password="Aroot092325",
-        database="stock_market_pro_db"
-    )
+    return db.get_connection()
 
 # ─────────────────────────────────────────
 # Create All Tables
@@ -304,7 +312,7 @@ def fetch_and_save(ticker, cursor, conn):
     try:
         stock = yf.Ticker(ticker)
         info = stock.info
-        sector = TICKER_SECTOR_MAP.get(ticker, "Unknown")
+        sector = resolve_sector(ticker)
         now = datetime.now()
 
         current_price = info.get("currentPrice") or info.get("regularMarketPrice")

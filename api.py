@@ -15,7 +15,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = FastAPI(title="Stock Market Pro API")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(",") if o.strip()]
+app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 
 # ── Serve dashboard.html directly from port 8000 ──
 @app.get("/")
@@ -40,7 +41,7 @@ def get_db():
         "host": os.getenv("DB_HOST", "localhost"),
         "port": int(os.getenv("DB_PORT", 3306)),
         "user": os.getenv("DB_USER", "root"),
-        "password": os.getenv("DB_PASSWORD", "Aroot092325"),
+        "password": os.getenv("DB_PASSWORD", ""),
         "database": os.getenv("DB_NAME", "stock_market_pro_db")
     }
     if os.getenv("DB_SSL", "false").lower() == "true":
@@ -132,6 +133,27 @@ def get_stocks(sector: Optional[str]=None, search: Optional[str]=None, limit: in
     sql += " ORDER BY l.market_cap DESC LIMIT %s OFFSET %s"
     params.extend([limit, offset])
     return query(sql, params)
+
+# Must be declared before /api/stocks/{ticker}, otherwise that route captures 'search'.
+@app.get("/api/stocks/search")
+def search_stocks(q: str = "", limit: int = 10):
+    """Search stocks by ticker or company name for autocomplete."""
+    if not q:
+        return []
+    try:
+        results = query("""
+            SELECT ticker, company_name, sector, current_price, price_change_pct
+            FROM stocks_live
+            WHERE (ticker LIKE %s OR LOWER(company_name) LIKE LOWER(%s))
+            AND current_price IS NOT NULL
+            ORDER BY
+                CASE WHEN ticker LIKE %s THEN 0 ELSE 1 END,
+                market_cap DESC
+            LIMIT %s
+        """, (f"{q.upper()}%", f"%{q}%", f"{q.upper()}%", limit))
+        return results or []
+    except:
+        return []
 
 @app.get("/api/stocks/{ticker}")
 def get_stock(ticker: str):
@@ -541,26 +563,6 @@ def get_stocks_batch(tickers: str = ""):
         print(f"Batch error: {e}")
         return []
 
-@app.get("/api/stocks/search")
-def search_stocks(q: str = "", limit: int = 10):
-    """Search stocks by ticker or company name for autocomplete."""
-    if not q:
-        return []
-    try:
-        results = query("""
-            SELECT ticker, company_name, sector, current_price, price_change_pct
-            FROM stocks_live
-            WHERE (ticker LIKE %s OR LOWER(company_name) LIKE LOWER(%s))
-            AND current_price IS NOT NULL
-            ORDER BY
-                CASE WHEN ticker LIKE %s THEN 0 ELSE 1 END,
-                market_cap DESC
-            LIMIT %s
-        """, (f"{q.upper()}%", f"%{q}%", f"{q.upper()}%", limit))
-        return results or []
-    except:
-        return []
-
 @app.get("/api/market/indices")
 def get_indices():
     # Try DB first
@@ -888,7 +890,7 @@ def get_divs(limit: int=12):
         SELECT l.ticker,l.company_name,l.sector,l.current_price,l.price_change_pct,d.dividend_yield,d.dividend_rate,a.analyst_rating
         FROM stocks_dividends d JOIN stocks_live l ON d.ticker=l.ticker
         LEFT JOIN stocks_analyst a ON d.ticker=a.ticker
-        WHERE d.dividend_yield IS NOT NULL AND d.dividend_yield>0 AND d.dividend_yield<0.5
+        WHERE d.dividend_yield IS NOT NULL AND d.dividend_yield>0 AND d.dividend_yield<50
         AND l.current_price IS NOT NULL AND (l.sector!='Indices' OR l.sector IS NULL)
         ORDER BY d.dividend_yield DESC LIMIT %s
     """, [limit])
@@ -1004,6 +1006,14 @@ def get_prediction(ticker: str):
         if d.get(field) and isinstance(d[field],str):
             try: d[field]=json.loads(d[field])
             except: d[field]=[]
+    # Outcome of the most recent prediction that has been scored (the current one is still pending)
+    try:
+        o = query("""SELECT run_date, price_at_run, target_1w, actual_price, eval_date, direction_correct
+                     FROM stocks_prediction_log WHERE ticker=%s AND eval_date IS NOT NULL
+                     ORDER BY run_date DESC LIMIT 1""", [ticker.upper()])
+        d['last_outcome'] = o[0] if o else None
+    except Exception:
+        d['last_outcome'] = None  # log table not created yet (run predict.py once)
     return d
 
 # ══════════════════════════════════════════════════════
@@ -1046,30 +1056,7 @@ def get_stock_earnings(ticker: str):
 # NEWS
 # ══════════════════════════════════════════════════════
 def _fetch_news(ticker, count=10):
-    try:
-        import urllib.request
-        import xml.etree.ElementTree as ET
-        url = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={ticker}&region=US&lang=en-US"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=5) as response:
-            xml_data = response.read()
-        root = ET.fromstring(xml_data)
-        articles = []
-        for item in root.findall('.//item')[:count]:
-            title = item.findtext('title','').strip()
-            link = item.findtext('link','').strip()
-            pub = item.findtext('pubDate','')
-            source = item.findtext('source', 'Yahoo Finance')
-            pub_ts = None
-            if pub:
-                try:
-                    from email.utils import parsedate_to_datetime
-                    pub_ts = int(parsedate_to_datetime(pub).timestamp())
-                except: pass
-            if title:
-                articles.append({'title':title,'source':source,'url':link,'published':pub_ts,'ticker':ticker})
-        return articles
-    except: return []
+    return news_feed.fetch_news(ticker, count)
 
 @app.get("/api/news/market")
 def get_market_news():
@@ -1149,76 +1136,233 @@ def get_tx_summary():
 # ══════════════════════════════════════════════════════
 # AI AGENT ENDPOINTS
 # ══════════════════════════════════════════════════════
-from agent import run_agent, review_portfolio
-from screener import get_top_movers, get_sector_summary
-from pydantic import BaseModel
-from typing import List
+import logging
+import re
+import threading
+import time
+from collections import defaultdict, deque
+from typing import List, Literal
+
+import groq
+from fastapi import Path, Query, Request
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field, field_validator
+
+from agent import run_agent, review_portfolio, explain_single_stock, LLMUnavailable
+import ipo_data
+import news_feed
+import peers
+import sentiment
+from screener import get_top_movers, get_sector_summary, screen_stocks
+
+log = logging.getLogger("uvicorn.error")
+
+TICKER_RE = re.compile(r"^[A-Za-z0-9.\-^=]{1,10}$")
+
+
+def _valid_tickers(values):
+    return [t.strip() for t in values if isinstance(t, str) and TICKER_RE.match(t.strip())]
+
+
+# ── Rate limit for the endpoints that spend LLM quota (per client, sliding 60s window) ──
+AGENT_RATE_LIMIT = int(os.getenv("AGENT_RATE_LIMIT", "20"))
+_agent_hits = defaultdict(deque)
+_agent_hits_lock = threading.Lock()
+
+
+def _client_id(request: Request) -> str:
+    # Behind a proxy or tunnel every request comes from the proxy, so trust its forwarded header
+    forwarded = request.headers.get("cf-connecting-ip") or request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    return forwarded or (request.client.host if request.client else "unknown")
+
+
+def agent_error(status_code: int, message: str) -> JSONResponse:
+    return JSONResponse({"status": "error", "message": message}, status_code=status_code)
+
+
+def check_rate_limit(request: Request):
+    """Returns an error response when the client is over the limit, else None."""
+    now = time.time()
+    key = _client_id(request)
+    with _agent_hits_lock:
+        hits = _agent_hits[key]
+        while hits and now - hits[0] > 60:
+            hits.popleft()
+        if len(hits) >= AGENT_RATE_LIMIT:
+            return agent_error(429, f"You're sending messages too quickly. Please wait a moment (limit {AGENT_RATE_LIMIT} per minute).")
+        hits.append(now)
+        if len(_agent_hits) > 5000:  # drop clients with no recent activity
+            for k in [k for k, v in _agent_hits.items() if not v or now - v[-1] > 60]:
+                del _agent_hits[k]
+    return None
+
+
+def run_ai(call):
+    """Run an AI call and turn failures into short, safe messages (details go to the server log)."""
+    try:
+        return call()
+    except LLMUnavailable:
+        return agent_error(503, "The AI assistant isn't available right now.")
+    except groq.RateLimitError:
+        return agent_error(429, "The AI service is busy. Please try again in a minute.")
+    except groq.APIConnectionError:  # includes timeouts
+        return agent_error(504, "I couldn't reach the AI service in time. Please try again.")
+    except Exception:
+        log.exception("AI endpoint failed")
+        return agent_error(500, "Something went wrong on our side. Please try again.")
+
 
 class ScreenerRequest(BaseModel):
     filters: dict = {}
-    limit: int = 50
+    limit: int = Field(default=50, ge=1, le=200)
 
+
+# Plain `def` endpoints run in FastAPI's thread pool, so slow LLM / database calls
+# do not freeze every other request the way they did inside `async def`.
 @app.post("/api/screener")
-async def run_screener(request: ScreenerRequest):
+def run_screener(request: ScreenerRequest):
     try:
-        from screener import screen_stocks
         results = screen_stocks(request.filters, limit=request.limit)
         return results or []
-    except Exception as e:
+    except Exception:
+        log.exception("Screener failed")
         return []
 
+
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(max_length=2000)
+
+
 class RecommendRequest(BaseModel):
-    query: str
-    portfolio_tickers: list = []
-    chat_history: list = []
+    query: str = Field(min_length=1, max_length=500)
+    portfolio_tickers: List[str] = Field(default_factory=list, max_length=30)
+    chat_history: List[ChatMessage] = Field(default_factory=list, max_length=20)
+    reply_to: str = Field(default="", max_length=300)
+
+    @field_validator("portfolio_tickers")
+    @classmethod
+    def only_valid_tickers(cls, v):
+        return _valid_tickers(v)
+
 
 class PortfolioRequest(BaseModel):
-    tickers: List[str]
+    tickers: List[str] = Field(max_length=30)
+
+    @field_validator("tickers")
+    @classmethod
+    def only_valid_tickers(cls, v):
+        return _valid_tickers(v)
+
 
 class ExplainRequest(BaseModel):
-    ticker: str
-    query: str = ""
+    ticker: str = Field(pattern=r"^[A-Za-z0-9.\-^=]{1,10}$")
+    query: str = Field(default="", max_length=500)
+
 
 @app.post("/agent/recommend")
-async def agent_recommend(request: RecommendRequest):
-    try:
+def agent_recommend(request: Request, body: RecommendRequest):
+    limited = check_rate_limit(request)
+    if limited:
+        return limited
+
+    def call():
         result = run_agent(
-            user_query=request.query,
-            portfolio_tickers=request.portfolio_tickers,
-            chat_history=request.chat_history
+            user_query=body.query.strip(),
+            portfolio_tickers=body.portfolio_tickers,
+            chat_history=[m.model_dump() for m in body.chat_history],
+            reply_to=body.reply_to.strip(),
         )
         return {
             "status": "success",
-            "query": request.query,
+            "query": body.query,
             "intent": result.get("intent"),
             "stocks_found": result["stocks_found"],
             "recommendation": result["recommendation"],
             "top_stocks": result["top_stocks"],
             "all_stocks": result["all_stocks"]
         }
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+    return run_ai(call)
+
 
 @app.post("/agent/explain-stock")
-async def agent_explain_stock(request: ExplainRequest):
-    try:
-        from agent import explain_single_stock
-        explanation = explain_single_stock(request.ticker, request.query)
-        return {"status": "success", "ticker": request.ticker, "explanation": explanation}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+def agent_explain_stock(request: Request, body: ExplainRequest):
+    limited = check_rate_limit(request)
+    if limited:
+        return limited
+    return run_ai(lambda: {"status": "success", "ticker": body.ticker,
+                           "explanation": explain_single_stock(body.ticker, body.query)})
+
 
 @app.post("/agent/portfolio-review")
-async def agent_portfolio_review(request: PortfolioRequest):
+def agent_portfolio_review(request: Request, body: PortfolioRequest):
+    limited = check_rate_limit(request)
+    if limited:
+        return limited
+    return run_ai(lambda: {"status": "success", "tickers_reviewed": body.tickers,
+                           "review": review_portfolio(tickers=body.tickers)})
+
+@app.get("/api/ipos")
+def get_ipo_calendar(days_back: int = Query(14, ge=0, le=30), days_ahead: int = Query(60, ge=0, le=90)):
+    """Upcoming and recently priced US IPOs (cached for 30 minutes)."""
     try:
-        review = review_portfolio(tickers=request.tickers)
-        return {
-            "status": "success",
-            "tickers_reviewed": request.tickers,
-            "review": review
-        }
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return ipo_data.get_ipos(days_back, days_ahead)
+    except ipo_data.IPOUnavailable:
+        return agent_error(503, "The IPO calendar is unavailable right now. Please try again shortly.")
+    except Exception:
+        log.exception("IPO calendar failed")
+        return agent_error(500, "Something went wrong loading the IPO calendar.")
+
+
+@app.get("/api/peers/{ticker}")
+def get_stock_peers(request: Request, ticker: str = Path(pattern=r"^[A-Za-z0-9.\-^=]{1,10}$"), n: int = Query(4, ge=1, le=5)):
+    """Suggested competitors for a stock (database pool, closest picked by AI, cached for a week)."""
+    limited = check_rate_limit(request)  # an uncached lookup makes an LLM call
+    if limited:
+        return limited
+    try:
+        result = peers.suggest_peers(ticker, n)
+    except Exception:
+        log.exception("Peer lookup failed")
+        return agent_error(500, "Something went wrong finding peers.")
+    if result is None:
+        return agent_error(404, f"{ticker.upper()} isn't in our database.")
+    return {"status": "success", **result}
+
+
+@app.get("/api/sentiment/{ticker}")
+def get_stock_sentiment(request: Request, ticker: str = Path(pattern=r"^[A-Za-z0-9.\-^=]{1,10}$")):
+    """AI-scored sentiment of a stock's recent headlines (cached for a few hours)."""
+    limited = check_rate_limit(request)  # a refresh makes an LLM call
+    if limited:
+        return limited
+
+    def call():
+        result = sentiment.get_sentiment(ticker)
+        if result is None:
+            return agent_error(404, f"{ticker.upper()} isn't in our database.")
+        return {"status": "success", **result}
+    return run_ai(call)
+
+
+@app.get("/api/compare")
+def compare_stocks(tickers: str = Query(..., min_length=1, max_length=120)):
+    """Side-by-side metrics. The first ticker is the stock the others are compared against."""
+    parts = [t.strip() for t in tickers.split(",") if t.strip()]
+    valid = _valid_tickers(parts)
+    if len(valid) != len(parts):
+        return agent_error(400, "One of the tickers is not valid.")
+    if not 2 <= len({t.upper() for t in valid}) <= peers.MAX_STOCKS:
+        return agent_error(400, f"Compare between 2 and {peers.MAX_STOCKS} different stocks.")
+    try:
+        result = peers.build_comparison(valid)
+    except Exception:
+        log.exception("Comparison failed")
+        return agent_error(500, "Something went wrong building the comparison.")
+    if valid[0].upper() not in result["tickers"] or len(result["tickers"]) < 2:
+        return agent_error(404, "We need at least two stocks we track, including the first one.")
+    return {"status": "success", **result}
+
 
 @app.get("/api/market/signals")
 async def market_signals():
@@ -1227,9 +1371,9 @@ async def market_signals():
         cursor = conn.cursor(dictionary=True)
         cursor.execute("""
             SELECT l.sector,
-                SUM(CASE WHEN p.buy_signal = 'BUY' THEN 1 ELSE 0 END) as buy_count,
-                SUM(CASE WHEN p.buy_signal = 'HOLD' THEN 1 ELSE 0 END) as hold_count,
-                SUM(CASE WHEN p.buy_signal = 'SELL' THEN 1 ELSE 0 END) as sell_count
+                SUM(CASE WHEN p.buy_signal IN ('Buy','Strong Buy') THEN 1 ELSE 0 END) as buy_count,
+                SUM(CASE WHEN p.buy_signal = 'Hold' THEN 1 ELSE 0 END) as hold_count,
+                SUM(CASE WHEN p.buy_signal IN ('Sell','Strong Sell') THEN 1 ELSE 0 END) as sell_count
             FROM stocks_live l
             JOIN stocks_predictions p ON l.ticker = p.ticker
             WHERE l.sector IS NOT NULL
@@ -1244,25 +1388,25 @@ async def market_signals():
         return {"signals": [], "error": str(e)}
 
 @app.get("/api/predictions/accuracy")
-async def prediction_accuracy():
+def prediction_accuracy():
+    """Hit rate of the 1-week (7 trading day) direction call, next to what always guessing 'up' would have scored."""
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("""
-            SELECT 
-                COUNT(*) as total,
-                SUM(CASE WHEN direction_correct_1w = 1 THEN 1 ELSE 0 END) as correct
-            FROM stocks_predictions
-            WHERE direction_correct_1w IS NOT NULL
-        """)
-        result = cursor.fetchone()
-        conn.close()
-        return {
-            "total": result['total'] or 0,
-            "correct": result['correct'] or 0
-        }
-    except Exception as e:
-        return {"total": 0, "correct": 0, "error": str(e)}
+        r = query("""SELECT COUNT(*) AS total, COALESCE(SUM(direction_correct),0) AS correct,
+                            AVG(actual_price > price_at_run)*100 AS always_up_pct,
+                            MIN(run_date) AS first_run, MAX(run_date) AS last_run
+                     FROM stocks_prediction_log WHERE eval_date IS NOT NULL""")[0]
+        total, correct = int(r['total'] or 0), int(r['correct'] or 0)
+        if not total:
+            return {"total": 0, "correct": 0, "horizon": "7 trading days"}
+        pct = round(correct / total * 100, 1)
+        up = round(float(r['always_up_pct'] or 0), 1)
+        return {"total": total, "correct": correct, "accuracy_pct": pct, "always_up_pct": up,
+                "edge_pp": round(pct - up, 1), "first_run": str(r['first_run']), "last_run": str(r['last_run']),
+                "horizon": "7 trading days"}
+    except Exception:
+        log.exception("Accuracy summary failed")
+        return {"total": 0, "correct": 0, "error": "Accuracy data is not available yet."}
+
     try:
         movers = get_top_movers(5)
         sectors = get_sector_summary()

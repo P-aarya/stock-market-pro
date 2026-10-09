@@ -5,15 +5,16 @@
 
 import yfinance as yf
 import mysql.connector
+import db
 from datetime import datetime
 import time
-from tickers import ALL_TICKERS
+from tickers import ALL_TICKERS as _FILE_TICKERS
+
+# tickers.py plus anything added to the database since
+ALL_TICKERS = list(dict.fromkeys(_FILE_TICKERS + db.get_db_tickers()))
 
 def get_connection():
-    return mysql.connector.connect(
-        host="localhost", port=3306, user="root",
-        password="Aroot092325", database="stock_market_pro_db"
-    )
+    return db.get_connection()
 
 def fetch_earnings(ticker, cursor, conn):
     try:

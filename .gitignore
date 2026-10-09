@@ -1,6 +1,9 @@
-﻿.env
+.env
 __pycache__/
 *.pyc
 *.pyo
 ngrok-v3-stable-windows-amd64/
 *.log
+.DS_Store
+venv/
+cloudflared*

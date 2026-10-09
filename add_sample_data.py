@@ -1,10 +1,8 @@
 import mysql.connector
+import db
 
 def get_db():
-    return mysql.connector.connect(
-        host="localhost", port=3306, user="root",
-        password="Aroot092325", database="stock_market_pro_db"
-    )
+    return db.get_connection()
 
 def main():
     conn = get_db()
