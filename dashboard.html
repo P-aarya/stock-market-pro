@@ -965,6 +965,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     </div>
 
     <div class="fssec" id="fss-news">
+      <div id="sent-card"></div>
       <div id="fs-news-list"><div class="load"><div class="spin"></div>Loading news...</div></div>
     </div>
 
@@ -1065,6 +1066,7 @@ function showFST(t,btn){
   if(t==='intelligence')loadPrediction();
   if(t==='company')loadCompanyTab();
   if(t==='peers')loadPeers();
+  if(t==='news')loadSentiment();
   if(t==='quarterly')loadQuarterly();
 }
 
@@ -1655,6 +1657,59 @@ function renderEarnings(){
 }
 function goEarnPg(p){earnPg=p;renderEarnings();}
 
+// News sentiment
+function safeHttpUrl(u){return/^https?:\/\//i.test(u||'')?u:'';}
+function openNewsLink(el){const u=el.dataset.url;if(u)window.open(u,'_blank','noopener');}
+let sentSeq=0;
+async function loadSentiment(){
+  const tk=curTick,el=document.getElementById('sent-card');
+  if(!tk||!el)return;
+  if(el.dataset.t===tk&&el.dataset.state==='ok')return;          // already loaded for this stock
+  const seq=++sentSeq;
+  el.dataset.t=tk;el.dataset.state='loading';
+  el.innerHTML='<div class="sent-card"><div class="load"><div class="spin"></div>Scoring recent headlines with AI...</div></div>';
+  const d=await api('/api/sentiment/'+encodeURIComponent(tk));
+  if(seq!==sentSeq||curTick!==tk)return;                         // the user moved on
+  if(!d||d.status!=='success'){
+    el.dataset.state='error';
+    el.innerHTML='<div class="sent-card"><div class="empty">News sentiment is unavailable right now. <button class="linkbtn" onclick="document.getElementById(\'sent-card\').dataset.state=\'\';loadSentiment()">Retry</button></div></div>';
+    return;
+  }
+  el.dataset.state='ok';
+  el.innerHTML=renderSentiment(d);
+}
+function sentChip(score){
+  if(score==null)return'<span class="sent-chip" style="background:var(--bg3);color:var(--t3)">n/a</span>';
+  const bg=score>=0.15?'rgba(0,230,118,0.12)':score<=-0.15?'rgba(255,68,68,0.12)':'rgba(79,142,247,0.12)';
+  const fg=score>=0.15?'var(--green)':score<=-0.15?'var(--red)':'var(--blue)';
+  return`<span class="sent-chip" style="background:${bg};color:${fg}">${score>0?'+':''}${score.toFixed(2)}</span>`;
+}
+function sentHeadline(h){
+  const u=safeHttpUrl(h.url),title=escapeHtml(h.title||''),age=h.published?new Date(h.published*1000).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
+  return`<div class="sent-row">${sentChip(h.score)}<div>${u?`<a href="${escapeHtml(u)}" target="_blank" rel="noopener">${title}</a>`:`<span class="t">${title}</span>`}
+    <div class="sent-meta" style="margin-top:2px">${escapeHtml(h.source||'')}${age?' · '+age:''}</div></div></div>`;
+}
+function renderSentiment(d){
+  const label=d.label||'',score=d.score;
+  const badge=label==='Positive'?'bg':label==='Negative'?'br':score==null?'by':'bb';
+  const about=(d.headlines||[]).filter(h=>h.score!=null).sort((a,b)=>(b.published||0)-(a.published||0));
+  const other=(d.headlines||[]).filter(h=>h.score==null);
+  const pos=score==null?50:Math.max(0,Math.min(100,(score+1)/2*100));
+  const upd=d.updated_at?new Date(d.updated_at).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+  const c=d.counts||{};
+  return`<div class="sent-card">
+    <div class="chdr" style="margin-bottom:10px"><div class="ctitle">📰 News sentiment</div><span class="badge ${badge}">${escapeHtml(label)}</span></div>
+    ${score==null?`<div class="empty" style="padding:8px 0">${d.n_articles?'None of the recent headlines are about this company.':'No recent headlines found for this stock.'}</div>`:
+    `<div class="sent-top"><div class="sent-score ${score>=0.15?'g':score<=-0.15?'r':''}">${score>0?'+':''}${score.toFixed(2)}</div>
+      <div class="sent-gauge" title="-1 very negative, +1 very positive"><i style="left:${pos}%"></i></div></div>
+    <div class="sent-meta">${d.n_relevant} of ${d.n_articles} headlines are about ${escapeHtml(d.ticker)} · ${c.positive||0} positive · ${c.neutral||0} neutral · ${c.negative||0} negative</div>`}
+    ${d.stale?'<div class="sent-meta r">⚠️ The AI service is unavailable, so this is an older result.</div>':''}
+    <div style="margin-top:10px">${about.map(sentHeadline).join('')}</div>
+    ${other.length?`<details><summary>${other.length} headline${other.length>1?'s':''} not about ${escapeHtml(d.ticker)} (ignored)</summary>${other.map(sentHeadline).join('')}</details>`:''}
+    <div class="sent-meta" style="margin-top:10px">Headlines are scored by AI from -1 (very negative) to +1 (very positive) for their likely effect on this stock, newer ones counting more. It is context, not a forecast, and a story reported by several outlets counts once per outlet.${upd?' Updated '+escapeHtml(upd)+'.':''}</div>
+  </div>`;
+}
+
 // Peer comparison
 let peerState={target:null,suggested:[],list:[],source:'',names:{},loadSeq:0,cmpSeq:0,searchSeq:0};
 const PEER_MAX=5;
@@ -2136,7 +2191,7 @@ async function openStock(ticker){
 
   // News
   document.getElementById('fs-news-list').innerHTML=news?.length
-    ?news.map(n=>`<div class="ni" onclick="window.open('${n.url||'#'}','_blank')"><div class="nt">${n.title||'No title'}</div><div class="nm"><span class="ns">📰 ${n.source||'Yahoo Finance'}</span><span>📅 ${n.published?new Date(n.published*1000).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'--'}</span></div></div>`).join('')
+    ?news.map(n=>`<div class="ni" data-url="${escapeHtml(safeHttpUrl(n.url))}" onclick="openNewsLink(this)"><div class="nt">${escapeHtml(n.title||'No title')}</div><div class="nm"><span class="ns">📰 ${escapeHtml(n.source||'Yahoo Finance')}</span><span>📅 ${n.published?new Date(n.published*1000).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'--'}</span></div></div>`).join('')
     :'<div class="empty">No recent news found for '+ticker+' from Yahoo Finance.</div>';
 
   window._hist=hist;
@@ -2549,8 +2604,6 @@ function buildAccuracyTracker(d, livePrice){
   if(!d.run_date) return '';
   const runDate = d.run_date;
   const pred1w  = d.target_1w;
-  const actual  = d.actual_1w;
-  const correct = d.direction_correct_1w;
 
   let html = `<div style="background:var(--bg2);border:1px solid var(--b1);border-radius:10px;padding:14px;margin-top:14px">
     <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:var(--cyan);margin-bottom:12px">
@@ -2559,30 +2612,32 @@ function buildAccuracyTracker(d, livePrice){
 
   // Prediction run info
   html += `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
-    <div class="mi"><div class="ml">Predicted On</div><div class="mv" style="font-size:12px">${runDate||'--'}</div></div>
+    <div class="mi"><div class="ml">Predicted On</div><div class="mv" style="font-size:12px">${escapeHtml(String(runDate||'--'))}</div></div>
     <div class="mi"><div class="ml">Price At Prediction</div><div class="mv">${fp(d.current_price)}</div></div>
     <div class="mi"><div class="ml">Today's Live Price</div><div class="mv ${gc(livePrice-d.current_price)}">${fp(livePrice)}</div></div>
   </div>`;
 
-  // 1W accuracy if available
-  if(actual && pred1w){
-    const predDir = pred1w > d.current_price ? '↑ Up' : '↓ Down';
-    const actualDir = actual > d.current_price ? '↑ Up' : '↓ Down';
-    const hit = correct === 1;
+  // Result of the most recent prediction that has been scored (the current one is still waiting)
+  const lo = d.last_outcome;
+  if(lo && lo.actual_price!=null && lo.target_1w!=null && lo.price_at_run){
+    const predDir = lo.target_1w > lo.price_at_run ? '↑ Up' : '↓ Down';
+    const actualDir = lo.actual_price > lo.price_at_run ? '↑ Up' : '↓ Down';
+    const hit = lo.direction_correct === 1;
     html += `<div style="background:${hit?'rgba(0,230,118,0.08)':'rgba(255,68,68,0.08)'};border:1px solid ${hit?'rgba(0,230,118,0.2)':'rgba(255,68,68,0.2)'};border-radius:8px;padding:12px">
-      <div style="font-size:11px;font-weight:800;color:${hit?'var(--green)':'var(--red)'};margin-bottom:8px">
-        ${hit?'✅ Direction Correct':'❌ Direction Wrong'} — 1 Week Prediction
+      <div style="font-size:11px;font-weight:800;color:${hit?'var(--green)':'var(--red)'};margin-bottom:4px">
+        ${hit?'✅ Direction Correct':'❌ Direction Wrong'} — last scored prediction
       </div>
+      <div style="font-size:10px;color:var(--t3);margin-bottom:8px">Made on ${escapeHtml(String(lo.run_date))} at ${fp(lo.price_at_run)}; scored on ${escapeHtml(String(lo.eval_date))}, 7 trading days later.</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-        <div class="mi"><div class="ml">1W Prediction</div><div class="mv">${fp(pred1w)}</div><div style="font-size:10px;color:var(--t3)">${predDir}</div></div>
-        <div class="mi"><div class="ml">Actual Price</div><div class="mv">${fp(actual)}</div><div style="font-size:10px;color:var(--t3)">${actualDir}</div></div>
-        <div class="mi"><div class="ml">Error</div><div class="mv ${hit?'g':'r'}">${f2(Math.abs(actual-pred1w)/pred1w*100)}%</div></div>
+        <div class="mi"><div class="ml">Predicted</div><div class="mv">${fp(lo.target_1w)}</div><div style="font-size:10px;color:var(--t3)">${predDir}</div></div>
+        <div class="mi"><div class="ml">Actual Price</div><div class="mv">${fp(lo.actual_price)}</div><div style="font-size:10px;color:var(--t3)">${actualDir}</div></div>
+        <div class="mi"><div class="ml">Error</div><div class="mv ${hit?'g':'r'}">${f2(Math.abs(lo.actual_price-lo.target_1w)/lo.target_1w*100)}%</div></div>
       </div>
     </div>`;
   } else {
     html += `<div style="color:var(--t3);font-size:12px;font-weight:600;padding:10px;background:var(--bg3);border-radius:7px">
-      ⏳ Accuracy data will be available 7 days after predictions were run (${runDate||'--'}).
-      Run predict.py weekly to build accuracy history.
+      ⏳ No scored prediction yet. Each prediction is scored 7 trading days after it is made (this one was made on ${escapeHtml(String(runDate||'--'))}).
+      Run predict.py regularly to build the accuracy history.
     </div>`;
   }
 
@@ -3491,6 +3546,18 @@ function loadPortfolioTickers() {
 .b-stock-item .bsi-left .bsi-name{font-size:11px;color:var(--t3);}
 .b-stock-item .bsi-right .bsi-price{font-size:12px;font-weight:700;color:var(--t1);text-align:right;}
 .b-stock-item .bsi-right .bsi-chg{font-size:11px;font-weight:600;text-align:right;}
+/* ── News sentiment ── */
+.sent-card{background:var(--bg2);border:1px solid var(--b1);border-radius:10px;padding:14px;margin-bottom:14px;}
+.sent-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px;}
+.sent-score{font-family:var(--mono);font-size:22px;font-weight:800;}
+.sent-gauge{position:relative;flex:1;min-width:160px;height:8px;border-radius:4px;background:linear-gradient(90deg,var(--red),var(--bg3) 50%,var(--green));}
+.sent-gauge i{position:absolute;top:-4px;width:4px;height:16px;border-radius:2px;background:var(--t1);transform:translateX(-50%);}
+.sent-meta{font-size:11px;font-weight:600;color:var(--t3);margin-top:6px;}
+.sent-row{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--b1);font-size:12px;}
+.sent-chip{flex:0 0 46px;text-align:center;font-family:var(--mono);font-weight:800;font-size:11px;border-radius:5px;padding:3px 0;}
+.sent-row a,.sent-row span.t{color:var(--t2);font-weight:600;text-decoration:none;}
+.sent-row a:hover{color:var(--cyan);}
+.sent-card details summary{cursor:pointer;font-size:11px;font-weight:700;color:var(--t3);padding-top:8px;}
 /* ── Peer comparison ── */
 .peer-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px;}
 .peer-chips{display:flex;flex-wrap:wrap;gap:6px;}

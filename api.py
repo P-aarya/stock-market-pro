@@ -981,6 +981,14 @@ def get_prediction(ticker: str):
         if d.get(field) and isinstance(d[field],str):
             try: d[field]=json.loads(d[field])
             except: d[field]=[]
+    # Outcome of the most recent prediction that has been scored (the current one is still pending)
+    try:
+        o = query("""SELECT run_date, price_at_run, target_1w, actual_price, eval_date, direction_correct
+                     FROM stocks_prediction_log WHERE ticker=%s AND eval_date IS NOT NULL
+                     ORDER BY run_date DESC LIMIT 1""", [ticker.upper()])
+        d['last_outcome'] = o[0] if o else None
+    except Exception:
+        d['last_outcome'] = None  # log table not created yet (run predict.py once)
     return d
 
 # ══════════════════════════════════════════════════════
@@ -1023,30 +1031,7 @@ def get_stock_earnings(ticker: str):
 # NEWS
 # ══════════════════════════════════════════════════════
 def _fetch_news(ticker, count=10):
-    try:
-        import urllib.request
-        import xml.etree.ElementTree as ET
-        url = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={ticker}&region=US&lang=en-US"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req, timeout=5) as response:
-            xml_data = response.read()
-        root = ET.fromstring(xml_data)
-        articles = []
-        for item in root.findall('.//item')[:count]:
-            title = item.findtext('title','').strip()
-            link = item.findtext('link','').strip()
-            pub = item.findtext('pubDate','')
-            source = item.findtext('source', 'Yahoo Finance')
-            pub_ts = None
-            if pub:
-                try:
-                    from email.utils import parsedate_to_datetime
-                    pub_ts = int(parsedate_to_datetime(pub).timestamp())
-                except: pass
-            if title:
-                articles.append({'title':title,'source':source,'url':link,'published':pub_ts,'ticker':ticker})
-        return articles
-    except: return []
+    return news_feed.fetch_news(ticker, count)
 
 @app.get("/api/news/market")
 def get_market_news():
@@ -1140,7 +1125,9 @@ from pydantic import BaseModel, Field, field_validator
 
 from agent import run_agent, review_portfolio, explain_single_stock, LLMUnavailable
 import ipo_data
+import news_feed
 import peers
+import sentiment
 from screener import get_top_movers, get_sector_summary, screen_stocks
 
 log = logging.getLogger("uvicorn.error")
@@ -1318,6 +1305,21 @@ def get_stock_peers(request: Request, ticker: str = Path(pattern=r"^[A-Za-z0-9.\
     return {"status": "success", **result}
 
 
+@app.get("/api/sentiment/{ticker}")
+def get_stock_sentiment(request: Request, ticker: str = Path(pattern=r"^[A-Za-z0-9.\-^=]{1,10}$")):
+    """AI-scored sentiment of a stock's recent headlines (cached for a few hours)."""
+    limited = check_rate_limit(request)  # a refresh makes an LLM call
+    if limited:
+        return limited
+
+    def call():
+        result = sentiment.get_sentiment(ticker)
+        if result is None:
+            return agent_error(404, f"{ticker.upper()} isn't in our database.")
+        return {"status": "success", **result}
+    return run_ai(call)
+
+
 @app.get("/api/compare")
 def compare_stocks(tickers: str = Query(..., min_length=1, max_length=120)):
     """Side-by-side metrics. The first ticker is the stock the others are compared against."""
@@ -1361,25 +1363,25 @@ async def market_signals():
         return {"signals": [], "error": str(e)}
 
 @app.get("/api/predictions/accuracy")
-async def prediction_accuracy():
+def prediction_accuracy():
+    """Hit rate of the 1-week (7 trading day) direction call, next to what always guessing 'up' would have scored."""
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("""
-            SELECT 
-                COUNT(*) as total,
-                SUM(CASE WHEN direction_correct_1w = 1 THEN 1 ELSE 0 END) as correct
-            FROM stocks_predictions
-            WHERE direction_correct_1w IS NOT NULL
-        """)
-        result = cursor.fetchone()
-        conn.close()
-        return {
-            "total": result['total'] or 0,
-            "correct": result['correct'] or 0
-        }
-    except Exception as e:
-        return {"total": 0, "correct": 0, "error": str(e)}
+        r = query("""SELECT COUNT(*) AS total, COALESCE(SUM(direction_correct),0) AS correct,
+                            AVG(actual_price > price_at_run)*100 AS always_up_pct,
+                            MIN(run_date) AS first_run, MAX(run_date) AS last_run
+                     FROM stocks_prediction_log WHERE eval_date IS NOT NULL""")[0]
+        total, correct = int(r['total'] or 0), int(r['correct'] or 0)
+        if not total:
+            return {"total": 0, "correct": 0, "horizon": "7 trading days"}
+        pct = round(correct / total * 100, 1)
+        up = round(float(r['always_up_pct'] or 0), 1)
+        return {"total": total, "correct": correct, "accuracy_pct": pct, "always_up_pct": up,
+                "edge_pp": round(pct - up, 1), "first_run": str(r['first_run']), "last_run": str(r['last_run']),
+                "horizon": "7 trading days"}
+    except Exception:
+        log.exception("Accuracy summary failed")
+        return {"total": 0, "correct": 0, "error": "Accuracy data is not available yet."}
+
     try:
         movers = get_top_movers(5)
         sectors = get_sector_summary()
