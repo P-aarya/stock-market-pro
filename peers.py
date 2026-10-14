@@ -54,7 +54,8 @@ def _name_key(name):
 # ── candidate pool ─────────────────────────────────────────
 
 _POOL_COLUMNS = "l.ticker, l.company_name, l.sector, l.industry, l.market_cap"
-_POOL_FILTER = "l.current_price IS NOT NULL AND l.market_cap IS NOT NULL AND (l.sector != 'Indices' OR l.sector IS NULL)"
+_POOL_FILTER = ("l.current_price IS NOT NULL AND l.market_cap IS NOT NULL AND (l.sector != 'Indices' OR l.sector IS NULL)"
+                " AND l.last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)")  # no update for two weeks usually means delisted
 
 
 def get_target(ticker):
@@ -120,6 +121,60 @@ Return ONLY JSON: {{"peers": ["TICKER", ...]}}"""
     return picked[:n]
 
 
+_peers_table_ready = False
+
+def _ensure_peers_table():
+    global _peers_table_ready
+    if _peers_table_ready:
+        return
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("""CREATE TABLE IF NOT EXISTS stocks_peers (
+                           ticker VARCHAR(20) NOT NULL, n TINYINT NOT NULL, peers JSON NOT NULL,
+                           updated_at DATETIME NOT NULL, PRIMARY KEY (ticker, n))""")
+        conn.commit()
+        _peers_table_ready = True
+    finally:
+        conn.close()
+
+
+def _stored_peers(ticker, n):
+    """AI-chosen peers saved by an earlier run (and still fresh), as the same shape suggest_peers returns, or None."""
+    try:
+        _ensure_peers_table()
+        rows = _query("SELECT peers FROM stocks_peers WHERE ticker = %s AND n = %s AND updated_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)", (ticker, n))
+        if not rows:
+            return None
+        tickers = rows[0]["peers"] if isinstance(rows[0]["peers"], list) else json.loads(rows[0]["peers"])
+        target = get_target(ticker)
+        if not target or not tickers:
+            return None
+        found = {r["ticker"]: r for r in _query(
+            f"SELECT {_POOL_COLUMNS} FROM stocks_live l WHERE l.ticker IN (%s) AND l.current_price IS NOT NULL" % ",".join(["%s"] * len(tickers)), tickers)}
+        peers = [found[t] for t in tickers if t in found]
+        return {"target": target, "peers": peers, "source": "ai"} if len(peers) == len(tickers) else None
+    except Exception as e:
+        print(f"Stored peers lookup failed: {e}")
+        return None
+
+
+def _store_peers(ticker, n, value):
+    try:
+        _ensure_peers_table()
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute("""INSERT INTO stocks_peers (ticker, n, peers, updated_at) VALUES (%s, %s, %s, NOW())
+                           ON DUPLICATE KEY UPDATE peers = VALUES(peers), updated_at = VALUES(updated_at)""",
+                        (ticker, n, json.dumps([p["ticker"] for p in value["peers"]])))
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception as e:
+        print(f"Could not save peers: {e}")
+
+
 def suggest_peers(ticker, n=4):
     """Returns {"target", "peers", "source"} or None if the ticker is unknown. source is 'ai' or 'database'."""
     ticker = ticker.upper()
@@ -129,6 +184,12 @@ def suggest_peers(ticker, n=4):
         hit = _peer_cache.get(key)
         if hit and hit["expires"] > time.time():
             return hit["value"]
+
+    stored = _stored_peers(ticker, n)
+    if stored:
+        with _cache_lock:
+            _peer_cache[key] = {"value": stored, "expires": time.time() + AI_CACHE_TTL}
+        return stored
 
     target = get_target(ticker)
     if not target:
@@ -155,6 +216,8 @@ def suggest_peers(ticker, n=4):
     ttl = AI_CACHE_TTL if source == "ai" or len(pool) <= n else FALLBACK_CACHE_TTL
     with _cache_lock:
         _peer_cache[key] = {"value": value, "expires": time.time() + ttl}
+    if source == "ai":
+        _store_peers(ticker, n, value)
     return value
 
 
@@ -204,6 +267,9 @@ METRIC_GROUPS = [
         ("analyst_rating", "Analyst rating", "text", None, False),
         ("upside_pct", "Upside to analyst target", "pp", "higher", False),
     ]),
+    ("News", [
+        ("news_sentiment", "News sentiment (AI)", "sent", "higher", False),
+    ]),
     ("Size", [
         ("market_cap", "Market cap", "usd", None, False),
     ]),
@@ -216,6 +282,7 @@ TEXT_RANKS = {
 }
 
 SIMILAR_WITHIN = 0.05   # within 5% of the peer median counts as "in line"
+OUTLIER_PCT = 2.0       # a percentage metric beyond +/-200% is flagged: usually a tiny base or a data error
 
 _COMPARE_SQL = """
     SELECT l.ticker, l.company_name, l.sector, l.industry, l.current_price, l.price_change_pct,
@@ -261,6 +328,16 @@ def build_comparison(tickers):
 
     found = [t for t in wanted if t in rows]
     missing = [t for t in wanted if t not in rows]
+    sentiments = {}
+    if found:
+        try:
+            sentiments = {r["ticker"]: r["score"] for r in _query(
+                "SELECT ticker, score FROM stocks_sentiment WHERE score IS NOT NULL AND updated_at >= DATE_SUB(NOW(), INTERVAL 3 DAY) AND ticker IN (%s)"
+                % ",".join(["%s"] * len(found)), found)}
+        except Exception:
+            pass  # sentiment has never been scored
+    for t in found:
+        rows[t]["news_sentiment"] = sentiments.get(t)
     for r in rows.values():
         price, target_price = r.get("current_price"), r.get("target_1w")
         r["model_move_1w"] = round((target_price - price) / price * 100, 2) if _number(price) and _number(target_price) else None
@@ -289,17 +366,104 @@ def build_comparison(tickers):
                 mine = usable.get(target)
                 if better and mine is not None:
                     # "in line" = within 5% of the median, or within 1 percentage point for percentages
-                    tolerance = max(SIMILAR_WITHIN * abs(median), {"pct": 0.01, "pp": 1.0}.get(fmt, 0))
+                    tolerance = max(SIMILAR_WITHIN * abs(median), {"pct": 0.01, "pp": 1.0, "sent": 0.15}.get(fmt, 0))
                     if abs(mine - median) <= tolerance:
                         position = "similar"
                     else:
                         position = "better" if (mine > median) == (better == "higher") else "worse"
 
+            outliers = [t for t, v in values.items() if fmt == "pct" and _number(v) is not None and abs(v) > OUTLIER_PCT]
             out.append({"key": key, "label": label, "format": fmt, "better": better,
-                        "values": values, "best": best, "median": median, "position": position})
+                        "values": values, "best": best, "median": median, "position": position, "outliers": outliers})
         groups.append({"name": group_name, "metrics": out})
 
     companies = {t: {k: rows[t][k] for k in ("company_name", "sector", "industry", "current_price", "price_change_pct", "market_cap")} for t in found}
     stamps = [rows[t]["price_updated"] for t in found if rows[t].get("price_updated")]
     return {"target": target, "tickers": found, "missing": missing, "companies": companies,
             "groups": groups, "prices_as_of": max(stamps) if stamps else None}
+
+
+# ── rebased price chart ───────────────────────────────────
+
+_price_cache = {}
+PRICE_CACHE_TTL = 1800
+
+
+def rebased_prices(tickers, period="1y"):
+    """
+    Daily closes for each ticker over `period`, rebased so every line starts at 100 on the first day they all have data.
+    Returns {"dates": [...], "series": {ticker: [...]}, "missing": [...]}.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+    import yfinance as yf
+
+    wanted = []
+    for t in tickers:
+        t = t.strip().upper()
+        if t and t not in wanted:
+            wanted.append(t)
+    # Only stocks we track: Yahoo can hang for minutes on a symbol it does not know
+    tracked = {r["ticker"] for r in _query("SELECT ticker FROM stocks_live WHERE ticker IN (%s)" % ",".join(["%s"] * len(wanted)), wanted)} if wanted else set()
+    unknown = [t for t in wanted if t not in tracked]
+    wanted = [t for t in wanted if t in tracked][:MAX_STOCKS]
+    key = (tuple(wanted), period)
+    hit = _price_cache.get(key)
+    if hit and hit["expires"] > time.time():
+        return hit["value"]
+
+    def closes(t):
+        try:
+            c = yf.Ticker(t).history(period=period, timeout=15)["Close"].dropna()
+            c.index = [str(x)[:10] for x in c.index]
+            return c if len(c) > 20 else None
+        except Exception as e:
+            print(f"Price history failed for {t}: {e}")
+            return None
+
+    with ThreadPoolExecutor(max_workers=max(1, len(wanted))) as pool:
+        histories = dict(zip(wanted, pool.map(closes, wanted)))
+    have = {t: c for t, c in histories.items() if c is not None}
+    missing = unknown + [t for t in wanted if t not in have]
+    if len(have) < 1:
+        return {"dates": [], "series": {}, "missing": missing}
+
+    common = None
+    for c in have.values():
+        common = set(c.index) if common is None else common & set(c.index)
+    dates = sorted(common or [])
+    if len(dates) < 20:
+        return {"dates": [], "series": {}, "missing": missing + [t for t in have]}
+    series = {t: [round(float(c[d]) / float(c[dates[0]]) * 100, 2) for d in dates] for t, c in have.items()}
+    value = {"dates": dates, "series": series, "missing": missing}
+    _price_cache[key] = {"value": value, "expires": time.time() + PRICE_CACHE_TTL}
+    return value
+
+
+# ── AI verdict ────────────────────────────────────────────
+
+_verdict_cache = {}
+VERDICT_CACHE_TTL = 3600
+
+
+def verdict(tickers):
+    """A short written comparison of these stocks, grounded in their stored data. Cached for an hour."""
+    from agent import generate_comparison  # imported here so peers.py and agent.py can import each other
+    from screener import get_stock_snapshot
+
+    wanted = []
+    for t in tickers:
+        t = t.strip().upper()
+        if t and t not in wanted:
+            wanted.append(t)
+    wanted = wanted[:MAX_STOCKS]
+    key = tuple(wanted)
+    hit = _verdict_cache.get(key)
+    if hit and hit["expires"] > time.time():
+        return hit["value"]
+    snapshots = [x for x in (get_stock_snapshot(t) for t in wanted) if x]
+    if len(snapshots) < 2:
+        return None
+    text = generate_comparison(f"Compare {', '.join(x['ticker'] for x in snapshots)}, treating {snapshots[0]['ticker']} as the main stock", snapshots)
+    value = {"verdict": text, "tickers": [x["ticker"] for x in snapshots]}
+    _verdict_cache[key] = {"value": value, "expires": time.time() + VERDICT_CACHE_TTL}
+    return value

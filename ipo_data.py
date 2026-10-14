@@ -15,8 +15,13 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
+import logging
+
 import requests
 import yfinance as yf
+
+# yfinance logs an error line for every symbol it has no data for, which is expected here
+logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 
 ET = ZoneInfo("America/New_York")
 CACHE_TTL = 1800          # seconds
@@ -176,6 +181,8 @@ def _merge(yahoo: list, nasdaq: list) -> list:
             by_name[key] = row
 
     for row in yahoo:
+        if row["ticker"] and row["ticker"] in by_ticker:
+            continue  # Yahoo sometimes lists the same ticker twice
         merged.append(row)
         index(row)
 
@@ -225,9 +232,16 @@ def _build() -> dict:
     if yahoo is None and nasdaq_ok == 0:
         raise IPOUnavailable("Both IPO data sources failed")
 
+    merged = [r for r in _merge(yahoo or [], nasdaq) if start <= r["date"] <= end]
+    # Rows only Yahoo lists (Nasdaq did not confirm them) are the doubtful ones: drop those that are already trading
+    doubtful = [r["ticker"] for r in merged if r["sources"] == ["Yahoo Finance"] and r["ticker"]]
+    existing = set()
+    if doubtful:
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            existing = {t for t, flag in zip(doubtful, pool.map(_already_trading, doubtful)) if flag}
     rows = []
-    for r in _merge(yahoo or [], nasdaq):
-        if not (start <= r["date"] <= end):
+    for r in merged:
+        if r["ticker"] in existing and r["sources"] == ["Yahoo Finance"]:
             continue
         if "Nasdaq" not in r["sources"] and (not r["company"] or r["company"].lower() == "nan" or _NOT_AN_IPO.search(r["company"])):
             continue
@@ -243,6 +257,25 @@ def _build() -> dict:
         "sources": sorted({s for r in rows for s in r["sources"]}),
         "warnings": warnings,
     }
+
+
+ESTABLISHED_AFTER_DAYS = 45   # price history older than this means the company was already trading
+
+
+def _already_trading(ticker: str) -> bool:
+    """
+    True if Yahoo has price history for this ticker from well before today. A real IPO has little or no history
+    (it has only just started trading), so a long history means an existing company that appears on the calendar
+    for another reason, such as a relisting, a transfer between exchanges or a new share class.
+    """
+    try:
+        hist = yf.Ticker(ticker).history(period="3mo", timeout=10)
+        if hist is None or hist.empty:
+            return False
+        first = hist.index[0].to_pydatetime().replace(tzinfo=None)
+        return (datetime.now() - first).days > ESTABLISHED_AFTER_DAYS
+    except Exception:
+        return False  # when in doubt, keep the row
 
 
 def _tracked_tickers(tickers: list) -> set:

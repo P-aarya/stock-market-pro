@@ -31,6 +31,12 @@ logging.getLogger("cmdstanpy").setLevel(logging.WARNING)
 logging.getLogger("prophet").setLevel(logging.WARNING)
 
 PROPHET_WEIGHT = min(max(float(os.getenv("PROPHET_WEIGHT", "0.4")), 0.0), 1.0)
+# Backtests (59 large stocks, last 20% of five years, 7 and 30 days ahead) found the model's forecast error grows the
+# more weight it gets, and its up/down calls are no better than a coin flip. Forecasts are therefore pulled toward
+# "no change" by this fraction (1 = trust the raw model, 0 = always predict no change). The direction is unaffected.
+FORECAST_SHRINK = min(max(float(os.getenv("FORECAST_SHRINK", "0.25")), 0.0), 1.0)
+SENTIMENT_WEIGHT = min(max(float(os.getenv("SENTIMENT_WEIGHT", "5")), 0.0), 10.0)  # +/- points news sentiment can move the score
+CONFLICT_PCT = 2.0           # forecast must differ from the signal by this much (%) before we call it a conflict
 EVAL_HORIZON_DAYS = 7        # trading days: what target_1w really predicts
 EVAL_MIN_CALENDAR_DAYS = 11  # earliest a prediction can have 7 trading days of data after it
 
@@ -110,19 +116,26 @@ LOG_TABLE_SQL = """
     )
 """
 
+# Extra per-run facts kept in the log so the model's parts can be judged separately once outcomes are scored
+LOG_EXTRA_COLUMNS = {"xgb_target_1w": "FLOAT", "prophet_target_1w": "FLOAT", "sentiment_score": "FLOAT"}
+
+def ensure_columns(cursor, table, columns):
+    cursor.execute("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s", (table,))
+    existing = {r[0].lower() for r in cursor.fetchall()}
+    for col, ddl in columns.items():
+        if col not in existing:
+            try:
+                cursor.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
+                print(f"  Added column {table}.{col}")
+            except Exception as e:
+                print(f"  ⚠️  Could not add column {table}.{col}: {e}")
+
 def setup_tables():
     """Make sure every column exists, and create the prediction log (one row per stock per run)."""
     conn = get_db(); cursor = conn.cursor()
-    cursor.execute("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'stocks_predictions'")
-    existing = {r[0].lower() for r in cursor.fetchall()}
-    for col, ddl in LEGACY_COLUMNS.items():
-        if col not in existing:
-            try:
-                cursor.execute(f"ALTER TABLE stocks_predictions ADD COLUMN {col} {ddl}")
-                print(f"  Added column stocks_predictions.{col}")
-            except Exception as e:
-                print(f"  ⚠️  Could not add column {col}: {e}")
+    ensure_columns(cursor, "stocks_predictions", LEGACY_COLUMNS)
     cursor.execute(LOG_TABLE_SQL)
+    ensure_columns(cursor, "stocks_prediction_log", LOG_EXTRA_COLUMNS)
     # Seed the log with the predictions already stored, so their accuracy can be measured too
     cursor.execute("""
         INSERT IGNORE INTO stocks_prediction_log
@@ -133,6 +146,19 @@ def setup_tables():
     """)
     conn.commit(); cursor.close(); conn.close()
     print("✅ Tables ready")
+
+_sentiment_cache = {}
+
+def load_sentiment_cache():
+    """News sentiment scored in the last 3 days, if the sentiment feature has been used. {ticker: score in [-1, 1]}"""
+    _sentiment_cache.clear()
+    if SENTIMENT_WEIGHT <= 0:
+        return
+    try:
+        for r in query("SELECT ticker, score FROM stocks_sentiment WHERE score IS NOT NULL AND updated_at >= DATE_SUB(NOW(), INTERVAL 3 DAY)"):
+            _sentiment_cache[r['ticker']] = float(r['score'])
+    except Exception:
+        pass  # the table does not exist until sentiment has been used once
 
 def calc_features(df):
     close = df['Close']; high = df['High']; low = df['Low']; vol = df['Volume']
@@ -202,6 +228,13 @@ XGB_FEATURES = ['mom_7d','mom_30d','mom_90d','price_vs_ma50','price_vs_ma200',
                 'rsi','macd','macd_hist','bb_pos','vol_ratio','volatility',
                 'atr_pct','roc_5','roc_20','stoch_k']
 
+# More regularised than the original (depth 4, 200 trees): it scored slightly better in the same backtest,
+# and with so little signal in the data a simpler model is the safer choice.
+XGB_PARAMS = dict(n_estimators=150, max_depth=3, learning_rate=0.05, subsample=0.7, colsample_bytree=0.7, min_child_weight=10, reg_lambda=5)
+
+def new_model():
+    return XGBRegressor(random_state=42, verbosity=0, **XGB_PARAMS) if XGB_OK else LinearRegression()
+
 def xgb_predict(df, db_feats, cur_px):
     results={}
     all_feats=[c for c in XGB_FEATURES if c in df.columns]
@@ -211,17 +244,21 @@ def xgb_predict(df, db_feats, cur_px):
             if len(td)<100: continue
             X=td[all_feats].values; y=td[tcol].values
             split=int(len(X)*0.8)
+            # Each training row's answer looks `days` rows into the future. Rows near the split would use prices
+            # from the test period, so leave a gap of `days` rows (an embargo) between training and test.
+            end=max(split-days,50)
             scaler=StandardScaler()
-            Xtr=scaler.fit_transform(X[:split]); Xte=scaler.transform(X[split:])
-            model=XGBRegressor(n_estimators=200,max_depth=4,learning_rate=0.05,
-                               subsample=0.8,colsample_bytree=0.8,random_state=42,verbosity=0) if XGB_OK else LinearRegression()
-            model.fit(Xtr,y[:split])
-            latest=scaler.transform(df[all_feats].dropna().iloc[-1:].values)
-            ret=float(model.predict(latest)[0])
-            ret=max(min(ret,0.50),-0.50)
+            Xtr=scaler.fit_transform(X[:end]); Xte=scaler.transform(X[split:])
+            model=new_model(); model.fit(Xtr,y[:end])
             yp=model.predict(Xte); yt=y[split:]
             dir_acc=sum((yp>0)==(yt>0))/len(yt)*100 if len(yt)>0 else 50
             up_rate=float((yt>0).mean()*100) if len(yt)>0 else 50.0  # what always guessing "up" would have scored
+            # The forecast itself comes from a model refit on all the history, so it also learns from the latest 20%
+            full_scaler=StandardScaler(); Xall=full_scaler.fit_transform(X)
+            final=new_model(); final.fit(Xall,y)
+            latest=full_scaler.transform(df[all_feats].dropna().iloc[-1:].values)
+            ret=float(final.predict(latest)[0])
+            ret=max(min(ret,0.50),-0.50)
             conf=round(max(50,min(90,dir_acc)),1)
             results[days]={
                 'target':round(cur_px*(1+ret),2),
@@ -277,28 +314,32 @@ def ensemble(xgb, pro, cur_px):
     final={}
     for days in [7,30,90]:
         x=xgb.get(days); p=pro.get(days)
+        agree=None
         if x and p:
             target=round(x['target']*(1-PROPHET_WEIGHT)+p['target']*PROPHET_WEIGHT,2)
             upper=p.get('upper',round(target*1.05,2))
             lower=p.get('lower',round(target*0.95,2))
-            both_agree=(x['target']>cur_px)==(p['target']>cur_px)
-            conf=round(min(90,x['confidence']+(10 if both_agree else -10)),1)
-            prob=round((x['prob_up']+p['prob_up'])/2,1)
+            agree=(x['target']>cur_px)==(p['target']>cur_px)
+            conf=x['confidence']          # XGBoost's hit rate on held-out history. It is not adjusted by guesswork.
+            prob=x['prob_up']             # Prophet's fixed 70/30 is not a probability, so it is left out
             model_used="XGBoost+Prophet"
         elif x:
             target=x['target']; upper=round(target*1.06,2); lower=round(target*0.94,2)
             conf=x['confidence']; prob=x['prob_up']; model_used="XGBoost"
         elif p:
             target=p['target']; upper=p.get('upper',round(target*1.06,2))
-            lower=p.get('lower',round(target*0.94,2)); conf=58.0
-            prob=p['prob_up']; model_used="Prophet"
+            lower=p.get('lower',round(target*0.94,2)); conf=50.0
+            prob=55.0 if target>cur_px else 45.0; model_used="Prophet"
         else: continue
-        final[days]={'target':target,'upper':upper,'lower':lower,
+        raw_target=target
+        target=round(cur_px*(1+FORECAST_SHRINK*(raw_target-cur_px)/cur_px),2)
+        final[days]={'target':target,'upper':upper,'lower':lower,'raw_return_pct':round((raw_target-cur_px)/cur_px*100,2),
                      'return_pct':round((target-cur_px)/cur_px*100,2),
-                     'confidence':conf,'prob_up':prob,'model_used':model_used}
+                     'confidence':conf,'prob_up':prob,'model_used':model_used,'models_agree':agree,
+                     'xgb_target':x['target'] if x else None,'prophet_target':p['target'] if p else None}
     return final
 
-def get_signals(df, ens, cur_px, db_feats):
+def get_signals(df, ens, cur_px, db_feats, sentiment=None):
     try:
         latest=df.iloc[-1]
         ma50=float(latest.get('ma50',cur_px) or cur_px)
@@ -310,7 +351,11 @@ def get_signals(df, ens, cur_px, db_feats):
         else: trend="Sideways"
         score=50.0
         rsi=float(latest.get('rsi',50) or 50)
-        score+=(rsi-50)*0.3
+        # RSI: momentum in the middle of its range, but overbought / oversold readings count against / for the stock,
+        # which is also how the explanation text below describes them.
+        if rsi>70: score+=6-(rsi-70)*0.4
+        elif rsi<30: score+=-6+(30-rsi)*0.4
+        else: score+=(rsi-50)*0.3
         if float(latest.get('macd',0) or 0)>0: score+=10
         else: score-=10
         if cur_px>ma50: score+=8
@@ -321,6 +366,8 @@ def get_signals(df, ens, cur_px, db_feats):
         if upside>15: score+=8
         elif upside>5: score+=4
         elif upside<-10: score-=8
+        if sentiment is not None and SENTIMENT_WEIGHT>0:
+            score+=max(-SENTIMENT_WEIGHT,min(SENTIMENT_WEIGHT,SENTIMENT_WEIGHT*sentiment))
         score=round(max(0,min(100,score)),1)
         vol=float(latest.get('volatility',30) or 30)
         beta=db_feats.get('beta')
@@ -340,8 +387,20 @@ def get_signals(df, ens, cur_px, db_feats):
         elif upside<-5: factors.append(f"Analyst target below current price")
         if float(latest.get('macd',0) or 0)>0: factors.append("MACD positive — momentum bullish")
         else: factors.append("MACD negative — momentum bearish")
+        if sentiment is not None and SENTIMENT_WEIGHT>0 and abs(sentiment)>=0.15:
+            factors.append(f"News sentiment {'positive' if sentiment>0 else 'negative'} ({sentiment:+.2f})")
+        # The signal is a rule-based technical score, the forecast is a statistical model. When they disagree, say so.
+        e30=ens.get(30) if ens else None
+        if e30:
+            fc=e30['return_pct']
+            if score>=58 and fc<=-CONFLICT_PCT:
+                factors.insert(0,f"⚠️ Technical signal is bullish, but the model forecasts {fc:+.1f}% over the next 30 trading days")
+            elif score<42 and fc>=CONFLICT_PCT:
+                factors.insert(0,f"⚠️ Technical signal is bearish, but the model forecasts {fc:+.1f}% over the next 30 trading days")
         return trend, score, risk, factors[:5]
-    except: return "Sideways",50.0,"Medium",["Insufficient data"]
+    except Exception as e:
+        warn(f"signal calculation failed: {e}")
+        return "Sideways",50.0,"Medium",["Insufficient data"]
 
 def build_paths(hist, cur_px, ens):
     """Build price_history + predicted_path — timezone safe"""
@@ -359,7 +418,7 @@ def build_paths(hist, cur_px, ens):
         for days,label in [(7,"1W"),(30,"1M"),(90,"3M")]:
             if days in ens:
                 e=ens[days]
-                fd=today+timedelta(days=days)
+                fd=(pd.Timestamp(today)+pd.offsets.BDay(days)).to_pydatetime()  # trading days, as the model was trained
                 predicted_path.append({
                     "date":fd.strftime("%Y-%m-%d"),
                     "price":round(e['target'],2),
@@ -374,7 +433,7 @@ def build_paths(hist, cur_px, ens):
         print(f"      build_paths error: {e}")
         return [],[]
 
-def save(ticker, cur_px, ens, trend, momentum, risk, factors, ph, pp, model_used, holdout=None):
+def save(ticker, cur_px, ens, trend, momentum, risk, factors, ph, pp, model_used, holdout=None, extra=None):
     try:
         e7=ens.get(7,{}); e30=ens.get(30,{}); e90=ens.get(90,{})
         if momentum>=72: sig="Strong Buy"
@@ -419,16 +478,18 @@ def save(ticker, cur_px, ens, trend, momentum, risk, factors, ph, pp, model_used
         cursor.execute("""
             INSERT INTO stocks_prediction_log
                 (ticker,run_date,price_at_run,target_1w,target_1m,target_3m,buy_signal,momentum_score,
-                 confidence_pct,model_used,holdout_dir_acc,holdout_up_rate)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                 confidence_pct,model_used,holdout_dir_acc,holdout_up_rate,xgb_target_1w,prophet_target_1w,sentiment_score)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             ON DUPLICATE KEY UPDATE
                 price_at_run=VALUES(price_at_run),target_1w=VALUES(target_1w),target_1m=VALUES(target_1m),
                 target_3m=VALUES(target_3m),buy_signal=VALUES(buy_signal),momentum_score=VALUES(momentum_score),
                 confidence_pct=VALUES(confidence_pct),model_used=VALUES(model_used),
                 holdout_dir_acc=VALUES(holdout_dir_acc),holdout_up_rate=VALUES(holdout_up_rate),
+                xgb_target_1w=VALUES(xgb_target_1w),prophet_target_1w=VALUES(prophet_target_1w),sentiment_score=VALUES(sentiment_score),
                 eval_date=NULL,actual_price=NULL,direction_correct=NULL
         """, (ticker,datetime.now().date(),cur_px,e7.get('target'),e30.get('target'),e90.get('target'),
-              sig,momentum,e30.get('confidence',60),model_used,holdout.get('dir_acc'),holdout.get('up_rate')))
+              sig,momentum,e30.get('confidence',60),model_used,holdout.get('dir_acc'),holdout.get('up_rate'),
+              (extra or {}).get('xgb_target_1w'),(extra or {}).get('prophet_target_1w'),(extra or {}).get('sentiment_score')))
         conn.commit(); cursor.close(); conn.close()
         return True
     except Exception as e:
@@ -508,8 +569,20 @@ def accuracy_summary():
             return {"scored": 0}
         hit = float(r['hits'] or 0) / n * 100
         up = float(r['up_rate'] or 0)
-        return {"scored": n, "model_hit_pct": round(hit, 1), "always_up_pct": round(up, 1),
-                "edge_pp": round(hit - up, 1), "first_run": str(r['first_run']), "last_run": str(r['last_run'])}
+        out = {"scored": n, "model_hit_pct": round(hit, 1), "always_up_pct": round(up, 1),
+               "edge_pp": round(hit - up, 1), "first_run": str(r['first_run']), "last_run": str(r['last_run'])}
+        try:  # how each part did on its own, once runs that logged them have been scored
+            c = query("""
+                SELECT SUM(xgb_target_1w IS NOT NULL) nx,
+                       AVG(CASE WHEN xgb_target_1w IS NOT NULL THEN (xgb_target_1w > price_at_run) = (actual_price > price_at_run) END)*100 xh,
+                       SUM(prophet_target_1w IS NOT NULL) np,
+                       AVG(CASE WHEN prophet_target_1w IS NOT NULL THEN (prophet_target_1w > price_at_run) = (actual_price > price_at_run) END)*100 ph
+                FROM stocks_prediction_log WHERE eval_date IS NOT NULL""")[0]
+            if c['nx']: out['xgboost_alone'] = {"scored": int(c['nx']), "hit_pct": round(float(c['xh']), 1)}
+            if c['np']: out['prophet_alone'] = {"scored": int(c['np']), "hit_pct": round(float(c['ph']), 1)}
+        except Exception:
+            pass
+        return out
     except Exception as e:
         return {"scored": 0, "error": str(e)}
 
@@ -522,12 +595,34 @@ def print_accuracy():
         return
     print(f"     {a['scored']} predictions | model right {a['model_hit_pct']}% | always guessing 'up' would be right {a['always_up_pct']}% "
           f"| edge {a['edge_pp']:+.1f} points")
+    for key, label in (("xgboost_alone", "XGBoost alone"), ("prophet_alone", "Prophet alone")):
+        if a.get(key):
+            print(f"     {label}: right {a[key]['hit_pct']}% over {a[key]['scored']} predictions")
+
+def clean_history(hist):
+    """
+    Yahoo returns today's row with every price missing until the market data settles. Forecasting from that blank row
+    makes every forecast NaN, so rows without a price are dropped first.
+    """
+    if hist is None or hist.empty:
+        return hist
+    return hist.dropna(subset=['Close', 'High', 'Low'])
+
+
+def all_finite(ens):
+    """True if every number in the ensemble output is a real number (a NaN would break the database insert)."""
+    for horizon in ens.values():
+        for value in horizon.values():
+            if isinstance(value, (int, float, np.floating)) and not isinstance(value, bool) and not np.isfinite(value):
+                return False
+    return True
+
 
 def process(ticker, dry_run=False):
     global CURRENT_TICKER
     CURRENT_TICKER = ticker
     try:
-        hist = yf.Ticker(ticker).history(period="5y")
+        hist = clean_history(yf.Ticker(ticker).history(period="5y"))
         if hist.empty or len(hist)<200:
             return False,"Insufficient history"
         cur_px=float(hist['Close'].iloc[-1])
@@ -538,7 +633,9 @@ def process(ticker, dry_run=False):
         pro_res=prophet_predict(df,cur_px) if PROPHET_WEIGHT>0 else {}
         ens=ensemble(xgb_res,pro_res,cur_px)
         if not ens: return False,"No model output"
-        trend,momentum,risk,factors=get_signals(df,ens,cur_px,db_feats)
+        if not all_finite(ens): return False,"Forecast was not a number"
+        sent=_sentiment_cache.get(ticker)
+        trend,momentum,risk,factors=get_signals(df,ens,cur_px,db_feats,sent)
         ph,pp=build_paths(hist,cur_px,ens)
         model_used=ens.get(30,{}).get('model_used','XGBoost')
         e30=ens.get(30,{})
@@ -546,11 +643,14 @@ def process(ticker, dry_run=False):
         if dry_run:
             e7=ens.get(7,{})
             beta=db_feats.get('beta')
-            return True,(f"{summary}\n        model={model_used} | 7d target ${e7.get('target','?')} ({e7.get('return_pct',0):+.1f}%) | risk={risk}"
+            return True,(f"{summary} (raw model {e30.get('raw_return_pct',0):+.1f}%)\n        model={model_used} | 7d target ${e7.get('target','?')} ({e7.get('return_pct',0):+.1f}%) | risk={risk}"
                          f" (beta {beta if beta is not None else 'n/a'}) | momentum={momentum}"
-                         f"\n        holdout 7d: model {xgb_res.get(7,{}).get('dir_acc','?')}% vs always-up {xgb_res.get(7,{}).get('up_rate','?')}%")
+                         f"\n        holdout 7d: model {xgb_res.get(7,{}).get('dir_acc','?')}% vs always-up {xgb_res.get(7,{}).get('up_rate','?')}%"
+                         f"\n        sentiment {'n/a' if sent is None else format(sent,'+.2f')} | models agree (30d): {ens.get(30,{}).get('models_agree')}"
+                         + (f"\n        {factors[0]}" if factors and factors[0].startswith('⚠️') else ''))
         holdout={k:xgb_res.get(7,{}).get(k) for k in ('dir_acc','up_rate')}
-        saved=save(ticker,cur_px,ens,trend,momentum,risk,factors,ph,pp,model_used,holdout)
+        extra={'xgb_target_1w':xgb_res.get(7,{}).get('target'),'prophet_target_1w':pro_res.get(7,{}).get('target'),'sentiment_score':sent}
+        saved=save(ticker,cur_px,ens,trend,momentum,risk,factors,ph,pp,model_used,holdout,extra)
         if saved:
             return True,summary+f" | {model_used}",holdout
         return False,"Save failed"
@@ -580,11 +680,15 @@ def main():
         update_actuals()          # score earlier predictions before they are replaced
         print_accuracy()
 
+    load_sentiment_cache()
+    if _sentiment_cache:
+        print(f"  News sentiment available for {len(_sentiment_cache)} stocks (weight +/-{SENTIMENT_WEIGHT:g} points)")
     if tickers:
         stocks=[{'ticker':t} for t in tickers]
     else:
         stocks=query("""SELECT ticker FROM stocks_live
             WHERE current_price IS NOT NULL AND current_price>0
+            AND last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)
             AND (sector!='Indices' OR sector IS NULL)
             ORDER BY market_cap DESC""")
     print(f"\n  Stocks to predict: {len(stocks)}")

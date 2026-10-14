@@ -27,6 +27,7 @@ RANGE_FILTERS = {
     "current_price", "market_cap", "pe_ratio", "forward_pe", "peg_ratio", "revenue_growth",
     "earnings_growth", "profit_margin", "operating_margin", "roe", "debt_to_equity",
     "dividend_yield", "beta", "price_change_pct",
+    "sentiment",   # AI-scored news sentiment, -1 to 1. Only stocks whose news was scored in the last 3 days can match.
 }
 TEXT_FILTERS = {"sector", "market_cap_category", "buy_signal", "trend"}
 FLAG_FILTERS = {"positive_fcf", "pays_dividend"}
@@ -103,11 +104,19 @@ def screen_stocks(filters: dict, limit: int = 30):
         FROM stocks_fundamentals f
         JOIN stocks_live l ON f.ticker = l.ticker
         LEFT JOIN stocks_predictions p ON f.ticker = p.ticker
-        WHERE l.current_price IS NOT NULL
+        WHERE l.current_price IS NOT NULL AND l.last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)
         AND l.current_price > 0
     """
 
     params = []
+
+    if "sentiment" in filters:
+        query = query.replace("            l.last_updated as price_updated,",
+                              "            s.score as news_sentiment,\n            l.last_updated as price_updated,", 1)
+        query = query.replace("        LEFT JOIN stocks_predictions p ON f.ticker = p.ticker\n",
+                              "        LEFT JOIN stocks_predictions p ON f.ticker = p.ticker\n"
+                              "        JOIN stocks_sentiment s ON s.ticker = f.ticker AND s.score IS NOT NULL"
+                              " AND s.updated_at >= DATE_SUB(NOW(), INTERVAL 3 DAY)\n", 1)
 
     # Current price filter
     if "current_price" in filters:
@@ -256,6 +265,15 @@ def screen_stocks(filters: dict, limit: int = 30):
         query += " AND p.trend = %s"
         params.append(filters["trend"])
 
+    # News sentiment (AI-scored headlines, -1 to 1)
+    if "sentiment" in filters:
+        if "min" in filters["sentiment"]:
+            query += " AND s.score >= %s"
+            params.append(filters["sentiment"]["min"])
+        if "max" in filters["sentiment"]:
+            query += " AND s.score <= %s"
+            params.append(filters["sentiment"]["max"])
+
     # Free cash flow positive
     if filters.get("positive_fcf"):
         query += " AND f.free_cash_flow > 0"
@@ -285,40 +303,15 @@ def screen_stocks(filters: dict, limit: int = 30):
     query += " LIMIT %s"
     params.append(int(limit))
 
-    cursor.execute(query, params)
-    results = cursor.fetchall()
-
-    # Auto-broaden: if fewer than 5 results, retry with relaxed filters
-    if len(results) < 5 and filters:
-        # Fallback — just return best stocks broadly
-        cursor.execute("""
-            SELECT 
-                f.ticker, l.company_name, l.sector, l.current_price, l.price_change_pct,
-                f.market_cap, f.market_cap_category, f.pe_ratio, f.forward_pe, f.peg_ratio,
-                f.pb_ratio, f.revenue_growth, f.earnings_growth, f.profit_margin,
-                f.operating_margin, f.gross_margin, f.roe, f.roa, f.debt_to_equity,
-                f.current_ratio, f.free_cash_flow, f.dividend_yield, f.beta,
-                f.fifty_two_week_high, f.fifty_two_week_low, f.recommendation_mean,
-                f.target_mean_price, f.short_ratio,
-                COALESCE(p.target_1w, l.current_price) as target_1w,
-                COALESCE(p.target_1m, l.current_price) as target_1m,
-                COALESCE(p.buy_signal, 'N/A') as buy_signal,
-                COALESCE(p.trend, 'NEUTRAL') as trend,
-                COALESCE(p.momentum_score, 0) as momentum_score,
-                COALESCE(p.confidence_pct, 0) as confidence_pct,
-                COALESCE(p.prob_up_1w, 0.5) as prob_up_1w,
-                COALESCE(p.risk_level, 'Medium') as risk_level,
-                l.last_updated as price_updated,
-                p.run_date as prediction_date
-            FROM stocks_fundamentals f
-            JOIN stocks_live l ON f.ticker = l.ticker
-            LEFT JOIN stocks_predictions p ON f.ticker = p.ticker
-            WHERE l.current_price IS NOT NULL AND l.current_price > 0
-            AND f.profit_margin > 0
-            ORDER BY COALESCE(p.momentum_score, 0) DESC, l.price_change_pct DESC
-            LIMIT %s
-        """, (limit,))
+    try:
+        cursor.execute(query, params)
         results = cursor.fetchall()
+    except Exception as e:
+        if "sentiment" in filters and "stocks_sentiment" in str(e):
+            results = []  # sentiment has never been scored, so nothing can match
+        else:
+            raise
+    # No silent "broadening": if few stocks match, the caller gets exactly those and can say so.
 
     conn.close()
     return results

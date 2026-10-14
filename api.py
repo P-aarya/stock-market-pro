@@ -1,22 +1,132 @@
 # ============================================================
 # STOCK MARKET PRO - api.py (Final Clean Version)
 # ============================================================
-from fastapi import FastAPI, Body
+from fastapi import FastAPI, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 import mysql.connector
 import yfinance as yf
 import pandas as pd
 from datetime import datetime
 from typing import Optional
+import hashlib
+import hmac
 import os
 import json
+import secrets
+import time
+import urllib.parse
+from collections import defaultdict, deque
 from dotenv import load_dotenv
 load_dotenv()
 
 app = FastAPI(title="Stock Market Pro API")
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(",") if o.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"])
+
+# ── Optional password protection ──
+# Set APP_PASSWORD in .env to require a login for the whole app: pages, data and every endpoint that changes anything.
+# Leave it unset (the default) and the app stays open, which is fine on your own machine but not when it is exposed
+# to the internet, for example through a tunnel. APP_SECRET (optional) changes the key sessions are signed with.
+APP_PASSWORD = os.getenv("APP_PASSWORD", "")
+SESSION_DAYS = 14
+SESSION_COOKIE = "smp_session"
+LOGIN_MAX_FAILURES = 5          # wrong passwords allowed per client ...
+LOGIN_WINDOW_SECONDS = 300      # ... in this many seconds
+_OPEN_PATHS = {"/login", "/logout", "/health", "/api/auth/status", "/favicon.ico"}
+_login_failures = defaultdict(deque)
+
+
+def _session_key() -> bytes:
+    return hashlib.sha256(("smp|" + (os.getenv("APP_SECRET") or APP_PASSWORD)).encode()).digest()
+
+
+def _sign(expires: int) -> str:
+    return hmac.new(_session_key(), str(expires).encode(), hashlib.sha256).hexdigest()
+
+
+def make_session_token() -> str:
+    expires = int(time.time()) + SESSION_DAYS * 86400
+    return f"{expires}.{_sign(expires)}"
+
+
+def valid_session_token(token: str) -> bool:
+    try:
+        expires, signature = token.split(".", 1)
+        return int(expires) > time.time() and hmac.compare_digest(signature, _sign(int(expires)))
+    except (ValueError, AttributeError):
+        return False
+
+
+@app.middleware("http")
+async def require_login(request: Request, call_next):
+    if not APP_PASSWORD or request.method == "OPTIONS" or request.url.path in _OPEN_PATHS \
+            or valid_session_token(request.cookies.get(SESSION_COOKIE, "")):
+        return await call_next(request)
+    if request.url.path.startswith(("/api/", "/agent/")):
+        return JSONResponse({"status": "error", "message": "Please sign in."}, status_code=401)
+    return RedirectResponse("/login", status_code=302)
+
+
+def _login_page(error: str = "") -> str:
+    message = f'<p class="err">{error}</p>' if error else ""
+    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sign in</title><style>
+:root{{--bg:#0b0d17;--card:#12152a;--line:#242a4a;--text:#e8ecf8;--muted:#8d97b8;--accent:#00c8ff;--red:#ff5c5c}}
+@media (prefers-color-scheme: light){{:root{{--bg:#f3f5fb;--card:#fff;--line:#d9deef;--text:#16192b;--muted:#5d6785;--accent:#0a7bd1;--red:#c62828}}}}
+*{{box-sizing:border-box}}body{{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--text);font:15px system-ui,sans-serif}}
+form{{width:min(360px,calc(100vw - 32px));background:var(--card);border:1px solid var(--line);border-radius:14px;padding:28px}}
+h1{{margin:0 0 4px;font-size:20px}}p{{margin:0 0 18px;color:var(--muted);font-size:13px}}
+input{{width:100%;padding:11px 12px;border-radius:9px;border:1px solid var(--line);background:transparent;color:var(--text);font-size:15px}}
+input:focus{{outline:2px solid var(--accent);outline-offset:1px}}
+button{{margin-top:14px;width:100%;padding:11px;border:0;border-radius:9px;background:var(--accent);color:#fff;font-weight:700;font-size:15px;cursor:pointer}}
+.err{{color:var(--red);font-weight:600;margin:12px 0 0}}</style></head><body>
+<form method="post" action="/login"><h1>Stock Market Pro</h1><p>Enter the password to continue.</p>
+<input type="password" name="password" placeholder="Password" autocomplete="current-password" autofocus required>
+<button type="submit">Sign in</button>{message}</form></body></html>"""
+
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page(request: Request):
+    if not APP_PASSWORD or valid_session_token(request.cookies.get(SESSION_COOKIE, "")):
+        return RedirectResponse("/", status_code=303)
+    return HTMLResponse(_login_page())
+
+
+@app.post("/login")
+async def login(request: Request):
+    if not APP_PASSWORD:
+        return RedirectResponse("/", status_code=303)
+    client = _client_id(request)
+    now = time.time()
+    failures = _login_failures[client]
+    while failures and now - failures[0] > LOGIN_WINDOW_SECONDS:
+        failures.popleft()
+    if len(failures) >= LOGIN_MAX_FAILURES:
+        return HTMLResponse(_login_page("Too many wrong passwords. Please wait a few minutes and try again."), status_code=429)
+    form = urllib.parse.parse_qs((await request.body()).decode("utf-8", "ignore"))
+    attempt = form.get("password", [""])[0]
+    if hmac.compare_digest(attempt.encode(), APP_PASSWORD.encode()):
+        failures.clear()
+        response = RedirectResponse("/", status_code=303)
+        response.set_cookie(SESSION_COOKIE, make_session_token(), max_age=SESSION_DAYS * 86400, httponly=True, samesite="lax",
+                            secure=request.headers.get("x-forwarded-proto", request.url.scheme) == "https")
+        return response
+    failures.append(now)
+    return HTMLResponse(_login_page("That password isn't right."), status_code=401)
+
+
+@app.get("/logout")
+def logout():
+    response = RedirectResponse("/login", status_code=303)
+    response.delete_cookie(SESSION_COOKIE)
+    return response
+
+
+@app.get("/api/auth/status")
+def auth_status(request: Request):
+    return {"enabled": bool(APP_PASSWORD), "signed_in": (not APP_PASSWORD) or valid_session_token(request.cookies.get(SESSION_COOKIE, ""))}
+
 
 # ── Serve dashboard.html directly from port 8000 ──
 @app.get("/")
@@ -123,7 +233,7 @@ def get_stocks(sector: Optional[str]=None, search: Optional[str]=None, limit: in
         LEFT JOIN stocks_technicals t ON l.ticker=t.ticker
         LEFT JOIN stocks_smartmoney sm ON l.ticker=sm.ticker
         WHERE (l.sector != 'Indices' OR l.sector IS NULL)
-        AND l.current_price IS NOT NULL
+        AND l.current_price IS NOT NULL AND l.last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)
     """
     params = []
     if sector: sql += " AND l.sector=%s"; params.append(sector)
@@ -145,7 +255,7 @@ def search_stocks(q: str = "", limit: int = 10):
             SELECT ticker, company_name, sector, current_price, price_change_pct
             FROM stocks_live
             WHERE (ticker LIKE %s OR LOWER(company_name) LIKE LOWER(%s))
-            AND current_price IS NOT NULL
+            AND current_price IS NOT NULL AND last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)
             ORDER BY
                 CASE WHEN ticker LIKE %s THEN 0 ELSE 1 END,
                 market_cap DESC
@@ -245,26 +355,26 @@ def get_summary():
                ROUND(AVG(price_change_pct),2) as avg_change_pct,
                MAX(last_updated) as last_updated
         FROM stocks_live
-        WHERE (sector!='Indices' OR sector IS NULL) AND current_price IS NOT NULL
+        WHERE (sector!='Indices' OR sector IS NULL) AND current_price IS NOT NULL AND last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)
     """)
     return r[0] if r else {}
 
 @app.get("/api/market/gainers")
 def get_gainers(limit: int=20):
     return query("""SELECT ticker,company_name,sector,current_price,price_change,price_change_pct,volume
-        FROM stocks_live WHERE price_change_pct IS NOT NULL AND current_price IS NOT NULL
+        FROM stocks_live WHERE price_change_pct IS NOT NULL AND current_price IS NOT NULL AND last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)
         AND (sector!='Indices' OR sector IS NULL) ORDER BY price_change_pct DESC LIMIT %s""", [limit])
 
 @app.get("/api/market/losers")
 def get_losers(limit: int=20):
     return query("""SELECT ticker,company_name,sector,current_price,price_change,price_change_pct,volume
-        FROM stocks_live WHERE price_change_pct IS NOT NULL AND current_price IS NOT NULL
+        FROM stocks_live WHERE price_change_pct IS NOT NULL AND current_price IS NOT NULL AND last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)
         AND (sector!='Indices' OR sector IS NULL) ORDER BY price_change_pct ASC LIMIT %s""", [limit])
 
 @app.get("/api/market/most-active")
 def get_active(limit: int=20):
     return query("""SELECT ticker,company_name,sector,current_price,price_change_pct,volume,market_cap
-        FROM stocks_live WHERE volume IS NOT NULL AND current_price IS NOT NULL
+        FROM stocks_live WHERE volume IS NOT NULL AND current_price IS NOT NULL AND last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)
         AND (sector!='Indices' OR sector IS NULL) ORDER BY volume DESC LIMIT %s""", [limit])
 
 @app.get("/api/market/sectors")
@@ -275,7 +385,7 @@ def get_sectors():
                SUM(CASE WHEN price_change_pct>0 THEN 1 ELSE 0 END) as gainers,
                SUM(CASE WHEN price_change_pct<0 THEN 1 ELSE 0 END) as losers,
                ROUND(SUM(market_cap)/1e9,2) as total_market_cap_bn
-        FROM stocks_live WHERE sector IS NOT NULL AND sector!='Indices' AND current_price IS NOT NULL
+        FROM stocks_live WHERE sector IS NOT NULL AND sector!='Indices' AND current_price IS NOT NULL AND last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)
         GROUP BY sector ORDER BY avg_change_pct DESC
     """)
 
@@ -297,7 +407,7 @@ def batch_commodity_companies(request: dict = Body(...)):
             LEFT JOIN stocks_predictions p ON l.ticker = p.ticker
             LEFT JOIN stocks_analyst a ON l.ticker = a.ticker
             WHERE l.ticker IN ({placeholders})
-            AND l.current_price IS NOT NULL
+            AND l.current_price IS NOT NULL AND l.last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)
         """, tickers)
         return results or []
     except Exception as e:
@@ -567,7 +677,7 @@ def get_stocks_batch(tickers: str = ""):
 def get_indices():
     # Try DB first
     db_result = query("""SELECT ticker,company_name,current_price,price_change,price_change_pct,last_updated
-        FROM stocks_live WHERE ticker IN ('SPY','QQQ','DIA','IWM') AND current_price IS NOT NULL""")
+        FROM stocks_live WHERE ticker IN ('SPY','QQQ','DIA','IWM') AND current_price IS NOT NULL AND last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)""")
     
     if db_result and len(db_result) >= 4:
         return db_result
@@ -816,7 +926,7 @@ def get_sentiment():
                SUM(CASE WHEN l.price_change_pct<0 THEN 1 ELSE 0 END) as losers,
                COUNT(*) as total
         FROM stocks_live l LEFT JOIN stocks_technicals t ON l.ticker=t.ticker
-        WHERE l.price_change_pct IS NOT NULL AND l.current_price IS NOT NULL
+        WHERE l.price_change_pct IS NOT NULL AND l.current_price IS NOT NULL AND l.last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)
         AND (l.sector!='Indices' OR l.sector IS NULL)
     """)
     if not r or not r[0]: return {"score":50,"label":"Neutral","avg_rsi":None,"avg_change":None}
@@ -846,7 +956,7 @@ def get_pe():
         FROM stocks_fundamentals f JOIN stocks_live l ON f.ticker=l.ticker
         LEFT JOIN stocks_analyst a ON f.ticker=a.ticker
         WHERE f.pe_ratio IS NOT NULL AND f.pe_ratio>0 AND f.pe_ratio<200
-        AND l.market_cap>1000000000 AND l.current_price IS NOT NULL
+        AND l.market_cap>1000000000 AND l.current_price IS NOT NULL AND l.last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)
         AND (l.sector!='Indices' OR l.sector IS NULL)
         ORDER BY l.market_cap DESC LIMIT 300
     """)
@@ -872,7 +982,7 @@ def get_rsi():
 def get_vol_sec():
     return query("""SELECT sector,SUM(volume) as total_volume,COUNT(*) as stock_count
         FROM stocks_live WHERE volume IS NOT NULL AND sector IS NOT NULL AND sector!='Indices'
-        AND current_price IS NOT NULL GROUP BY sector ORDER BY total_volume DESC""")
+        AND current_price IS NOT NULL AND last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY) GROUP BY sector ORDER BY total_volume DESC""")
 
 @app.get("/api/market/most-volatile")
 def get_volatile(limit: int=12):
@@ -880,7 +990,7 @@ def get_volatile(limit: int=12):
         SELECT l.ticker,l.company_name,l.sector,l.current_price,l.price_change_pct,t.volatility,t.beta,a.analyst_rating
         FROM stocks_technicals t JOIN stocks_live l ON t.ticker=l.ticker
         LEFT JOIN stocks_analyst a ON t.ticker=a.ticker
-        WHERE t.volatility IS NOT NULL AND l.current_price IS NOT NULL
+        WHERE t.volatility IS NOT NULL AND l.current_price IS NOT NULL AND l.last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)
         AND (l.sector!='Indices' OR l.sector IS NULL) ORDER BY t.volatility DESC LIMIT %s
     """, [limit])
 
@@ -891,7 +1001,7 @@ def get_divs(limit: int=12):
         FROM stocks_dividends d JOIN stocks_live l ON d.ticker=l.ticker
         LEFT JOIN stocks_analyst a ON d.ticker=a.ticker
         WHERE d.dividend_yield IS NOT NULL AND d.dividend_yield>0 AND d.dividend_yield<50
-        AND l.current_price IS NOT NULL AND (l.sector!='Indices' OR l.sector IS NULL)
+        AND l.current_price IS NOT NULL AND l.last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY) AND (l.sector!='Indices' OR l.sector IS NULL)
         ORDER BY d.dividend_yield DESC LIMIT %s
     """, [limit])
 
@@ -902,7 +1012,7 @@ def get_52w(limit: int=15):
                ROUND((week_52_high-current_price)/NULLIF(week_52_high,0)*100,1) as distance_from_high_pct,
                price_change_pct
         FROM stocks_live WHERE week_52_high IS NOT NULL AND week_52_low IS NOT NULL
-        AND current_price IS NOT NULL AND market_cap>5000000000
+        AND current_price IS NOT NULL AND last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY) AND market_cap>5000000000
         AND (sector!='Indices' OR sector IS NULL) ORDER BY market_cap DESC LIMIT %s
     """, [limit])
 
@@ -913,7 +1023,7 @@ def get_breadth():
                SUM(CASE WHEN l.current_price>t.ma_50 THEN 1 ELSE 0 END) as above_ma50,
                SUM(CASE WHEN l.current_price<=t.ma_50 THEN 1 ELSE 0 END) as below_ma50
         FROM stocks_live l JOIN stocks_technicals t ON l.ticker=t.ticker
-        WHERE t.ma_50 IS NOT NULL AND l.current_price IS NOT NULL
+        WHERE t.ma_50 IS NOT NULL AND l.current_price IS NOT NULL AND l.last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)
         AND l.sector IS NOT NULL AND l.sector!='Indices'
         GROUP BY l.sector ORDER BY above_ma50 DESC
     """)
@@ -924,7 +1034,7 @@ def get_vspikes(limit: int=12):
         SELECT ticker,company_name,sector,current_price,price_change_pct,
                volume,avg_volume,ROUND(volume/NULLIF(avg_volume,0),2) as volume_ratio
         FROM stocks_live WHERE volume IS NOT NULL AND avg_volume IS NOT NULL AND avg_volume>0
-        AND current_price IS NOT NULL AND (sector!='Indices' OR sector IS NULL)
+        AND current_price IS NOT NULL AND last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY) AND (sector!='Indices' OR sector IS NULL)
         AND volume>avg_volume*1.5 ORDER BY volume_ratio DESC LIMIT %s
     """, [limit])
 
@@ -944,7 +1054,7 @@ def get_consensus(sector: Optional[str]=None, rating: Optional[str]=None, limit:
         LEFT JOIN stocks_fundamentals f ON a.ticker=f.ticker
         LEFT JOIN stocks_dividends d ON a.ticker=d.ticker
         WHERE a.analyst_rating IS NOT NULL AND a.num_analysts IS NOT NULL AND a.num_analysts>0
-        AND l.current_price IS NOT NULL AND a.target_price IS NOT NULL
+        AND l.current_price IS NOT NULL AND l.last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY) AND a.target_price IS NOT NULL
         AND (l.sector!='Indices' OR l.sector IS NULL)
     """
     params=[]
@@ -962,7 +1072,7 @@ def get_analyst_sectors():
                SUM(CASE WHEN a.analyst_rating IN ('sell','strong_sell') THEN 1 ELSE 0 END) as sell_count,
                ROUND(AVG(a.upside_pct),1) as avg_upside_pct
         FROM stocks_analyst a JOIN stocks_live l ON a.ticker=l.ticker
-        WHERE a.analyst_rating IS NOT NULL AND a.num_analysts>0 AND l.current_price IS NOT NULL
+        WHERE a.analyst_rating IS NOT NULL AND a.num_analysts>0 AND l.current_price IS NOT NULL AND l.last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)
         AND (l.sector!='Indices' OR l.sector IS NULL)
         GROUP BY l.sector ORDER BY avg_upside_pct DESC
     """)
@@ -982,7 +1092,7 @@ def get_predictions(sector: Optional[str]=None, limit: int=1000):
         FROM stocks_predictions p
         JOIN stocks_live l ON p.ticker=l.ticker
         LEFT JOIN stocks_analyst a ON p.ticker=a.ticker
-        WHERE l.current_price IS NOT NULL AND p.target_1m IS NOT NULL
+        WHERE l.current_price IS NOT NULL AND l.last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY) AND p.target_1m IS NOT NULL
         AND (l.sector!='Indices' OR l.sector IS NULL)
     """
     params=[]
@@ -1026,7 +1136,7 @@ def get_earnings(limit: int=500):
                e.eps_estimate,e.eps_actual,e.earnings_surprise_pct,
                l.current_price,l.price_change_pct,l.market_cap
         FROM stocks_earnings e JOIN stocks_live l ON e.ticker=l.ticker
-        WHERE l.current_price IS NOT NULL
+        WHERE l.current_price IS NOT NULL AND l.last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)
         AND (l.sector!='Indices' OR l.sector IS NULL)
         AND (e.next_earnings_date IS NOT NULL OR e.eps_actual IS NOT NULL)
         ORDER BY e.next_earnings_date ASC,l.market_cap DESC LIMIT %s
@@ -1075,68 +1185,11 @@ def get_stock_news(ticker: str):
 # ══════════════════════════════════════════════════════
 # PORTFOLIO
 # ══════════════════════════════════════════════════════
-@app.get("/api/portfolio")
-def get_portfolio():
-    return query("""
-        SELECT p.*,l.current_price,l.price_change_pct as day_change_pct,l.sector,
-               ROUND((l.current_price-p.avg_buy_price)*p.quantity,2) as unrealized_pnl,
-               ROUND(((l.current_price-p.avg_buy_price)/p.avg_buy_price)*100,2) as pnl_pct,
-               ROUND(l.current_price*p.quantity,2) as current_value,
-               ROUND(p.avg_buy_price*p.quantity,2) as invested_value,
-               a.analyst_rating,a.target_price,a.upside_pct
-        FROM portfolio p LEFT JOIN stocks_live l ON p.ticker=l.ticker
-        LEFT JOIN stocks_analyst a ON p.ticker=a.ticker ORDER BY current_value DESC
-    """)
-
-@app.post("/api/portfolio/add")
-def add_portfolio(ticker: str, quantity: float, avg_buy_price: float, buy_date: str, notes: str=""):
-    conn=get_db(); cursor=conn.cursor(dictionary=True)
-    cursor.execute("SELECT company_name,sector FROM stocks_live WHERE ticker=%s",[ticker.upper()])
-    s=cursor.fetchone()
-    cursor.execute("INSERT INTO portfolio (ticker,company_name,quantity,avg_buy_price,buy_date,sector,notes) VALUES (%s,%s,%s,%s,%s,%s,%s)",
-        (ticker.upper(),s["company_name"] if s else ticker,quantity,avg_buy_price,buy_date,s["sector"] if s else "Unknown",notes))
-    conn.commit(); cursor.close(); conn.close()
-    return {"message":f"✅ {ticker.upper()} added"}
-
-@app.get("/api/portfolio/summary")
-def get_portfolio_summary():
-    r=query("""SELECT ROUND(SUM(l.current_price*p.quantity),2) as total_value,
-               ROUND(SUM(p.avg_buy_price*p.quantity),2) as total_invested,
-               ROUND(SUM((l.current_price-p.avg_buy_price)*p.quantity),2) as total_pnl,
-               ROUND(SUM(l.current_price*p.quantity*l.price_change_pct/100),2) as day_change,
-               COUNT(*) as total_holdings
-        FROM portfolio p LEFT JOIN stocks_live l ON p.ticker=l.ticker""")
-    return r[0] if r else {}
-
-# ══════════════════════════════════════════════════════
-# TRANSACTIONS
-# ══════════════════════════════════════════════════════
-@app.get("/api/transactions")
-def get_transactions():
-    return query("SELECT * FROM transactions ORDER BY transaction_date DESC")
-
-@app.post("/api/transactions/add")
-def add_transaction(ticker: str, transaction_type: str, quantity: float, price: float, transaction_date: str, notes: str=""):
-    conn=get_db(); cursor=conn.cursor(dictionary=True)
-    cursor.execute("SELECT company_name FROM stocks_live WHERE ticker=%s",[ticker.upper()])
-    s=cursor.fetchone()
-    cursor.execute("INSERT INTO transactions (ticker,company_name,transaction_type,quantity,price,total_value,transaction_date,notes) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
-        (ticker.upper(),s["company_name"] if s else ticker,transaction_type.upper(),quantity,price,round(quantity*price,2),transaction_date,notes))
-    conn.commit(); cursor.close(); conn.close()
-    return {"message":f"✅ Added"}
-
-@app.get("/api/transactions/summary")
-def get_tx_summary():
-    r=query("""SELECT COUNT(*) as total_trades,
-               SUM(CASE WHEN transaction_type='BUY' THEN total_value ELSE 0 END) as total_invested,
-               SUM(CASE WHEN transaction_type='SELL' THEN total_value ELSE 0 END) as total_sold,
-               MAX(total_value) as largest_trade FROM transactions""")
-    return r[0] if r else {}
-
 # ══════════════════════════════════════════════════════
 # AI AGENT ENDPOINTS
 # ══════════════════════════════════════════════════════
 import logging
+import queue
 import re
 import threading
 import time
@@ -1145,14 +1198,18 @@ from typing import List, Literal
 
 import groq
 from fastapi import Path, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse, StreamingResponse
+from datetime import date as Date
 from pydantic import BaseModel, Field, field_validator
 
-from agent import run_agent, review_portfolio, explain_single_stock, LLMUnavailable
+from agent import run_agent, explain_single_stock, LLMUnavailable, set_stream_sink, clear_stream_sink
 import ipo_data
 import news_feed
 import peers
+import portfolio
 import sentiment
+import stock_period
 from screener import get_top_movers, get_sector_summary, screen_stocks
 
 log = logging.getLogger("uvicorn.error")
@@ -1197,19 +1254,25 @@ def check_rate_limit(request: Request):
     return None
 
 
+def describe_ai_error(e):
+    """(HTTP status, short safe message) for a failure inside an AI call. Details go to the server log, not the client."""
+    if isinstance(e, LLMUnavailable):
+        return 503, "The AI assistant isn't available right now."
+    if isinstance(e, groq.RateLimitError):
+        return 429, "The AI service is busy. Please try again in a minute."
+    if isinstance(e, groq.APIConnectionError):  # includes timeouts
+        return 504, "I couldn't reach the AI service in time. Please try again."
+    log.error("AI endpoint failed", exc_info=e)
+    return 500, "Something went wrong on our side. Please try again."
+
+
 def run_ai(call):
-    """Run an AI call and turn failures into short, safe messages (details go to the server log)."""
+    """Run an AI call and turn failures into short, safe messages."""
     try:
         return call()
-    except LLMUnavailable:
-        return agent_error(503, "The AI assistant isn't available right now.")
-    except groq.RateLimitError:
-        return agent_error(429, "The AI service is busy. Please try again in a minute.")
-    except groq.APIConnectionError:  # includes timeouts
-        return agent_error(504, "I couldn't reach the AI service in time. Please try again.")
-    except Exception:
-        log.exception("AI endpoint failed")
-        return agent_error(500, "Something went wrong on our side. Please try again.")
+    except Exception as e:
+        status, message = describe_ai_error(e)
+        return agent_error(status, message)
 
 
 class ScreenerRequest(BaseModel):
@@ -1247,12 +1310,13 @@ class RecommendRequest(BaseModel):
 
 
 class PortfolioRequest(BaseModel):
-    tickers: List[str] = Field(max_length=30)
+    tickers: List[str] = Field(default_factory=list, max_length=30)   # ticker symbols or company names
+    use_holdings: bool = False                                        # review the saved holdings instead
 
     @field_validator("tickers")
     @classmethod
-    def only_valid_tickers(cls, v):
-        return _valid_tickers(v)
+    def sane_entries(cls, v):
+        return [t.strip()[:60] for t in v if isinstance(t, str) and t.strip()]
 
 
 class ExplainRequest(BaseModel):
@@ -1260,29 +1324,245 @@ class ExplainRequest(BaseModel):
     query: str = Field(default="", max_length=500)
 
 
+class HoldingIn(BaseModel):
+    ticker: str = Field(pattern=r"^[A-Za-z0-9.\-^=]{1,10}$")
+    quantity: float = Field(gt=0, le=1e9)
+    avg_buy_price: float = Field(gt=0, le=1e7)
+    buy_date: Date
+    notes: str = Field(default="", max_length=200)
+
+
+class HoldingEdit(BaseModel):
+    quantity: float = Field(gt=0, le=1e9)
+    avg_buy_price: float = Field(gt=0, le=1e7)
+    buy_date: Date
+    notes: str = Field(default="", max_length=200)
+
+
+def holding_call(fn, *args):
+    try:
+        return {"status": "success", **fn(*args)}
+    except portfolio.PortfolioError as e:
+        return agent_error(e.status, e.message)
+    except Exception:
+        log.exception("Portfolio change failed")
+        return agent_error(500, "Something went wrong saving that. Please try again.")
+
+
+@app.get("/api/portfolio")
+def get_portfolio():
+    return portfolio.list_holdings()
+
+
+@app.get("/api/portfolio/summary")
+def get_portfolio_summary():
+    return portfolio.summarize(portfolio.list_holdings())
+
+
+@app.post("/api/portfolio")
+def add_portfolio_holding(body: HoldingIn):
+    """Add a purchase. Buying more of a stock you already hold merges into one position at the weighted-average cost."""
+    return holding_call(portfolio.add_holding, body.ticker, body.quantity, body.avg_buy_price, body.buy_date, body.notes)
+
+
+@app.put("/api/portfolio/{holding_id}")
+def edit_portfolio_holding(holding_id: int, body: HoldingEdit):
+    return holding_call(portfolio.update_holding, holding_id, body.quantity, body.avg_buy_price, body.buy_date, body.notes)
+
+
+@app.delete("/api/portfolio/{holding_id}")
+def delete_portfolio_holding(holding_id: int):
+    return holding_call(portfolio.delete_holding, holding_id)
+
+
+class TxIn(BaseModel):
+    ticker: str = Field(pattern=r"^[A-Za-z0-9.\-^=]{1,10}$")
+    transaction_type: Literal["BUY", "SELL", "DIVIDEND"]
+    quantity: float = Field(gt=0, le=1e9)
+    price: float = Field(gt=0, le=1e7)          # for a DIVIDEND, the amount per share
+    transaction_date: Date
+    notes: str = Field(default="", max_length=200)
+    apply_to_holdings: bool = False             # also add the shares to / remove them from Holdings
+
+
+class TxEdit(BaseModel):
+    quantity: float = Field(gt=0, le=1e9)
+    price: float = Field(gt=0, le=1e7)
+    transaction_date: Date
+    notes: str = Field(default="", max_length=200)
+
+
+@app.get("/api/transactions")
+def get_transactions():
+    return portfolio.list_transactions()
+
+
+@app.get("/api/transactions/summary")
+def get_transactions_summary():
+    return portfolio.transaction_summary()
+
+
+@app.post("/api/transactions")
+def add_transaction_entry(body: TxIn):
+    return holding_call(portfolio.add_transaction, body.ticker, body.transaction_type, body.quantity, body.price,
+                        body.transaction_date, body.notes, body.apply_to_holdings)
+
+
+@app.put("/api/transactions/{tx_id}")
+def edit_transaction_entry(tx_id: int, body: TxEdit):
+    return holding_call(portfolio.update_transaction, tx_id, body.quantity, body.price, body.transaction_date, body.notes)
+
+
+@app.delete("/api/transactions/{tx_id}")
+def delete_transaction_entry(tx_id: int):
+    return holding_call(portfolio.delete_transaction, tx_id)
+
+
+@app.get("/api/portfolio/performance")
+def portfolio_performance():
+    """Portfolio value against the same dollars invested in the S&P 500, plus risk measures."""
+    try:
+        return {"status": "success", **portfolio.performance()}
+    except portfolio.PortfolioError as e:
+        return agent_error(e.status, e.message)
+    except Exception:
+        log.exception("Portfolio performance failed")
+        return agent_error(500, "Something went wrong working out performance.")
+
+
+def _tracked_stock(ticker: str) -> bool:
+    return bool(query("SELECT 1 FROM stocks_live WHERE ticker=%s LIMIT 1", [ticker.upper()]))
+
+
+@app.get("/api/stocks/{ticker}/price-range")
+def stock_price_range(ticker: str = Path(pattern=r"^[A-Za-z0-9.\-^=]{1,10}$")):
+    """First and last trading day we have prices for, so the period picker only offers years that exist."""
+    if not _tracked_stock(ticker):
+        return agent_error(404, f"{ticker.upper()} isn't in our database.")
+    try:
+        return {"status": "success", **stock_period.price_range(ticker)}
+    except stock_period.PeriodError as e:
+        return agent_error(e.status, e.message)
+    except Exception:
+        log.exception("Price range failed")
+        return agent_error(500, "Something went wrong loading the price history.")
+
+
+@app.get("/api/stocks/{ticker}/period")
+def stock_period_performance(ticker: str = Path(pattern=r"^[A-Za-z0-9.\-^=]{1,10}$"), start: Date = Query(...), end: Date = Query(...)):
+    """How the stock performed between two dates (a year, a quarter or anything else), against the S&P 500."""
+    if not _tracked_stock(ticker):
+        return agent_error(404, f"{ticker.upper()} isn't in our database.")
+    try:
+        return {"status": "success", **stock_period.period_performance(ticker, start, end)}
+    except stock_period.PeriodError as e:
+        return agent_error(e.status, e.message)
+    except Exception:
+        log.exception("Period performance failed")
+        return agent_error(500, "Something went wrong loading the price history.")
+
+
+def _parse_compare_tickers(tickers: str):
+    parts = [t.strip() for t in tickers.split(",") if t.strip()]
+    valid = _valid_tickers(parts)
+    if len(valid) != len(parts):
+        return None, agent_error(400, "One of the tickers is not valid.")
+    if not 2 <= len({t.upper() for t in valid}) <= peers.MAX_STOCKS:
+        return None, agent_error(400, f"Compare between 2 and {peers.MAX_STOCKS} different stocks.")
+    return valid, None
+
+
+@app.get("/api/compare/prices")
+def compare_prices(tickers: str = Query(..., min_length=1, max_length=120)):
+    """One-year closing prices rebased to 100, so the stocks' relative performance can be charted."""
+    valid, error = _parse_compare_tickers(tickers)
+    if error:
+        return error
+    try:
+        return {"status": "success", **peers.rebased_prices(valid)}
+    except Exception:
+        log.exception("Price comparison failed")
+        return agent_error(500, "Something went wrong loading prices.")
+
+
+@app.get("/api/compare/verdict")
+def compare_verdict(request: Request, tickers: str = Query(..., min_length=1, max_length=120)):
+    """A short AI-written comparison of the stocks, based only on the stored data (cached for an hour)."""
+    limited = check_rate_limit(request)
+    if limited:
+        return limited
+    valid, error = _parse_compare_tickers(tickers)
+    if error:
+        return error
+
+    def call():
+        result = peers.verdict(valid)
+        if result is None:
+            return agent_error(404, "We need at least two stocks we track to compare.")
+        return {"status": "success", **result}
+    return run_ai(call)
+
+
+def recommend_payload(body: RecommendRequest) -> dict:
+    result = run_agent(
+        user_query=body.query.strip(),
+        portfolio_tickers=body.portfolio_tickers,
+        chat_history=[m.model_dump() for m in body.chat_history],
+        reply_to=body.reply_to.strip(),
+    )
+    return {
+        "status": "success",
+        "query": body.query,
+        "intent": result.get("intent"),
+        "stocks_found": result["stocks_found"],
+        "recommendation": result["recommendation"],
+        "top_stocks": result["top_stocks"],
+        "all_stocks": result["all_stocks"]
+    }
+
+
 @app.post("/agent/recommend")
 def agent_recommend(request: Request, body: RecommendRequest):
     limited = check_rate_limit(request)
     if limited:
         return limited
+    return run_ai(lambda: recommend_payload(body))
 
-    def call():
-        result = run_agent(
-            user_query=body.query.strip(),
-            portfolio_tickers=body.portfolio_tickers,
-            chat_history=[m.model_dump() for m in body.chat_history],
-            reply_to=body.reply_to.strip(),
-        )
-        return {
-            "status": "success",
-            "query": body.query,
-            "intent": result.get("intent"),
-            "stocks_found": result["stocks_found"],
-            "recommendation": result["recommendation"],
-            "top_stocks": result["top_stocks"],
-            "all_stocks": result["all_stocks"]
-        }
-    return run_ai(call)
+
+@app.post("/agent/recommend/stream")
+def agent_recommend_stream(request: Request, body: RecommendRequest):
+    """
+    The same answer as /agent/recommend, sent as server-sent events so the text appears as it is written:
+      data: {"delta": "..."}   a piece of the answer
+      data: {"final": {...}}   the complete result (same shape as /agent/recommend), including stock cards
+      data: {"error": {"status": 429, "message": "..."}}
+    """
+    limited = check_rate_limit(request)
+    if limited:
+        return limited
+    events = queue.Queue()
+
+    def worker():
+        token = set_stream_sink(lambda text: events.put(("delta", text)))
+        try:
+            events.put(("final", jsonable_encoder(recommend_payload(body))))
+        except Exception as e:
+            status, message = describe_ai_error(e)
+            events.put(("error", {"status": status, "message": message}))
+        finally:
+            clear_stream_sink(token)
+            events.put(("done", None))
+
+    threading.Thread(target=worker, daemon=True).start()
+
+    def stream():
+        while True:
+            kind, value = events.get()
+            if kind == "done":
+                return
+            yield f"data: {json.dumps({kind: value})}\n\n"
+    return StreamingResponse(stream(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @app.post("/agent/explain-stock")
@@ -1299,8 +1579,16 @@ def agent_portfolio_review(request: Request, body: PortfolioRequest):
     limited = check_rate_limit(request)
     if limited:
         return limited
-    return run_ai(lambda: {"status": "success", "tickers_reviewed": body.tickers,
-                           "review": review_portfolio(tickers=body.tickers)})
+    if not body.use_holdings and not body.tickers:
+        return agent_error(400, "Type at least one ticker or company name, or review your saved holdings.")
+
+    def call():
+        try:
+            result = portfolio.review(body.tickers, body.use_holdings)
+        except portfolio.PortfolioError as e:
+            return agent_error(e.status, e.message)
+        return {"status": "success", **result}
+    return run_ai(call)
 
 @app.get("/api/ipos")
 def get_ipo_calendar(days_back: int = Query(14, ge=0, le=30), days_ahead: int = Query(60, ge=0, le=90)):

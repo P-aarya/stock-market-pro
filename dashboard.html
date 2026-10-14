@@ -650,28 +650,41 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     <div class="sc" style="--sc-t:var(--cyan)"><div class="sc-l">Portfolio Value</div><div class="sc-v c" id="pf-val">$--</div><div class="sc-s">Current value</div></div>
     <div class="sc" style="--sc-t:var(--blue)"><div class="sc-l">Total Invested</div><div class="sc-v b" id="pf-inv">$--</div><div class="sc-s">Cost basis</div></div>
     <div class="sc" style="--sc-t:var(--green)"><div class="sc-l">Unrealized P&L</div><div class="sc-v" id="pf-pnl">$--</div><div class="sc-s" id="pf-pp">--</div></div>
-    <div class="sc" style="--sc-t:var(--yellow)"><div class="sc-l">Today's Change</div><div class="sc-v" id="pf-day">$--</div><div class="sc-s">Daily</div></div>
+    <div class="sc" style="--sc-t:var(--yellow)"><div class="sc-l">Today's Change</div><div class="sc-v" id="pf-day">$--</div><div class="sc-s" id="pf-day-s">Today</div></div>
   </div>
+  <div class="info-note" id="pf-warn" style="display:none;border-left-color:var(--yellow)"></div>
   <!-- AI Portfolio Review — top after KPI -->
   <div class="ai-wrap" style="margin-bottom:16px;">
     <div class="ai-header">
       <div class="ai-icon">🧠</div>
       <div>
         <div class="ai-title">AI Portfolio Review</div>
-        <div class="ai-sub">Enter tickers you own and our AI will review each one — hold, add more, or consider swapping</div>
+        <div class="ai-sub">Review your saved holdings using your real quantities, cost and position sizes, or type any stocks (tickers or company names) to review</div>
       </div>
     </div>
     <div class="ai-input-row">
-      <input class="ai-input" id="pf-tickers" placeholder="e.g. Apple, Tesla, Nvidia  or  AAPL, TSLA, NVDA"/>
-      <button class="ai-btn" id="pf-ai-btn" onclick="runPfReview()">🔍 Review Portfolio</button>
+      <input class="ai-input" id="pf-tickers" placeholder="e.g. Apple, Tesla, Nvidia  or  AAPL, TSLA, NVDA" onkeydown="if(event.key==='Enter')runPfReview('list')"/>
+      <button class="ai-btn" id="pf-ai-btn" onclick="runPfReview('list')">🔍 Review these stocks</button>
     </div>
-    <div style="margin-bottom:8px;">
-      <button style="font-size:11px;font-weight:700;color:var(--cyan);background:none;border:none;cursor:pointer;padding:0;" onclick="loadPortfolioTickers()">📋 Load from my holdings above</button>
+    <div style="margin-bottom:8px;display:flex;gap:18px;flex-wrap:wrap">
+      <button class="linkbtn" id="pf-hold-btn" onclick="runPfReview('holdings')">🧠 Review my saved holdings</button>
+      <button class="linkbtn" onclick="loadPortfolioTickers()">📋 Fill the box with my holdings' tickers</button>
     </div>
-    <div class="ai-loading" id="pf-ai-loading"><div class="spin"></div>AI is reviewing your portfolio — this takes about 10 seconds...</div>
+    <div class="ai-loading" id="pf-ai-loading"><div class="spin"></div>AI is reviewing — this takes about 10 seconds...</div>
     <div class="ai-result" id="pf-ai-result">
       <div class="ai-result-title">🧠 Portfolio Review</div>
       <div class="ai-result-text" id="pf-ai-result-text"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px" id="pf-perf-card">
+    <div class="chdr"><div class="ctitle">📈 Performance vs the S&P 500</div><span id="pf-perf-sub" style="font-size:11px;font-weight:600;color:var(--t3)"></span></div>
+    <div id="pf-perf-msg"><div class="load"><div class="spin"></div>Loading price history...</div></div>
+    <div id="pf-perf-body" style="display:none">
+      <div class="g4" id="pf-perf-stats" style="margin-bottom:12px"></div>
+      <div style="height:260px"><canvas id="perf-c"></canvas></div>
+      <div class="g4" id="pf-risk" style="margin-top:14px"></div>
+      <div class="peer-legend" id="pf-perf-notes"></div>
     </div>
   </div>
 
@@ -686,19 +699,25 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   <div class="card" style="margin-bottom:16px">
     <div class="stitle">Holdings</div>
     <div class="tw"><table>
-      <thead><tr><th>Ticker</th><th>Company</th><th>Sector</th><th>Qty</th><th>Avg Buy</th><th>Current</th><th>Invested</th><th>Value</th><th>P&L $</th><th>P&L %</th><th>Day %</th><th>Analyst</th><th>Target</th></tr></thead>
-      <tbody id="tb-pf"><tr><td colspan="13"><div class="load"><div class="spin"></div></div></td></tr></tbody>
+      <thead><tr><th>Ticker</th><th>Company</th><th>Sector</th><th>Qty</th><th>Avg Buy</th><th>Current</th><th>Invested</th><th>Value</th><th>P&L $</th><th>P&L %</th><th>Day %</th><th>Analyst</th><th>Target</th><th></th></tr></thead>
+      <tbody id="tb-pf"><tr><td colspan="14"><div class="load"><div class="spin"></div></div></td></tr></tbody>
     </table></div>
   </div>
-  <div class="card">
-    <div class="stitle">➕ Add Holding</div>
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;align-items:end">
+  <div class="card" id="pf-form-card">
+    <div class="stitle" id="pf-form-title">➕ Add Holding</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;align-items:end">
       <div><label class="flbl">Ticker</label><input class="finp" id="a-tick" placeholder="AAPL"/></div>
-      <div><label class="flbl">Quantity</label><input class="finp" type="number" id="a-qty" placeholder="100"/></div>
-      <div><label class="flbl">Avg Buy ($)</label><input class="finp" type="number" id="a-px" placeholder="150"/></div>
+      <div><label class="flbl">Quantity</label><input class="finp" type="number" id="a-qty" min="0" step="any" placeholder="100"/></div>
+      <div><label class="flbl">Avg Buy ($)</label><input class="finp" type="number" id="a-px" min="0" step="any" placeholder="150"/></div>
       <div><label class="flbl">Buy Date</label><input class="finp" type="date" id="a-dt"/></div>
-      <button class="btn btns" onclick="addHolding()">Add Stock</button>
+      <div><label class="flbl">Notes (optional)</label><input class="finp" id="a-notes" maxlength="200" placeholder="Why you bought it"/></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btns" id="pf-save-btn" onclick="saveHolding()">Add Stock</button>
+        <button class="btn" id="pf-cancel-btn" style="display:none" onclick="cancelHoldingEdit()">Cancel</button>
+      </div>
     </div>
+    <div id="pf-msg" style="margin-top:10px;font-size:12px;font-weight:700;min-height:16px"></div>
+    <div class="peer-legend">Buying more of a stock you already hold adds to that position at the weighted-average cost.</div>
   </div>
 
 </div>
@@ -711,6 +730,12 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     <div class="sc" style="--sc-t:var(--purple)"><div class="sc-l">Total Sold</div><div class="sc-v p" id="tx-sold">$--</div><div class="sc-s">Sell volume</div></div>
     <div class="sc" style="--sc-t:var(--yellow)"><div class="sc-l">Largest Trade</div><div class="sc-v y" id="tx-big">$--</div><div class="sc-s">Single tx</div></div>
   </div>
+  <div class="g3">
+    <div class="sc" style="--sc-t:var(--green)"><div class="sc-l">Realized P&L</div><div class="sc-v" id="tx-real">$--</div><div class="sc-s">From sales, average-cost method</div></div>
+    <div class="sc" style="--sc-t:var(--cyan)"><div class="sc-l">Dividends received</div><div class="sc-v c" id="tx-div">$--</div><div class="sc-s">All time</div></div>
+    <div class="card"><div class="chdr"><div class="ctitle">Realized by stock</div></div><div id="tx-real-list"><div class="empty">No sales recorded yet.</div></div></div>
+  </div>
+  <div class="info-note" id="tx-warn" style="display:none;border-left-color:var(--yellow)"></div>
   <div class="g2">
     <div class="card"><div class="chdr"><div class="ctitle">Buy vs Sell</div></div><div style="height:190px"><canvas id="bs-c"></canvas></div></div>
     <div class="card"><div class="chdr"><div class="ctitle">Monthly Volume</div></div><div style="height:190px"><canvas id="txm-c"></canvas></div></div>
@@ -722,23 +747,31 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <button class="fbtn on" onclick="setTxF('all',this)">All</button>
       <button class="fbtn" onclick="setTxF('BUY',this)">Buy</button>
       <button class="fbtn" onclick="setTxF('SELL',this)">Sell</button>
+      <button class="fbtn" onclick="setTxF('DIVIDEND',this)">Dividend</button>
     </div>
     <div class="tw"><table>
-      <thead><tr><th>Date</th><th>Ticker</th><th>Company</th><th>Type</th><th>Qty</th><th>Price</th><th>Total</th><th>Notes</th></tr></thead>
-      <tbody id="tb-tx"><tr><td colspan="8"><div class="load"><div class="spin"></div></div></td></tr></tbody>
+      <thead><tr><th>Date</th><th>Ticker</th><th>Company</th><th>Type</th><th>Qty</th><th>Price</th><th>Total</th><th>Notes</th><th></th></tr></thead>
+      <tbody id="tb-tx"><tr><td colspan="9"><div class="load"><div class="spin"></div></div></td></tr></tbody>
     </table></div>
   </div>
-  <div class="card">
-    <div class="stitle">➕ Add Transaction</div>
-    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;align-items:end">
+  <div class="card" id="tx-form-card">
+    <div class="stitle" id="tx-form-title">➕ Add Transaction</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;align-items:end">
       <div><label class="flbl">Ticker</label><input class="finp" id="tx-tick" placeholder="AAPL"/></div>
-      <div><label class="flbl">Type</label><select class="finp" id="tx-type"><option>BUY</option><option>SELL</option></select></div>
-      <div><label class="flbl">Qty</label><input class="finp" type="number" id="tx-qty" placeholder="100"/></div>
-      <div><label class="flbl">Price ($)</label><input class="finp" type="number" id="tx-px" placeholder="150"/></div>
+      <div><label class="flbl">Type</label><select class="finp" id="tx-type"><option>BUY</option><option>SELL</option><option>DIVIDEND</option></select></div>
+      <div><label class="flbl">Qty (shares)</label><input class="finp" type="number" id="tx-qty" min="0" step="any" placeholder="100"/></div>
+      <div><label class="flbl">Price / dividend per share ($)</label><input class="finp" type="number" id="tx-px" min="0" step="any" placeholder="150"/></div>
       <div><label class="flbl">Date</label><input class="finp" type="date" id="tx-dt"/></div>
-      <button class="btn btnp" onclick="addTx()">Add</button>
+      <div><label class="flbl">Notes (optional)</label><input class="finp" id="tx-notes" maxlength="200" placeholder=""/></div>
+      <div style="display:flex;gap:8px"><button class="btn btnp" id="tx-save-btn" onclick="saveTx()">Add</button><button class="btn" id="tx-cancel-btn" style="display:none" onclick="cancelTxEdit()">Cancel</button></div>
     </div>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12px;font-weight:600;color:var(--t2);cursor:pointer" id="tx-apply-wrap">
+      <input type="checkbox" id="tx-apply"/> Also update my Holdings (a buy adds shares at the average cost, a sale removes them)
+    </label>
+    <div id="tx-msg" style="margin-top:10px;font-size:12px;font-weight:700;min-height:16px"></div>
+    <div class="peer-legend">Editing or deleting a past transaction does not change your Holdings.</div>
   </div>
+
 </div>
 
 <!-- ═══════════ COMMODITIES PAGE ═══════════ -->
@@ -959,7 +992,32 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
         <div id="pred-wrap" style="height:320px;display:flex;align-items:center;justify-content:center">
           <div class="load"><div class="spin"></div>Loading predictions...</div>
         </div>
+        <div id="period-bar" class="period-bar" style="display:none">
+          <div class="period-row">
+            <span class="period-lbl">📅 Performance period</span>
+            <select class="sel" id="period-year" onchange="periodYearChanged()"><option value="">Year…</option></select>
+            <select class="sel" id="period-quarter" onchange="periodQuarterChanged()" disabled><option value="">Full year</option></select>
+            <span class="period-or">or</span>
+            <input type="date" class="srch" id="period-from" aria-label="From date"/>
+            <span class="period-or">to</span>
+            <input type="date" class="srch" id="period-to" aria-label="To date"/>
+            <button class="fbtn" id="period-apply" onclick="periodApplyCustom()">Apply</button>
+          </div>
+          <div class="period-row">
+            <span class="period-lbl">Quick</span>
+            <button class="fbtn" data-quick="YTD" onclick="periodQuick('YTD')">YTD</button>
+            <button class="fbtn" data-quick="1Y" onclick="periodQuick('1Y')">1Y</button>
+            <button class="fbtn" data-quick="3Y" onclick="periodQuick('3Y')">3Y</button>
+            <button class="fbtn" data-quick="5Y" onclick="periodQuick('5Y')">5Y</button>
+            <button class="fbtn" data-quick="10Y" onclick="periodQuick('10Y')">10Y</button>
+            <button class="fbtn" data-quick="MAX" onclick="periodQuick('MAX')">Max</button>
+            <button class="linkbtn" id="period-back" style="display:none;margin-left:auto" onclick="backToForecast()">↩ Back to forecast</button>
+          </div>
+          <div id="period-msg" style="font-size:12px;font-weight:700;color:var(--red);min-height:0"></div>
+        </div>
+        <div id="pred-period-view" style="display:none"></div>
         <div id="pred-targets" class="intgrid" style="margin-top:16px"></div>
+        <div class="info-note" style="margin-top:12px">⚠️ Treat these as rough guides. In backtests on 59 large stocks the model's up/down calls were about as accurate as a coin flip, so its targets are pulled toward "no change". <b>Hit rate</b> is how often the model called direction correctly on held-out history, not a probability. Horizons are trading days (7 ≈ 1.5 weeks, 30 ≈ 6 weeks, 90 ≈ 4 months).</div>
       </div>
       <div class="intbox" id="fs-int"></div>
       <div id="pred-accuracy-wrap"></div>
@@ -1055,7 +1113,11 @@ const mi=(l,v,c='')=>`<div class="mi"><div class="ml">${l}</div><div class="mv $
 
 setInterval(()=>{document.getElementById('ntime').textContent=new Date().toLocaleTimeString('en-US',{hour12:false});},1000);
 
-async function api(url){try{const r=await fetch(API+url);if(!r.ok)throw new Error(r.status);return await r.json();}catch(e){console.error('API:',url,e);return null;}}
+// When the app is password-protected and the session has ended, any API call answers 401: go to the login page.
+function signedOut(res){if(res&&res.status===401&&!location.pathname.startsWith('/login')){location.href='/login';return true;}return false;}
+async function api(url){try{const r=await fetch(API+url);if(signedOut(r))return null;if(!r.ok)throw new Error(r.status);return await r.json();}catch(e){console.error('API:',url,e);return null;}}
+// A "Sign out" link, shown only when the server has a password set
+(async()=>{try{const r=await fetch(API+'/api/auth/status');const d=await r.json();if(d.enabled&&d.signed_in){const a=document.createElement('a');a.href='/logout';a.textContent='Sign out';a.style.cssText='font-size:12px;font-weight:700;color:var(--t3);text-decoration:none;margin-left:12px';document.querySelector('.nav-r')?.appendChild(a);}}catch(e){}})();
 
 function showPage(n,btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
@@ -1572,7 +1634,7 @@ function renderIntelligence(){
           <div style="font-size:9px;color:var(--t3)">${pct1m!=null?(pct1m>=0?'+':'')+f2(pct1m)+'%':''}</div>
         </div>
       </div>
-      ${pred?`<div style="font-size:10px;font-weight:600;color:var(--t3);margin-top:6px">Confidence: <span class="c">${f2(pred.confidence_pct,0)}%</span> · ${pred.trend||''}</div>`:''}
+      ${pred?`<div style="font-size:10px;font-weight:600;color:var(--t3);margin-top:6px">Hit rate: <span class="c">${f2(pred.confidence_pct,0)}%</span> · ${pred.trend||''}</div>`:''}
     </div>`;
   }).join(''):'<div class="empty">No stocks match filter.</div>';
 
@@ -1628,7 +1690,7 @@ function renderPredictions(){
           <div class="actgt-v ${up?'g':'r'}">${up?'+':''}${f2(pct1m)}%</div>
         </div>
       </div>
-      <div style="font-size:10px;font-weight:600;color:var(--t3);margin-top:6px">Confidence: <span class="c">${f2(s.confidence_pct,0)}%</span> · ${s.model_used||'Ensemble'}</div>
+      <div style="font-size:10px;font-weight:600;color:var(--t3);margin-top:6px">Hit rate: <span class="c">${f2(s.confidence_pct,0)}%</span> · ${s.model_used||'Ensemble'}</div>
     </div>`;
   }).join(''):'<div class="empty">No predictions match filter. Run predict.py to generate predictions.</div>';
 
@@ -1673,6 +1735,155 @@ function renderEarnings(){
   document.getElementById('earn-pgn').innerHTML=h;
 }
 function goEarnPg(p){earnPg=p;renderEarnings();}
+
+// Performance period (under the prediction chart)
+const QUARTERS={Q1:[1,3],Q2:[4,6],Q3:[7,9],Q4:[10,12]};
+let periodState={ticker:null,first:null,last:null,seq:0,active:false};
+const pad2=n=>String(n).padStart(2,'0');
+const isoDay=(y,m,d)=>`${y}-${pad2(m)}-${pad2(d)}`;
+const daysInMonth=(y,m)=>new Date(y,m,0).getDate();
+const todayIso=()=>{const d=new Date();return isoDay(d.getFullYear(),d.getMonth()+1,d.getDate());};
+
+/** Dates for a calendar year (and optionally one quarter of it). The end is capped at today; null if it hasn't started. */
+function periodRange(year,quarter,today){
+  year=Number(year);if(!year)return null;
+  const q=QUARTERS[quarter],m1=q?q[0]:1,m2=q?q[1]:12;
+  const start=isoDay(year,m1,1);let end=isoDay(year,m2,daysInMonth(year,m2));
+  if(start>today)return null;
+  const partial=end>today;if(partial)end=today;
+  return{start,end,partial,label:(quarter?`${quarter} ${year}`:`${year}`)+(partial?' (to date)':'')};
+}
+/** YTD / 1Y / 3Y / 5Y / 10Y / Max ending today. */
+function quickRange(kind,today,firstDate){
+  const[y,m,d]=today.split('-').map(Number);
+  const yearsBack=n=>isoDay(y-n,m,Math.min(d,daysInMonth(y-n,m)));
+  const starts={YTD:isoDay(y,1,1),'1Y':yearsBack(1),'3Y':yearsBack(3),'5Y':yearsBack(5),'10Y':yearsBack(10),MAX:firstDate};
+  const names={YTD:'Year to date','1Y':'Last year','3Y':'Last 3 years','5Y':'Last 5 years','10Y':'Last 10 years',MAX:'Since listing'};
+  let start=starts[kind];if(!start)return null;
+  if(firstDate&&start<firstDate)start=firstDate;                 // a stock that is younger than the period: start when it started
+  return{start,end:today,partial:false,label:names[kind]};
+}
+function resetPeriodBar(){
+  periodState.seq++;periodState.active=false;
+  const bar=document.getElementById('period-bar');if(bar)bar.style.display='none';
+  const view=document.getElementById('pred-period-view');if(view){view.style.display='none';view.innerHTML='';}
+  dc('period-c');
+}
+function setPeriodMsg(text){const el=document.getElementById('period-msg');if(el)el.textContent=text||'';}
+async function initPeriodBar(ticker){
+  periodState={ticker,first:null,last:null,seq:periodState.seq+1,active:false};
+  const bar=document.getElementById('period-bar');if(!bar)return;
+  const seq=periodState.seq;
+  const res=await periodFetch(`/api/stocks/${encodeURIComponent(ticker)}/price-range`);
+  if(seq!==periodState.seq||curTick!==ticker)return;                    // the user moved on
+  if(!res.ok){bar.style.display='none';return;}                         // no price history: just don't offer the filter
+  periodState.first=res.data.first_date;periodState.last=res.data.last_date;
+  const thisYear=Number(todayIso().slice(0,4)),firstYear=Number(periodState.first.slice(0,4));
+  let years='<option value="">Year…</option>';
+  for(let y=thisYear;y>=firstYear;y--)years+=`<option value="${y}">${y}</option>`;
+  document.getElementById('period-year').innerHTML=years;
+  const q=document.getElementById('period-quarter');q.innerHTML='<option value="">Full year</option>';q.disabled=true;
+  const from=document.getElementById('period-from'),to=document.getElementById('period-to');
+  from.min=to.min=periodState.first;from.max=to.max=todayIso();from.value=to.value='';
+  setPeriodMsg('');bar.style.display='flex';
+}
+/** Quarter choices for a year: quarters that haven't started, or ended before the stock's first price, are disabled. */
+function buildQuarterOptions(year){
+  const today=todayIso();let html='<option value="">Full year</option>';
+  for(const[q,[m1,m2]]of Object.entries(QUARTERS)){
+    const start=isoDay(year,m1,1),end=isoDay(year,m2,daysInMonth(year,m2));
+    const off=start>today||(periodState.first&&end<periodState.first);
+    html+=`<option value="${q}"${off?' disabled':''}>${q} (${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m1-1]}–${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m2-1]})</option>`;
+  }
+  return html;
+}
+function periodYearChanged(){
+  const year=document.getElementById('period-year').value,q=document.getElementById('period-quarter');
+  q.innerHTML=year?buildQuarterOptions(year):'<option value="">Full year</option>';q.disabled=!year;
+  if(!year){return;}
+  applyPeriod(periodRange(year,'',todayIso()));
+}
+function periodQuarterChanged(){
+  const year=document.getElementById('period-year').value,quarter=document.getElementById('period-quarter').value;
+  if(year)applyPeriod(periodRange(year,quarter,todayIso()));
+}
+function periodApplyCustom(){
+  const from=document.getElementById('period-from').value,to=document.getElementById('period-to').value;
+  if(!from||!to){setPeriodMsg('Pick both a start and an end date.');return;}
+  if(from>=to){setPeriodMsg('The start date must be before the end date.');return;}
+  applyPeriod({start:from,end:to,partial:false,label:`${from} to ${to}`});
+}
+function periodQuick(kind){
+  const r=quickRange(kind,todayIso(),periodState.first);if(r)applyPeriod(r,kind);
+}
+/** The request helper that keeps the server's own wording when something is wrong. */
+async function periodFetch(path){
+  try{
+    const res=await fetch(API+path);
+    if(signedOut(res))return{ok:false,data:null};
+    let data=null;try{data=await res.json();}catch(e){}
+    if(!res.ok||!data||data.status==='error')return{ok:false,data,message:apiMessage(data,res)};
+    return{ok:true,data};
+  }catch(e){return{ok:false,data:null,message:"Couldn't reach the server. Please try again."};}
+}
+function markPeriodButton(kind){
+  document.querySelectorAll('#period-bar [data-quick]').forEach(b=>b.classList.toggle('on',b.dataset.quick===kind));
+}
+async function applyPeriod(range,quickKind){
+  if(!range||!periodState.ticker){setPeriodMsg("That period hasn't started yet.");return;}
+  setPeriodMsg('');markPeriodButton(quickKind||null);
+  const seq=++periodState.seq,ticker=periodState.ticker;
+  const view=document.getElementById('pred-period-view'),wrap=document.getElementById('pred-wrap');
+  wrap.style.display='none';view.style.display='block';periodState.active=true;
+  document.getElementById('period-back').style.display='inline';
+  view.innerHTML='<div class="load"><div class="spin"></div>Loading '+escapeHtml(range.label)+'...</div>';
+  const res=await periodFetch(`/api/stocks/${encodeURIComponent(ticker)}/period?start=${range.start}&end=${range.end}`);
+  if(seq!==periodState.seq||curTick!==ticker)return;                    // a newer choice (or another stock) took over
+  if(!res.ok){backToForecast();setPeriodMsg(res.message);return;}      // show the forecast again rather than a blank chart
+  renderPeriodView(res.data,range);
+}
+function backToForecast(){
+  periodState.seq++;periodState.active=false;markPeriodButton(null);setPeriodMsg('');
+  const view=document.getElementById('pred-period-view');view.style.display='none';view.innerHTML='';dc('period-c');
+  document.getElementById('pred-wrap').style.display='';
+  document.getElementById('period-back').style.display='none';
+}
+function renderPeriodView(d,range){
+  const st=d.stats,view=document.getElementById('pred-period-view');
+  const pct=v=>v==null?'--':(v>=0?'+':'')+f2(v)+'%';
+  const shortDate=iso=>new Date(iso+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  const notes=[];
+  if(st.starts_late)notes.push(`Trading began on ${shortDate(st.actual_start)}, so the period is measured from then.`);
+  if(st.ends_early)notes.push(`The latest price available is from ${shortDate(st.actual_end)}.`);
+  if(range&&range.partial)notes.push('This period is still in progress, so it runs to the latest close.');
+  if(st.benchmark_change_pct==null)notes.push("S&P 500 comparison isn't available for this period.");
+  const cards=[
+    ['Start price',fp(st.start_price),shortDate(st.actual_start),''],
+    ['End price',fp(st.end_price),shortDate(st.actual_end),''],
+    ['Change',(st.change_usd>=0?'+':'')+fp(st.change_usd),pct(st.change_pct),gc(st.change_pct)],
+    ['vs S&P 500',st.difference_pp==null?'--':(st.difference_pp>=0?'+':'')+f2(st.difference_pp,1)+' pts',st.benchmark_change_pct==null?'':'Index '+pct(st.benchmark_change_pct),gc(st.difference_pp)],
+    ['Highest close',fp(st.high),shortDate(st.high_date),'g'],
+    ['Lowest close',fp(st.low),shortDate(st.low_date),'r'],
+    ['Biggest drop',f2(st.max_drawdown_pct,1)+'%',`${shortDate(st.max_drawdown_peak_date)} → ${shortDate(st.max_drawdown_low_date)}`,'r'],
+    ['Volatility',st.volatility_pct==null?'--':f2(st.volatility_pct,1)+'%','Yearly swing in daily returns',''],
+  ].map(([l,v,sub,cls])=>`<div class="sc"><div class="sc-l">${escapeHtml(l)}</div><div class="sc-v ${cls}" style="font-size:18px">${escapeHtml(v)}</div><div class="sc-s">${escapeHtml(sub)}</div></div>`).join('');
+  view.innerHTML=`<div class="period-head">
+      <span class="period-title">${escapeHtml(range?range.label:'')} · ${escapeHtml(shortDate(st.actual_start))} – ${escapeHtml(shortDate(st.actual_end))}</span>
+      <span class="period-change ${gc(st.change_pct)}">${pct(st.change_pct)}</span>
+      <span class="period-sub">${st.benchmark_change_pct==null?'':`S&amp;P 500 ${pct(st.benchmark_change_pct)}`}</span></div>
+    <div style="height:300px"><canvas id="period-c"></canvas></div>
+    ${notes.map(n=>`<div class="period-note">ℹ️ ${escapeHtml(n)}</div>`).join('')}
+    <div class="g4" style="margin-top:12px">${cards}</div>
+    <div class="period-note">${st.up_days_pct==null?'':`Up days ${f2(st.up_days_pct,0)}% · `}Best day ${pct(st.best_day_pct)} (${escapeHtml(shortDate(st.best_day))}) · Worst day ${pct(st.worst_day_pct)} (${escapeHtml(shortDate(st.worst_day))}) · ${st.trading_days} trading days. ${escapeHtml(d.adjusted||'')} Past performance does not predict the future.</div>`;
+  const up=st.change_pct>=0,line=up?'#00e676':'#ff4444';
+  dc('period-c');const ctx=document.getElementById('period-c')?.getContext('2d');
+  const datasets=[{label:d.ticker,data:d.prices,borderColor:line,backgroundColor:up?'rgba(0,230,118,0.08)':'rgba(255,68,68,0.08)',borderWidth:2,pointRadius:0,fill:true,tension:0.1}];
+  if(d.benchmark)datasets.push({label:(d.benchmark_name||'S&P 500')+' (from the same starting price)',data:d.benchmark,borderColor:'#ffc800',borderWidth:1.8,borderDash:[6,4],pointRadius:0,tension:0.1});
+  if(ctx)charts['period-c']=new Chart(ctx,{type:'line',data:{labels:d.dates,datasets},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{color:'#c0cce0',font:{size:11,weight:'700'}}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+fp(c.raw)}}},
+      scales:{x:{ticks:{color:'#58697a',maxTicksLimit:8},grid:{display:false}},y:{ticks:{color:'#58697a',callback:v=>fp(v)},grid:{color:'rgba(28,28,48,0.5)'}}}}});
+}
 
 // News sentiment
 function safeHttpUrl(u){return/^https?:\/\//i.test(u||'')?u:'';}
@@ -1719,11 +1930,11 @@ function renderSentiment(d){
     ${score==null?`<div class="empty" style="padding:8px 0">${d.n_articles?'None of the recent headlines are about this company.':'No recent headlines found for this stock.'}</div>`:
     `<div class="sent-top"><div class="sent-score ${score>=0.15?'g':score<=-0.15?'r':''}">${score>0?'+':''}${score.toFixed(2)}</div>
       <div class="sent-gauge" title="-1 very negative, +1 very positive"><i style="left:${pos}%"></i></div></div>
-    <div class="sent-meta">${d.n_relevant} of ${d.n_articles} headlines are about ${escapeHtml(d.ticker)} · ${c.positive||0} positive · ${c.neutral||0} neutral · ${c.negative||0} negative</div>`}
+    <div class="sent-meta">${d.n_relevant} of ${d.n_articles} headlines are about ${escapeHtml(d.ticker)}${d.n_stories&&d.n_stories<d.n_relevant?` (${d.n_stories} distinct stories)`:''} · ${c.positive||0} positive · ${c.neutral||0} neutral · ${c.negative||0} negative</div>`}
     ${d.stale?'<div class="sent-meta r">⚠️ The AI service is unavailable, so this is an older result.</div>':''}
     <div style="margin-top:10px">${about.map(sentHeadline).join('')}</div>
     ${other.length?`<details><summary>${other.length} headline${other.length>1?'s':''} not about ${escapeHtml(d.ticker)} (ignored)</summary>${other.map(sentHeadline).join('')}</details>`:''}
-    <div class="sent-meta" style="margin-top:10px">Headlines are scored by AI from -1 (very negative) to +1 (very positive) for their likely effect on this stock, newer ones counting more. It is context, not a forecast, and a story reported by several outlets counts once per outlet.${upd?' Updated '+escapeHtml(upd)+'.':''}</div>
+    <div class="sent-meta" style="margin-top:10px">Headlines are scored by AI from -1 (very negative) to +1 (very positive) for their likely effect on this stock, newer ones counting more. It is context, not a forecast. Headlines about the same story are grouped, and a heavily covered story counts more (by the square root of its coverage).${upd?' Updated '+escapeHtml(upd)+'.':''}</div>
   </div>`;
 }
 
@@ -1738,6 +1949,7 @@ function peerFmt(m,v){
   v=Number(v);if(!isFinite(v))return'—';
   switch(m.format){
     case'ratio':return v.toFixed(1)+'x';
+    case'sent':return(v>0?'+':'')+v.toFixed(2);
     case'pct':return(v*100).toFixed(1)+'%';
     case'pp':return(m.key==='model_move_1w'&&v>0?'+':'')+v.toFixed(2)+'%';
     case'usd':{const a=Math.abs(v),sg=v<0?'-':'';return a>=1e12?`${sg}$${(a/1e12).toFixed(2)}T`:a>=1e9?`${sg}$${(a/1e9).toFixed(2)}B`:a>=1e6?`${sg}$${(a/1e6).toFixed(1)}M`:`${sg}$${a.toFixed(0)}`;}
@@ -1789,6 +2001,37 @@ function peerAdd(t,name){
   document.getElementById('peer-search').value='';
   renderPeerChips();renderPeerTable();
 }
+let peerChartSeq=0;
+async function loadPeerChart(tickers){
+  const seq=++peerChartSeq,msg=document.getElementById('peer-chart-msg'),box=document.getElementById('peer-chart-box');
+  if(!msg||!box)return;
+  const d=await api('/api/compare/prices?tickers='+encodeURIComponent(tickers.join(',')));
+  if(seq!==peerChartSeq||!document.getElementById('peer-px-c'))return;      // a newer table replaced this one
+  if(!d||d.status!=='success'||!d.dates.length){msg.innerHTML='<div class="empty">Price history isn\'t available for this comparison.</div>';box.style.display='none';return;}
+  msg.style.display=(d.missing||[]).length?'block':'none';
+  if((d.missing||[]).length)msg.innerHTML=`<div class="peer-legend" style="margin:0 0 6px">No price history for: ${d.missing.map(escapeHtml).join(', ')}</div>`;
+  box.style.display='block';
+  dc('peer-px-c');const ctx=document.getElementById('peer-px-c').getContext('2d');
+  const names=Object.keys(d.series);
+  charts['peer-px-c']=new Chart(ctx,{type:'line',data:{labels:d.dates,datasets:names.map((t,i)=>({label:t,data:d.series[t],borderColor:C[i%C.length],borderWidth:t===tickers[0]?3:1.8,pointRadius:0,tension:0.1}))},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{color:'#c0cce0',font:{size:11,weight:'700'}}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+f2(c.raw,1)}}},
+      scales:{x:{ticks:{color:'#58697a',maxTicksLimit:8},grid:{display:false}},y:{ticks:{color:'#58697a'},grid:{color:'rgba(28,28,48,0.5)'}}}}});
+}
+async function loadPeerVerdict(){
+  const btn=document.getElementById('peer-verdict-btn'),out=document.getElementById('peer-verdict');
+  if(!btn||!out||!peerState.target)return;
+  const tickers=[peerState.target,...peerState.list];
+  btn.disabled=true;out.innerHTML='<div class="load"><div class="spin"></div>Writing the summary...</div>';
+  try{
+    const res=await fetch(`${API}/api/compare/verdict?tickers=${encodeURIComponent(tickers.join(','))}`);
+    if(signedOut(res))return;
+    let data=null;try{data=await res.json();}catch(e){}
+    if(!res.ok||!data||data.status==='error'){out.textContent=apiMessage(data,res);return;}
+    out.innerHTML=renderMarkdown(data.verdict);
+  }catch(e){out.textContent="Couldn't reach the server. Please try again.";}
+  finally{btn.disabled=false;}
+}
 function peerCloseSuggest(){const s=document.getElementById('peer-suggest');if(s)s.style.display='none';}
 function peerSearchDebounced(){clearTimeout(peerTimer);peerTimer=setTimeout(peerSearch,250);}
 async function peerSearch(){
@@ -1821,11 +2064,18 @@ async function renderPeerTable(){
   const rows=d.groups.map(g=>`<tr class="peer-grp"><td colspan="${cols}">${escapeHtml(g.name)}</td></tr>`+g.metrics.map(m=>
     `<tr><td style="color:var(--t2);font-weight:600">${escapeHtml(m.label)}</td>`+T.map(t=>{
       const v=m.values[t],cls=[t===tgt?'peer-target':'',m.best===t?'peer-best':'',m.format==='text'?peerTextClass(v):''].filter(Boolean).join(' ');
-      return`<td class="num ${cls}">${peerFmt(m,v)}${m.best===t?' ★':''}${t===tgt&&m.position?posMark[m.position]||'':''}</td>`;
+      const odd=(m.outliers||[]).includes(t)?' <span title="Unusually large. This may reflect a very small starting figure or a data error." style="cursor:help">⚠️</span>':'';
+      return`<td class="num ${cls}">${peerFmt(m,v)}${odd}${m.best===t?' ★':''}${t===tgt&&m.position?posMark[m.position]||'':''}</td>`;
     }).join('')+`<td class="num" style="color:var(--t3)">${m.median!=null?peerFmt(m,m.median):'—'}</td></tr>`).join('')).join('');
   const missing=(d.missing||[]).length?`<div class="r" style="font-size:11px;margin-top:8px">Not found: ${d.missing.map(escapeHtml).join(', ')}</div>`:'';
+  setTimeout(()=>loadPeerChart(T),0);
   body.innerHTML=`<div class="tw"><table class="peer-table"><thead>${head}</thead><tbody>${rows}</tbody></table></div>
     <div class="peer-legend">★ best in row &nbsp;·&nbsp; ▲ ▼ ≈ ${escapeHtml(tgt)} better / worse / in line with the peer median &nbsp;·&nbsp; "—" = not available or not meaningful (for example a negative P/E)</div>${missing}
+    <div class="card" style="margin-top:14px"><div class="chdr"><div class="ctitle">1-year price performance (rebased to 100)</div></div>
+      <div id="peer-chart-msg"><div class="load"><div class="spin"></div>Loading prices...</div></div>
+      <div style="height:260px;display:none" id="peer-chart-box"><canvas id="peer-px-c"></canvas></div></div>
+    <div class="card" style="margin-top:14px"><div class="chdr"><div class="ctitle">🧠 AI summary</div><button class="linkbtn" id="peer-verdict-btn" onclick="loadPeerVerdict()">Summarize this comparison</button></div>
+      <div id="peer-verdict" class="ai-result-text"><span style="color:var(--t3);font-size:12px;font-weight:600">A short written comparison based on the table above.</span></div></div>
     <div class="peer-legend">Prices as of ${d.prices_as_of?escapeHtml(new Date(d.prices_as_of).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})):'—'}. Fundamentals come from Yahoo Finance and may lag. Not investment advice.</div>`;
 }
 
@@ -2578,6 +2828,7 @@ async function loadBalanceSheetAndPnL(){
 // ── Prediction Chart: Past → Today → Future ──
 async function loadPrediction(){
   if(!curTick)return;
+  resetPeriodBar();
   document.getElementById('pred-wrap').innerHTML='<div class="load"><div class="spin"></div>Loading prediction model...</div>';
   document.getElementById('pred-targets').innerHTML='';
   document.getElementById('model-badge').textContent='';
@@ -2590,6 +2841,7 @@ async function loadPrediction(){
   }
 
   document.getElementById('model-badge').textContent='Model: '+(d.model_used||'XGBoost+Prophet');
+  initPeriodBar(curTick);                       // the period filter appears under the chart once there is a prediction
 
   const hist=d.price_history||[];
   const path=d.predicted_path||[];
@@ -2710,7 +2962,7 @@ async function loadPrediction(){
       <div class="intlbl">${label} Target</div>
       <div class="intval ${up?'g':'r'}">${fp(target)}</div>
       <div class="intchg ${up?'g':'r'}">${up?'+':''}${f2(pct)}%</div>
-      <div style="font-size:9px;color:var(--t3);margin-top:4px;font-weight:600">↑ ${f2(prob,0)}% prob · ${f2(conf,0)}% conf</div>
+      <div style="font-size:9px;color:var(--t3);margin-top:4px;font-weight:600" title="Hit rate: how often the model called the direction right on held-out history. It is not a probability.">↑ ${f2(prob,0)}% prob · ${f2(conf,0)}% hit rate</div>
     </div>`;
   };
 
@@ -2723,9 +2975,9 @@ async function loadPrediction(){
       <div class="intval">${fp(livePrice)}</div>
       <div class="intchg ${gc(d.price_change_pct)}">${d.price_change_pct!=null?(d.price_change_pct>=0?'+':'')+f2(d.price_change_pct)+'% today':''}</div>
     </div>`
-    +mkTarget('1 Week',d.target_1w,d.target_1w?((d.target_1w-livePrice)/livePrice*100):0,d.prob_up_1w||50,d.confidence_pct||60)
-    +mkTarget('1 Month',d.target_1m,d.target_1m?((d.target_1m-livePrice)/livePrice*100):0,d.prob_up_1m||50,d.confidence_pct||60)
-    +mkTarget('3 Months',d.target_3m,d.target_3m?((d.target_3m-livePrice)/livePrice*100):0,d.prob_up_3m||50,d.confidence_pct||60);
+    +mkTarget('7 Trading Days',d.target_1w,d.target_1w?((d.target_1w-livePrice)/livePrice*100):0,d.prob_up_1w||50,d.confidence_pct||60)
+    +mkTarget('30 Trading Days',d.target_1m,d.target_1m?((d.target_1m-livePrice)/livePrice*100):0,d.prob_up_1m||50,d.confidence_pct||60)
+    +mkTarget('90 Trading Days',d.target_3m,d.target_3m?((d.target_3m-livePrice)/livePrice*100):0,d.prob_up_3m||50,d.confidence_pct||60);
 
   // Show accuracy tracker in dedicated div
   const accHtml = buildAccuracyTracker(d, livePrice);
@@ -2781,86 +3033,252 @@ function buildAccuracyTracker(d, livePrice){
 function closeFS(){document.getElementById('fsm').classList.remove('open');document.body.style.overflow='';curTick=null;}
 
 // Portfolio
+let pfRows=[],pfEditId=null;
+function apiMessage(data,res){
+  if(data&&data.message)return data.message;
+  if(data&&Array.isArray(data.detail)&&data.detail[0])return data.detail[0].msg||'Please check the form.';
+  return res&&res.status===429?'Too many requests. Please wait a moment.':'Something went wrong. Please try again.';
+}
+function pfSay(text,ok){const el=document.getElementById('pf-msg');if(el){el.textContent=text||'';el.style.color=ok?'var(--green)':'var(--red)';}}
 async function loadPortfolio(){
   const [h,s]=await Promise.all([api('/api/portfolio'),api('/api/portfolio/summary')]);
   if(s){
-    const pnl=s.total_pnl,pp=s.total_invested?(pnl/s.total_invested*100):0;
+    const pnl=s.total_pnl,pp=s.return_pct!=null?s.return_pct:0;
     document.getElementById('pf-val').textContent=fb(s.total_value);
     document.getElementById('pf-inv').textContent=fb(s.total_invested);
     const pe=document.getElementById('pf-pnl');pe.textContent=pnl!=null?(pnl>=0?'+':'')+fb(pnl):'$--';pe.className='sc-v '+(pnl>=0?'g':'r');
-    document.getElementById('pf-pp').textContent=(pp>=0?'+':'')+f2(pp)+'% return';
+    document.getElementById('pf-pp').textContent=s.return_pct!=null?(pp>=0?'+':'')+f2(pp)+'% return':'--';
     const de=document.getElementById('pf-day');de.textContent=s.day_change!=null?(s.day_change>=0?'+':'')+fb(s.day_change):'$--';de.className='sc-v '+(s.day_change>=0?'g':'r');
+    document.getElementById('pf-day-s').textContent=s.day_change_pct!=null?(s.day_change_pct>=0?'+':'')+f2(s.day_change_pct)+'% today':'Today';
+    const warn=document.getElementById('pf-warn');
+    if(s.unpriced_holdings>0){warn.style.display='block';warn.textContent=`⚠️ ${s.unpriced_holdings} holding${s.unpriced_holdings>1?'s have':' has'} no live price (${(s.unpriced_tickers||[]).join(', ')}), so ${s.unpriced_holdings>1?'they are':'it is'} left out of value, P&L and return.`;}
+    else warn.style.display='none';
   }
-  if(!h||!h.length){
-    document.getElementById('tb-pf').innerHTML='<tr><td colspan="13" class="empty">No holdings yet. Add below!</td></tr>';
-    document.getElementById('sec-alloc').innerHTML='<div class="empty">No holdings yet.</div>';
+  if(!h){
+    document.getElementById('tb-pf').innerHTML='<tr><td colspan="14" class="empty">Could not load your holdings. <button class="linkbtn" onclick="loadPortfolio()">Retry</button></td></tr>';
     return;
   }
-  document.getElementById('tb-pf').innerHTML=h.map(x=>`<tr onclick="openStock('${x.ticker}')">
-    <td class="sym">${x.ticker}</td><td style="color:var(--t2);font-weight:600">${x.company_name||'--'}</td>
-    <td style="font-size:10px;color:var(--t3);font-weight:700">${x.sector||'--'}</td>
-    <td class="num">${x.quantity}</td><td class="num">${fp(x.avg_buy_price)}</td><td class="num">${fp(x.current_price)}</td>
+  pfRows=h;
+  loadPortfolioPerformance();
+  if(!h.length){
+    document.getElementById('tb-pf').innerHTML='<tr><td colspan="14" class="empty">No holdings yet. Add below!</td></tr>';
+    document.getElementById('sec-alloc').innerHTML='<div class="empty">No holdings yet.</div>';
+    dc('alloc-c');dc('pnl-c');
+    return;
+  }
+  document.getElementById('tb-pf').innerHTML=h.map(x=>`<tr data-t="${escapeHtml(x.ticker)}" onclick="openStock(this.dataset.t)">
+    <td class="sym">${escapeHtml(x.ticker)}</td><td style="color:var(--t2);font-weight:600">${escapeHtml(x.company_name||'--')}</td>
+    <td style="font-size:10px;color:var(--t3);font-weight:700">${escapeHtml(x.sector||'--')}</td>
+    <td class="num">${x.quantity}</td><td class="num">${fp(x.avg_buy_price)}</td><td class="num">${x.current_price!=null?fp(x.current_price):'<span class="badge by" title="No live price">no price</span>'}</td>
     <td style="color:var(--t2);font-weight:600">${fb(x.invested_value)}</td>
-    <td class="num c">${fb(x.current_value)}</td>
+    <td class="num c">${x.current_value!=null?fb(x.current_value):'--'}</td>
     <td class="num ${gc(x.unrealized_pnl)}">${x.unrealized_pnl!=null?(x.unrealized_pnl>=0?'+':'')+fb(x.unrealized_pnl):'--'}</td>
     <td class="num ${gc(x.pnl_pct)}">${x.pnl_pct!=null?(x.pnl_pct>=0?'+':'')+f2(x.pnl_pct)+'%':'--'}</td>
     <td class="num ${gc(x.day_change_pct)}">${x.day_change_pct!=null?(x.day_change_pct>=0?'+':'')+f2(x.day_change_pct)+'%':'--'}</td>
     <td>${mkRat(x.analyst_rating)}</td>
     <td class="num g">${x.target_price?fp(x.target_price):'--'}</td>
+    <td style="white-space:nowrap" onclick="event.stopPropagation()">
+      <button class="bm-act" data-id="${x.id}" onclick="editHolding(this.dataset.id)">✏️ Edit</button>
+      <button class="bm-act" data-id="${x.id}" onclick="deleteHolding(this.dataset.id)">🗑 Remove</button>
+    </td>
   </tr>`).join('');
   const total=h.reduce((s,x)=>s+(x.current_value||0),0);
-  const top=[...h].sort((a,b)=>(b.current_value||0)-(a.current_value||0)).slice(0,8);
+  const ranked=[...h].filter(x=>x.current_value).sort((a,b)=>(b.current_value||0)-(a.current_value||0));
+  const top=ranked.slice(0,8),otherValue=ranked.slice(8).reduce((sum,x)=>sum+x.current_value,0);
+  const slices=top.map(x=>({label:x.ticker,value:x.current_value||0})).concat(otherValue>0?[{label:`Other (${ranked.length-8})`,value:otherValue}]:[]);
   dc('alloc-c');const ctx=document.getElementById('alloc-c')?.getContext('2d');
-  if(ctx)charts['alloc-c']=new Chart(ctx,{type:'doughnut',data:{labels:top.map(x=>x.ticker),datasets:[{data:top.map(x=>x.current_value||0),backgroundColor:C,borderWidth:0,hoverOffset:6}]},
+  if(ctx)charts['alloc-c']=new Chart(ctx,{type:'doughnut',data:{labels:slices.map(x=>x.label),datasets:[{data:slices.map(x=>x.value),backgroundColor:slices.map((x,i)=>x.label.startsWith('Other')?'#58697a':C[i%C.length]),borderWidth:0,hoverOffset:6}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'right',labels:{color:'#c0cce0',font:{size:11,weight:'700'},padding:8}},tooltip:{callbacks:{label:c=>c.label+': '+fb(c.raw)+' ('+f2(c.raw/total*100)+'%)'}}}}});
   dc('pnl-c');const ctx2=document.getElementById('pnl-c')?.getContext('2d');
   const sorted=[...h].sort((a,b)=>(b.unrealized_pnl||0)-(a.unrealized_pnl||0));
   if(ctx2)charts['pnl-c']=new Chart(ctx2,{type:'bar',data:{labels:sorted.map(x=>x.ticker),datasets:[{data:sorted.map(x=>x.unrealized_pnl||0),backgroundColor:sorted.map(x=>(x.unrealized_pnl||0)>=0?'rgba(0,230,118,0.7)':'rgba(255,68,68,0.7)'),borderRadius:4,borderWidth:0}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#c0cce0',font:{size:10,weight:'600'}},grid:{display:false}},y:{ticks:{color:'#58697a',callback:v=>fb(v)},grid:{color:'rgba(28,28,48,0.5)'}}}}});
-  const sm={};h.forEach(x=>{const s=x.sector||'Unknown';sm[s]=(sm[s]||0)+(x.current_value||0);});
+  const sm={};h.forEach(x=>{const s=x.sector_group||x.sector||'Other';sm[s]=(sm[s]||0)+(x.current_value||0);});
   const sa=Object.entries(sm).sort((a,b)=>b[1]-a[1]);
-  document.getElementById('sec-alloc').innerHTML=sa.map(([n,v],i)=>`<div class="allocrow">
-    <div class="allocdot" style="background:${C[i%C.length]}"></div><div class="allocname">${n}</div>
+  document.getElementById('sec-alloc').innerHTML=total>0?sa.map(([n,v],i)=>`<div class="allocrow">
+    <div class="allocdot" style="background:${C[i%C.length]}"></div><div class="allocname">${escapeHtml(n)}</div>
     <div class="allocbarbg"><div class="allocbar" style="width:${v/sa[0][1]*100}%;background:${C[i%C.length]}"></div></div>
     <div class="allocpct">${f2(v/total*100)}%</div><div class="allocval">${fb(v)}</div>
-  </div>`).join('');
+  </div>`).join(''):'<div class="empty">No priced holdings yet.</div>';
 }
-async function addHolding(){
+let pfPerfSeq=0;
+async function loadPortfolioPerformance(){
+  const seq=++pfPerfSeq,msg=document.getElementById('pf-perf-msg'),body=document.getElementById('pf-perf-body');
+  if(!msg||!body)return;
+  msg.style.display='block';msg.innerHTML='<div class="load"><div class="spin"></div>Loading price history...</div>';body.style.display='none';
+  const d=await api('/api/portfolio/performance');
+  if(seq!==pfPerfSeq)return;                                      // a newer load is under way
+  if(!d||d.status!=='success'){msg.innerHTML='<div class="empty">Performance isn\'t available right now (price history couldn\'t be loaded). <button class="linkbtn" onclick="loadPortfolioPerformance()">Retry</button></div>';return;}
+  if(d.empty){msg.innerHTML='<div class="empty">Add a holding to see how it compares with the S&amp;P 500.</div>';return;}
+  msg.style.display='none';body.style.display='block';
+  const sm=d.summary,rk=d.risk||{};
+  const pctTxt=v=>v==null?'--':(v>=0?'+':'')+f2(v,1)+'%';
+  document.getElementById('pf-perf-sub').textContent='Same dollars, same dates · '+escapeHtml(d.benchmark_name);
+  document.getElementById('pf-perf-stats').innerHTML=[
+    ['Your portfolio',pctTxt(sm.portfolio_return_pct),fb(sm.portfolio_value)+' now',gc(sm.portfolio_return_pct)],
+    [d.benchmark_name,pctTxt(sm.benchmark_return_pct),fb(sm.benchmark_value)+' if invested in the index',gc(sm.benchmark_return_pct)],
+    ['Difference',(sm.difference_pp>=0?'+':'')+f2(sm.difference_pp,1)+' pts',(sm.difference_usd>=0?'+':'')+fb(sm.difference_usd)+' vs the index',gc(sm.difference_pp)],
+    ['Cost basis',fb(sm.cost),'what you put in','']
+  ].map(([l,v,sub,cls])=>`<div class="sc"><div class="sc-l">${escapeHtml(l)}</div><div class="sc-v ${cls}">${escapeHtml(v)}</div><div class="sc-s">${escapeHtml(sub)}</div></div>`).join('');
+  const dash=v=>v==null?'—':v;
+  document.getElementById('pf-risk').innerHTML=[
+    ['Volatility',rk.volatility_pct!=null?f2(rk.volatility_pct,1)+'%':'—','Yearly swing in daily returns'],
+    ['Worst fall',rk.max_drawdown_pct!=null?f2(rk.max_drawdown_pct,1)+'%':'—','Biggest drop from a peak'],
+    ['Beta vs S&P 500',dash(rk.beta),'1.0 moves with the market'],
+    ['Diversification',dash(rk.diversification),rk.effective_holdings!=null?`≈ ${f2(rk.effective_holdings,1)} equal-sized holdings · top 3 = ${f2(rk.top3_weight_pct,0)}%`:'']
+  ].map(([l,v,sub])=>`<div class="sc"><div class="sc-l">${escapeHtml(l)}</div><div class="sc-v" style="font-size:18px">${escapeHtml(String(v))}</div><div class="sc-s">${escapeHtml(sub)}</div></div>`).join('');
+  document.getElementById('pf-perf-notes').textContent=(d.notes||[]).join(' ');
+  dc('perf-c');const ctx=document.getElementById('perf-c')?.getContext('2d');
+  if(ctx)charts['perf-c']=new Chart(ctx,{type:'line',data:{labels:d.dates,datasets:[
+      {label:'Your portfolio',data:d.portfolio,borderColor:'#00c8ff',backgroundColor:'rgba(0,200,255,0.08)',borderWidth:2,pointRadius:0,fill:true,tension:0.15},
+      {label:d.benchmark_name+' (same dollars)',data:d.benchmark,borderColor:'#ffc800',borderWidth:2,borderDash:[6,4],pointRadius:0,tension:0.15},
+      {label:'Cost basis',data:d.invested,borderColor:'#58697a',borderWidth:1.5,pointRadius:0,stepped:true}]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{color:'#c0cce0',font:{size:11,weight:'700'}}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+fb(c.raw)}}},
+      scales:{x:{ticks:{color:'#58697a',maxTicksLimit:8},grid:{display:false}},y:{ticks:{color:'#58697a',callback:v=>fb(v)},grid:{color:'rgba(28,28,48,0.5)'}}}}});
+}
+function resetHoldingForm(){
+  pfEditId=null;
+  ['a-tick','a-qty','a-px','a-dt','a-notes'].forEach(id=>{const el=document.getElementById(id);el.value='';});
+  document.getElementById('a-tick').readOnly=false;
+  document.getElementById('pf-form-title').textContent='➕ Add Holding';
+  document.getElementById('pf-save-btn').textContent='Add Stock';
+  document.getElementById('pf-cancel-btn').style.display='none';
+}
+function cancelHoldingEdit(){resetHoldingForm();pfSay('');}
+function editHolding(id){
+  const h=pfRows.find(x=>String(x.id)===String(id));
+  if(!h)return;
+  pfEditId=h.id;
+  document.getElementById('a-tick').value=h.ticker;document.getElementById('a-tick').readOnly=true;
+  document.getElementById('a-qty').value=h.quantity;document.getElementById('a-px').value=h.avg_buy_price;
+  document.getElementById('a-dt').value=String(h.buy_date||'').slice(0,10);document.getElementById('a-notes').value=h.notes||'';
+  document.getElementById('pf-form-title').textContent='✏️ Edit '+h.ticker;
+  document.getElementById('pf-save-btn').textContent='Save Changes';
+  document.getElementById('pf-cancel-btn').style.display='inline-block';
+  pfSay('');
+  document.getElementById('pf-form-card').scrollIntoView({behavior:'smooth',block:'center'});
+}
+async function saveHolding(){
   const t=document.getElementById('a-tick').value.trim().toUpperCase();
-  const q=document.getElementById('a-qty').value,p=document.getElementById('a-px').value,d=document.getElementById('a-dt').value;
-  if(!t||!q||!p||!d){alert('Please fill all fields');return;}
-  const r=await fetch(`${API}/api/portfolio/add?ticker=${t}&quantity=${q}&avg_buy_price=${p}&buy_date=${d}`,{method:'POST'});
-  const x=await r.json();alert(x.message||'Added!');loadPortfolio();
+  const q=Number(document.getElementById('a-qty').value),p=Number(document.getElementById('a-px').value);
+  const d=document.getElementById('a-dt').value,notes=document.getElementById('a-notes').value.trim();
+  if(!t||!document.getElementById('a-qty').value||!document.getElementById('a-px').value||!d){pfSay('Please fill in ticker, quantity, average buy price and buy date.',false);return;}
+  if(!(q>0)){pfSay('Quantity must be greater than zero.',false);return;}
+  if(!(p>0)){pfSay('Average buy price must be greater than zero.',false);return;}
+  if(d>new Date().toISOString().slice(0,10)){pfSay("Buy date can't be in the future.",false);return;}
+  const btn=document.getElementById('pf-save-btn');btn.disabled=true;
+  try{
+    const editing=pfEditId!=null;
+    const res=await fetch(editing?`${API}/api/portfolio/${encodeURIComponent(pfEditId)}`:`${API}/api/portfolio`,{
+      method:editing?'PUT':'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(editing?{quantity:q,avg_buy_price:p,buy_date:d,notes}:{ticker:t,quantity:q,avg_buy_price:p,buy_date:d,notes})});
+    let data=null;try{data=await res.json();}catch(e){}
+    if(!res.ok||!data||data.status==='error'){pfSay(apiMessage(data,res),false);return;}
+    resetHoldingForm();pfSay('✅ '+data.message,true);
+    await loadPortfolio();
+  }catch(e){pfSay("Couldn't reach the server. Please try again.",false);}
+  finally{btn.disabled=false;}
+}
+async function deleteHolding(id){
+  const h=pfRows.find(x=>String(x.id)===String(id));
+  if(!h||!confirm(`Remove ${h.ticker} (${h.quantity} shares) from your portfolio?`))return;
+  try{
+    const res=await fetch(`${API}/api/portfolio/${encodeURIComponent(h.id)}`,{method:'DELETE'});
+    let data=null;try{data=await res.json();}catch(e){}
+    if(!res.ok||!data||data.status==='error'){pfSay(apiMessage(data,res),false);return;}
+    if(pfEditId===h.id)resetHoldingForm();
+    pfSay('✅ '+data.message,true);
+    await loadPortfolio();
+  }catch(e){pfSay("Couldn't reach the server. Please try again.",false);}
 }
 
 // Transactions
+let txEditId=null;
+function txSay(text,ok){const el=document.getElementById('tx-msg');if(el){el.textContent=text||'';el.style.color=ok?'var(--green)':'var(--red)';}}
 async function loadTx(){
   const [t,s]=await Promise.all([api('/api/transactions'),api('/api/transactions/summary')]);
-  if(s){document.getElementById('tx-tot').textContent=s.total_trades||0;document.getElementById('tx-inv').textContent=fb(s.total_invested);document.getElementById('tx-sold').textContent=fb(s.total_sold);document.getElementById('tx-big').textContent=fb(s.largest_trade);}
+  if(s){
+    document.getElementById('tx-tot').textContent=s.total_trades||0;document.getElementById('tx-inv').textContent=fb(s.total_invested);
+    document.getElementById('tx-sold').textContent=fb(s.total_sold);document.getElementById('tx-big').textContent=fb(s.largest_trade);
+    const re=document.getElementById('tx-real');re.textContent=(s.realized_pnl>=0?'+':'')+fb(s.realized_pnl);re.className='sc-v '+(s.realized_pnl>=0?'g':'r');
+    document.getElementById('tx-div').textContent=fb(s.dividends);
+    document.getElementById('tx-real-list').innerHTML=(s.realized_by_ticker||[]).length?s.realized_by_ticker.slice(0,6).map(r=>`<div class="allocrow"><div class="allocname" style="min-width:60px">${escapeHtml(r.ticker)}</div><div class="allocval ${gc(r.realized)}" style="margin-left:auto">${(r.realized>=0?'+':'')+fb(r.realized)}</div></div>`).join(''):'<div class="empty">No sales recorded yet.</div>';
+    const warn=document.getElementById('tx-warn');
+    if((s.unmatched_sells||[]).length){warn.style.display='block';warn.textContent='⚠️ Some sales are larger than the shares your transactions show you bought ('+s.unmatched_sells.map(u=>`${u.ticker}: ${u.quantity}`).join(', ')+'), so their profit cannot be worked out and is left out of Realized P&L.';}
+    else warn.style.display='none';
+  }
   aTx=t||[];renderTx();buildTxCharts();
 }
 function setTxF(f,btn){txF=f;document.querySelectorAll('#page-transactions .toolbar .fbtn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');renderTx();}
 function renderTx(){
   const q=document.getElementById('tx-srch').value.toLowerCase();
   const f=aTx.filter(t=>{const mf=txF==='all'||t.transaction_type===txF;const mq=!q||t.ticker?.toLowerCase().includes(q)||t.company_name?.toLowerCase().includes(q);return mf&&mq;});
-  document.getElementById('tb-tx').innerHTML=f.length?f.map(t=>`<tr><td style="color:var(--t2);font-weight:600">${t.transaction_date||'--'}</td><td class="sym">${t.ticker}</td><td style="color:var(--t2);font-weight:600">${t.company_name||'--'}</td><td><span class="badge ${t.transaction_type==='BUY'?'bg':'br'}">${t.transaction_type}</span></td><td class="num">${t.quantity}</td><td class="num">${fp(t.price)}</td><td class="num c">${fb(t.total_value)}</td><td style="color:var(--t3);font-size:12px">${t.notes||'--'}</td></tr>`).join(''):'<tr><td colspan="8" class="empty">No transactions yet.</td></tr>';
+  const badge={BUY:'bg',SELL:'br',DIVIDEND:'bc'};
+  document.getElementById('tb-tx').innerHTML=f.length?f.map(t=>`<tr><td style="color:var(--t2);font-weight:600">${escapeHtml(String(t.transaction_date||'--').slice(0,10))}</td><td class="sym">${escapeHtml(t.ticker)}</td><td style="color:var(--t2);font-weight:600">${escapeHtml(t.company_name||'--')}</td><td><span class="badge ${badge[t.transaction_type]||'bb'}">${escapeHtml(t.transaction_type)}</span></td><td class="num">${t.quantity}</td><td class="num">${fp(t.price)}</td><td class="num c">${fb(t.total_value)}</td><td style="color:var(--t3);font-size:12px">${escapeHtml(t.notes||'--')}</td>
+    <td style="white-space:nowrap"><button class="bm-act" data-id="${t.id}" onclick="editTx(this.dataset.id)">✏️ Edit</button> <button class="bm-act" data-id="${t.id}" onclick="deleteTx(this.dataset.id)">🗑 Remove</button></td></tr>`).join(''):'<tr><td colspan="9" class="empty">No transactions yet.</td></tr>';
 }
 function buildTxCharts(){
   const buys=aTx.filter(t=>t.transaction_type==='BUY').reduce((s,t)=>s+(t.total_value||0),0);
   const sells=aTx.filter(t=>t.transaction_type==='SELL').reduce((s,t)=>s+(t.total_value||0),0);
   dc('bs-c');const c1=document.getElementById('bs-c')?.getContext('2d');
   if(c1)charts['bs-c']=new Chart(c1,{type:'doughnut',data:{labels:['Buy','Sell'],datasets:[{data:[buys||1,sells||0],backgroundColor:['rgba(0,230,118,0.7)','rgba(255,68,68,0.7)'],borderWidth:0,hoverOffset:6}]},options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{labels:{color:'#c0cce0',font:{size:12,weight:'700'},padding:10}}}}});
-  const mm={};aTx.forEach(t=>{if(!t.transaction_date)return;const m=t.transaction_date.substring(0,7);mm[m]=(mm[m]||0)+(t.total_value||0);});
+  const mm={};aTx.forEach(t=>{if(!t.transaction_date||t.transaction_type==='DIVIDEND')return;const m=t.transaction_date.substring(0,7);mm[m]=(mm[m]||0)+(t.total_value||0);});
   const months=Object.keys(mm).sort();
   dc('txm-c');const c2=document.getElementById('txm-c')?.getContext('2d');
   if(c2)charts['txm-c']=new Chart(c2,{type:'bar',data:{labels:months,datasets:[{data:months.map(m=>mm[m]),backgroundColor:'rgba(79,142,247,0.65)',borderRadius:4,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#58697a',font:{size:10}},grid:{color:'rgba(28,28,48,0.5)'}},y:{ticks:{color:'#58697a',callback:v=>fb(v)},grid:{color:'rgba(28,28,48,0.5)'}}}}});
 }
-async function addTx(){
-  const t=document.getElementById('tx-tick').value.trim().toUpperCase();
-  const ty=document.getElementById('tx-type').value,q=document.getElementById('tx-qty').value,p=document.getElementById('tx-px').value,d=document.getElementById('tx-dt').value;
-  if(!t||!q||!p||!d){alert('Please fill all fields');return;}
-  const r=await fetch(`${API}/api/transactions/add?ticker=${t}&transaction_type=${ty}&quantity=${q}&price=${p}&transaction_date=${d}`,{method:'POST'});
-  const x=await r.json();alert(x.message||'Added!');loadTx();
+function resetTxForm(){
+  txEditId=null;
+  ['tx-tick','tx-qty','tx-px','tx-dt','tx-notes'].forEach(id=>{document.getElementById(id).value='';});
+  document.getElementById('tx-tick').readOnly=false;document.getElementById('tx-type').disabled=false;document.getElementById('tx-apply').checked=false;
+  document.getElementById('tx-apply-wrap').style.display='flex';
+  document.getElementById('tx-form-title').textContent='➕ Add Transaction';document.getElementById('tx-save-btn').textContent='Add';document.getElementById('tx-cancel-btn').style.display='none';
+}
+function cancelTxEdit(){resetTxForm();txSay('');}
+function editTx(id){
+  const t=aTx.find(x=>String(x.id)===String(id));if(!t)return;
+  txEditId=t.id;
+  document.getElementById('tx-tick').value=t.ticker;document.getElementById('tx-tick').readOnly=true;
+  document.getElementById('tx-type').value=t.transaction_type;document.getElementById('tx-type').disabled=true;
+  document.getElementById('tx-qty').value=t.quantity;document.getElementById('tx-px').value=t.price;
+  document.getElementById('tx-dt').value=String(t.transaction_date||'').slice(0,10);document.getElementById('tx-notes').value=t.notes||'';
+  document.getElementById('tx-apply-wrap').style.display='none';
+  document.getElementById('tx-form-title').textContent='✏️ Edit '+t.transaction_type+' '+t.ticker;document.getElementById('tx-save-btn').textContent='Save Changes';document.getElementById('tx-cancel-btn').style.display='inline-block';
+  txSay('');document.getElementById('tx-form-card').scrollIntoView({behavior:'smooth',block:'center'});
+}
+async function saveTx(){
+  const t=document.getElementById('tx-tick').value.trim().toUpperCase(),type=document.getElementById('tx-type').value;
+  const qRaw=document.getElementById('tx-qty').value,pRaw=document.getElementById('tx-px').value,d=document.getElementById('tx-dt').value,notes=document.getElementById('tx-notes').value.trim();
+  const q=Number(qRaw),p=Number(pRaw);
+  if(!t||!qRaw||!pRaw||!d){txSay('Please fill in ticker, quantity, price and date.',false);return;}
+  if(!(q>0)){txSay('Quantity must be greater than zero.',false);return;}
+  if(!(p>0)){txSay('Price must be greater than zero.',false);return;}
+  if(d>new Date().toISOString().slice(0,10)){txSay("Date can't be in the future.",false);return;}
+  const btn=document.getElementById('tx-save-btn');btn.disabled=true;
+  try{
+    const editing=txEditId!=null;
+    const res=await fetch(editing?`${API}/api/transactions/${encodeURIComponent(txEditId)}`:`${API}/api/transactions`,{
+      method:editing?'PUT':'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(editing?{quantity:q,price:p,transaction_date:d,notes}:{ticker:t,transaction_type:type,quantity:q,price:p,transaction_date:d,notes,apply_to_holdings:document.getElementById('tx-apply').checked})});
+    let data=null;try{data=await res.json();}catch(e){}
+    if(!res.ok||!data||data.status==='error'){txSay(apiMessage(data,res),false);return;}
+    const applied=!editing&&document.getElementById('tx-apply').checked;
+    resetTxForm();txSay('✅ '+data.message,true);
+    await loadTx();if(applied)loadPortfolio();
+  }catch(e){txSay("Couldn't reach the server. Please try again.",false);}
+  finally{btn.disabled=false;}
+}
+async function deleteTx(id){
+  const t=aTx.find(x=>String(x.id)===String(id));
+  if(!t||!confirm(`Remove this ${t.transaction_type} of ${t.quantity} ${t.ticker} (${String(t.transaction_date).slice(0,10)})? Your Holdings will not change.`))return;
+  try{
+    const res=await fetch(`${API}/api/transactions/${encodeURIComponent(t.id)}`,{method:'DELETE'});
+    let data=null;try{data=await res.json();}catch(e){}
+    if(!res.ok||!data||data.status==='error'){txSay(apiMessage(data,res),false);return;}
+    if(txEditId===t.id)resetTxForm();
+    txSay('✅ '+data.message,true);await loadTx();
+  }catch(e){txSay("Couldn't reach the server. Please try again.",false);}
 }
 
 async function checkConn(){
@@ -3588,16 +4006,20 @@ async function explainSelectedStock() {
   loading.classList.remove('show');
 }
 
-async function runPfReview() {
+async function runPfReview(mode) {
+  const holdings = mode === 'holdings';
   const raw = document.getElementById('pf-tickers').value.trim();
-  if (!raw) { alert('Please enter at least one ticker'); return; }
-
-  const tickers = raw.split(',').map(t => t.trim().toUpperCase()).filter(t => t);
-  const btn = document.getElementById('pf-ai-btn');
+  const result = document.getElementById('pf-ai-result'), text = document.getElementById('pf-ai-result-text');
+  if (!holdings && !raw) {
+    text.textContent = 'Type at least one ticker or company name, or use "Review my saved holdings".';
+    result.classList.add('show');
+    return;
+  }
+  const tickers = holdings ? [] : raw.split(/[,;\n]+/).map(t => t.trim()).filter(Boolean).slice(0, 30);
+  const btns = [document.getElementById('pf-ai-btn'), document.getElementById('pf-hold-btn')];
   const loading = document.getElementById('pf-ai-loading');
-  const result = document.getElementById('pf-ai-result');
 
-  btn.disabled = true;
+  btns.forEach(b => b.disabled = true);
   loading.classList.add('show');
   result.classList.remove('show');
 
@@ -3605,20 +4027,17 @@ async function runPfReview() {
     const res = await fetch(`${API}/agent/portfolio-review`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tickers, risk_profile: pfRisk })
+      body: JSON.stringify({ tickers, use_holdings: holdings })
     });
-    const data = await res.json();
-
-    if (!res.ok || data.status === 'error') throw new Error(data.message || 'Please try again with a shorter question.');
-
-    document.getElementById('pf-ai-result-text').innerHTML = renderMarkdown(data.review);
-    result.classList.add('show');
+    let data = null;
+    try { data = await res.json(); } catch (e) {}
+    if (!res.ok || !data || data.status === 'error') throw new Error(apiMessage(data, res));
+    text.innerHTML = renderMarkdown(data.review);
   } catch (e) {
-    document.getElementById('pf-ai-result-text').textContent = 'Error: ' + e.message;
-    result.classList.add('show');
+    text.textContent = e.message && e.message !== 'Failed to fetch' ? e.message : "Couldn't reach the server. Please try again.";
   }
-
-  btn.disabled = false;
+  result.classList.add('show');
+  btns.forEach(b => b.disabled = false);
   loading.classList.remove('show');
 }
 
@@ -3695,6 +4114,17 @@ function loadPortfolioTickers() {
 .b-stock-item .bsi-left .bsi-name{font-size:11px;color:var(--t3);}
 .b-stock-item .bsi-right .bsi-price{font-size:12px;font-weight:700;color:var(--t1);text-align:right;}
 .b-stock-item .bsi-right .bsi-chg{font-size:11px;font-weight:600;text-align:right;}
+/* ── Performance period (under the prediction chart) ── */
+.period-bar{margin-top:14px;padding:12px;background:var(--bg3);border:1px solid var(--b1);border-radius:10px;display:flex;flex-direction:column;gap:10px;}
+.period-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+.period-lbl{font-size:11px;font-weight:800;color:var(--t2);text-transform:uppercase;letter-spacing:1px;min-width:110px;}
+.period-or{font-size:11px;font-weight:700;color:var(--t3);}
+.period-bar .srch{padding:6px 10px;font-size:12px;}
+.period-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:14px;margin:14px 0 8px;}
+.period-title{font-size:13px;font-weight:800;color:var(--t1);}
+.period-change{font-family:var(--mono);font-size:26px;font-weight:900;}
+.period-sub{font-size:12px;font-weight:700;color:var(--t2);}
+.period-note{font-size:11px;font-weight:600;color:var(--t3);margin:6px 0;}
 /* ── News sentiment ── */
 .sent-card{background:var(--bg2);border:1px solid var(--b1);border-radius:10px;padding:14px;margin-bottom:14px;}
 .sent-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px;}
@@ -3830,7 +4260,7 @@ async function loadQuarterly(){
 // ─── BOUNTY AI CHATBOT ─────────────────────────────────────
 const BOUNTY_STORE = 'bounty_chat_v1';
 const BOUNTY_MAX_SAVED = 40;
-const BOUNTY_TIMEOUT_MS = 60000;
+const BOUNTY_TIMEOUT_MS = 90000;
 
 let bountyOpen = false;
 let bountyMsgs = [];          // [{id, role:'user'|'ai', text, stocks, time, greeting?, error?}]
@@ -4052,6 +4482,50 @@ async function sendBounty(){
   await askBounty(text, replyTo);
 }
 
+// Reads the server-sent events of /agent/recommend/stream. onDelta gets each piece of text as it arrives.
+async function readBountyStream(res, onDelta){
+  const reader = res.body.getReader(), decoder = new TextDecoder();
+  let buffer = '', final = null, error = null;
+  for(;;){
+    const {done, value} = await reader.read();
+    if(done) break;
+    buffer += decoder.decode(value, {stream:true});
+    let end;
+    while((end = buffer.indexOf('\n\n')) >= 0){
+      const block = buffer.slice(0, end);
+      buffer = buffer.slice(end + 2);
+      const line = block.split('\n').find(l => l.startsWith('data: '));
+      if(!line) continue;
+      let event; try { event = JSON.parse(line.slice(6)); } catch(e) { continue; }
+      if(event.delta != null) onDelta(event.delta);
+      else if(event.final) final = event.final;
+      else if(event.error) error = event.error;
+    }
+  }
+  return {final, error};
+}
+
+function showLiveBountyText(text){
+  removeBountyTyping();
+  let live = document.getElementById('bounty-live');
+  if(!live){
+    live = document.createElement('div');
+    live.className = 'bm ai';
+    live.id = 'bounty-live';
+    live.innerHTML = '<div class="bm-av">🤖</div><div class="bm-body"><div class="bm-bubble" id="bounty-live-bubble"></div></div>';
+    document.getElementById('bounty-msgs').appendChild(live);
+  }
+  document.getElementById('bounty-live-bubble').innerHTML = renderMarkdown(text);
+  const msgs = document.getElementById('bounty-msgs');
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function dropLiveBountyText(){
+  removeBountyTyping();
+  const live = document.getElementById('bounty-live');
+  if(live) live.remove();
+}
+
 async function askBounty(text, replyTo){
   setBountySending(true);
   addBountyTyping();
@@ -4061,7 +4535,7 @@ async function askBounty(text, replyTo){
   try {
     // The question itself is the last message in the log; send only what came before it as history.
     const history = bountyHistoryForApi().slice(0, -1);
-    const res = await fetch(`${API}/agent/recommend`, {
+    const request = {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       signal: controller.signal,
@@ -4071,17 +4545,32 @@ async function askBounty(text, replyTo){
         portfolio_tickers: (watchlist || []).slice(0, 30),
         reply_to: replyTo.slice(0, 300)
       })
-    });
+    };
 
-    let data = null;
-    try { data = await res.json(); } catch(e) {}
-    removeBountyTyping();
-
-    if(!res.ok || !data || data.status === 'error'){
-      const msg = (data && data.message) || (res.status === 422
+    let data = null, failure = null;
+    let res = await fetch(`${API}/agent/recommend/stream`, request);
+    const canStream = res.ok && res.body && typeof res.body.getReader === 'function';
+    if(canStream){
+      let shown = '';
+      const outcome = await readBountyStream(res, piece => { shown += piece; showLiveBountyText(shown); });
+      if(outcome.final) data = outcome.final;
+      else failure = outcome.error ? outcome.error.message : "The connection dropped before I finished. Please try again.";
+    } else if(res.status === 404 || res.status === 405 || (res.ok && !canStream)){
+      // An older server, or a browser that can't stream: use the normal request
+      res = await fetch(`${API}/agent/recommend`, request);
+      try { data = await res.json(); } catch(e) {}
+      if(!res.ok || !data || data.status === 'error'){ failure = (data && data.message) || "Something went wrong. Please try again."; data = null; }
+    } else {
+      let body = null;
+      try { body = await res.json(); } catch(e) {}
+      failure = (body && body.message) || (res.status === 422
         ? "I couldn't process that message. Please keep it under 500 characters."
         : "Something went wrong. Please try again.");
-      addBountyMsg('ai', '⚠️ ' + msg, [], {error:true});
+    }
+    dropLiveBountyText();
+
+    if(failure || !data){
+      addBountyMsg('ai', '⚠️ ' + (failure || "Something went wrong. Please try again."), [], {error:true});
       return;
     }
 
@@ -4093,7 +4582,7 @@ async function askBounty(text, replyTo){
     addBountyMsg('ai', reply, showStocks ? (data.top_stocks || []) : []);
 
   } catch(e){
-    removeBountyTyping();
+    dropLiveBountyText();
     addBountyMsg('ai', e.name === 'AbortError'
       ? "⚠️ That took too long. Please try again."
       : "⚠️ I'm having trouble connecting right now. Please try again in a moment.", [], {error:true});

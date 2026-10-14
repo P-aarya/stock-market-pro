@@ -4,8 +4,10 @@ load_dotenv()
 from groq import Groq
 import groq
 from screener import screen_stocks, get_stock_snapshot, get_top_movers, get_sector_summary, get_trending_stocks, find_similar_stocks
+import contextvars
 import json
 import re
+import types
 from datetime import datetime
 from ipo_data import get_ipos, IPOUnavailable
 
@@ -18,11 +20,34 @@ class LLMUnavailable(Exception):
     """The AI service is not configured or could not be reached."""
 
 
+# A request that wants its answer streamed installs a sink (a function taking a text chunk). Plain-text LLM calls
+# made while it is installed are streamed to it. JSON calls (the router) are not, because half a JSON object is useless.
+_stream_sink = contextvars.ContextVar("llm_stream_sink", default=None)
+
+
+def set_stream_sink(sink):
+    return _stream_sink.set(sink)
+
+
+def clear_stream_sink(token):
+    _stream_sink.reset(token)
+
+
 def llm_create(**kwargs):
-    """Single place every LLM call goes through (model, timeout and missing-key handling)."""
+    """Single place every LLM call goes through (model, timeout, streaming and missing-key handling)."""
     if client is None:
         raise LLMUnavailable("GROQ_API_KEY is not set")
-    return client.chat.completions.create(model=MODEL, **kwargs)
+    sink = _stream_sink.get()
+    if sink is None or kwargs.get("response_format") or kwargs.get("stream"):
+        return client.chat.completions.create(model=MODEL, **kwargs)
+    parts = []
+    for chunk in client.chat.completions.create(model=MODEL, stream=True, **kwargs):
+        delta = chunk.choices[0].delta.content if chunk.choices and chunk.choices[0].delta else None
+        if delta:
+            parts.append(delta)
+            sink(delta)
+    # Look like a normal (non-streamed) response so the callers do not change
+    return types.SimpleNamespace(choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="".join(parts)))])
 
 # ─────────────────────────────────────────
 # INTENT CLASSIFIER
@@ -135,7 +160,7 @@ def get_commodity_linked_stocks(commodity_name: str, category: str = None) -> li
             LEFT JOIN stocks_fundamentals f ON l.ticker = f.ticker
             LEFT JOIN stocks_predictions p ON l.ticker = p.ticker
             WHERE l.ticker IN ({placeholders})
-            AND l.current_price IS NOT NULL
+            AND l.current_price IS NOT NULL AND l.last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)
         """, tickers)
         stocks = cursor.fetchall()
         cursor.close()
@@ -170,6 +195,8 @@ COMMODITIES = {
     "oil": {"ticker": "CL=F", "name": "Crude Oil (WTI)", "category": "energy"},
     "wti": {"ticker": "CL=F", "name": "Crude Oil (WTI)", "category": "energy"},
     "brent": {"ticker": "BZ=F", "name": "Brent Crude", "category": "energy"},
+    "brent crude oil": {"ticker": "BZ=F", "name": "Brent Crude", "category": "energy"},
+    "brent crude": {"ticker": "BZ=F", "name": "Brent Crude", "category": "energy"},
     "natural gas": {"ticker": "NG=F", "name": "Natural Gas", "category": "energy"},
     "gas": {"ticker": "NG=F", "name": "Natural Gas", "category": "energy"},
     "gasoline": {"ticker": "RB=F", "name": "Gasoline", "category": "energy"},
@@ -220,6 +247,74 @@ def detect_commodity(query: str) -> dict:
         if m and (best is None or m.start() < best[0]):
             best = (m.start(), data)
     return best[1] if best else None
+
+def detect_commodities(query: str) -> list:
+    """Every distinct commodity named in the query, in the order mentioned. Longer names win ('crude oil' beats 'oil')."""
+    q = query.lower()
+    taken, found = [], []
+    for pattern, data in _COMMODITY_PATTERNS:  # longest names first
+        for m in pattern.finditer(q):
+            if any(m.start() < end and m.end() > start for start, end in taken):
+                continue  # inside a longer name we already matched
+            taken.append((m.start(), m.end()))
+            found.append((m.start(), data))
+            break
+    found.sort(key=lambda item: item[0])
+    seen, out = set(), []
+    for _, data in found:
+        if data["ticker"] not in seen:
+            seen.add(data["ticker"])
+            out.append(data)
+    return out
+
+
+def commodity_performance(ticker: str):
+    """Price and 1-day / 1-month / 3-month / 1-year change for a commodity future, or None."""
+    try:
+        import yfinance as yf
+        closes = yf.Ticker(ticker).history(period="1y")["Close"].dropna()
+        if len(closes) < 30:
+            return None
+        latest = float(closes.iloc[-1])
+
+        def change(n):
+            return round((latest / float(closes.iloc[-n - 1]) - 1) * 100, 2) if len(closes) > n else None
+        return {"price": round(latest, 2), "day": change(1), "month": change(21), "quarter": change(63),
+                "year": round((latest / float(closes.iloc[0]) - 1) * 100, 2)}
+    except Exception as e:
+        print(f"Commodity history error for {ticker}: {e}")
+        return None
+
+
+def compare_commodities(user_query: str, commodities: list, chat_history: list = None) -> dict:
+    """Side-by-side comparison of 2-4 commodities, written only from the price history we fetched."""
+    from concurrent.futures import ThreadPoolExecutor
+    commodities = commodities[:4]
+    with ThreadPoolExecutor(max_workers=len(commodities)) as pool:
+        perf = list(pool.map(lambda c: commodity_performance(c["ticker"]), commodities))
+
+    def fmt(v):
+        return "n/a" if v is None else f"{v:+.2f}%"
+    lines = [f"- {c['name']}: ${p['price']:,.2f} | today {fmt(p['day'])} | 1 month {fmt(p['month'])} | 3 months {fmt(p['quarter'])} | 1 year {fmt(p['year'])}"
+             for c, p in zip(commodities, perf) if p]
+    missing = [c["name"] for c, p in zip(commodities, perf) if not p]
+    if len(lines) < 2:
+        msg = "I couldn't get enough price history to compare those right now. Please try again in a moment."
+        return {"intent": "compare", "stocks_found": 0, "recommendation": msg, "portfolio_review": None, "top_stocks": [], "all_stocks": []}
+
+    answer = llm_text(with_history(f"""You are a commodities analyst at Stock Market Pro.
+
+The user asked: "{user_query}"
+
+Live price history (futures):
+{chr(10).join(lines)}
+
+Compare them in plain English (5-7 sentences, no tables): which has performed better over each period, how large the gap is, and what typically drives each commodity's price. Use only the figures above and do not predict future prices.
+End with: "⚠️ Past performance is not a forecast. Not financial advice." """, chat_history))
+    if missing:
+        answer = f"Note: no price history was available for {', '.join(missing)}, so it's left out.\n\n" + answer
+    return {"intent": "compare", "stocks_found": 0, "recommendation": answer, "portfolio_review": None, "top_stocks": [], "all_stocks": []}
+
 
 # ─────────────────────────────────────────
 # SMART AI ROUTER — understands any query
@@ -318,8 +413,9 @@ For "irrelevant" — write a polite redirect in "answer" field.
 Return ONLY valid JSON:
 {{"intent": "education", "ticker_hint": "", "company_name": "", "compare_items": [], "filters": {{}}, "answer": "Your explanation here", "commodity": ""}}
 
-Available filter keys: sector, market_cap_category (small/mid/large), current_price (min/max), pe_ratio (min/max), dividend_yield (min/max), revenue_growth (min/max), buy_signal (BUY/HOLD/SELL), beta (min/max), profit_margin (min/max), pays_dividend (true)
+Available filter keys: sector, market_cap_category (small/mid/large), current_price (min/max), pe_ratio (min/max), dividend_yield (min/max), revenue_growth (min/max), buy_signal (BUY/HOLD/SELL), beta (min/max), profit_margin (min/max), pays_dividend (true), sentiment (min/max, from -1 very negative to 1 very positive)
 
+Use sentiment only when the user asks about news, headlines or sentiment. It only covers stocks whose news has recently been scored, so it matches few stocks.
 Units: dividend_yield is in PERCENT (3 means 3%). revenue_growth and profit_margin are FRACTIONS (0.15 means 15%).
 For any request about dividends or income stocks, include "pays_dividend": true so that stocks paying no dividend are excluded. Only add a dividend_yield min if the user names a minimum yield.
 
@@ -349,7 +445,7 @@ def count_tracked_stocks() -> int:
         from screener import get_db_connection
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM stocks_live WHERE current_price IS NOT NULL")
+        cursor.execute("SELECT COUNT(*) FROM stocks_live WHERE current_price IS NOT NULL AND last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)")
         n = cursor.fetchone()[0]
         cursor.close(); conn.close()
         return int(n)
@@ -381,7 +477,7 @@ def find_ticker_in_db(company_name: str, ticker_hint: str = "") -> str:
 
             hint_row = None
             if ticker_hint and 1 <= len(ticker_hint) <= 6:
-                cursor.execute("SELECT ticker, company_name FROM stocks_live WHERE ticker = %s AND current_price IS NOT NULL",
+                cursor.execute("SELECT ticker, company_name FROM stocks_live WHERE ticker = %s AND current_price IS NOT NULL AND last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)",
                                (ticker_hint.upper(),))
                 hint_row = cursor.fetchone()
 
@@ -393,7 +489,7 @@ def find_ticker_in_db(company_name: str, ticker_hint: str = "") -> str:
                 # 2. Well-known alias (google -> GOOGL, facebook -> META)
                 alias = COMPANY_MAP.get(" ".join(name_tokens)) or COMPANY_MAP.get((company_name or "").lower().strip())
                 if alias:
-                    cursor.execute("SELECT ticker FROM stocks_live WHERE ticker = %s AND current_price IS NOT NULL", (alias,))
+                    cursor.execute("SELECT ticker FROM stocks_live WHERE ticker = %s AND current_price IS NOT NULL AND last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)", (alias,))
                     row = cursor.fetchone()
                     if row:
                         return row["ticker"]
@@ -401,7 +497,7 @@ def find_ticker_in_db(company_name: str, ticker_hint: str = "") -> str:
                 # 2b. The name is itself a ticker we track (e.g. PLTR)
                 bare = (company_name or "").strip().upper()
                 if re.fullmatch(r"[A-Z0-9.\-]{1,6}", bare):
-                    cursor.execute("SELECT ticker FROM stocks_live WHERE ticker = %s AND current_price IS NOT NULL", (bare,))
+                    cursor.execute("SELECT ticker FROM stocks_live WHERE ticker = %s AND current_price IS NOT NULL AND last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)", (bare,))
                     row = cursor.fetchone()
                     if row:
                         return row["ticker"]
@@ -409,7 +505,7 @@ def find_ticker_in_db(company_name: str, ticker_hint: str = "") -> str:
                 # 3. Company name: exact name beats "starts with the name"; anything looser is rejected
                 cursor.execute("""
                     SELECT ticker, company_name FROM stocks_live
-                    WHERE LOWER(company_name) LIKE %s AND current_price IS NOT NULL
+                    WHERE LOWER(company_name) LIKE %s AND current_price IS NOT NULL AND last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)
                     ORDER BY market_cap DESC LIMIT 25
                 """, (f"%{name_tokens[0]}%",))
                 best = None
@@ -440,6 +536,43 @@ def find_ticker_in_db(company_name: str, ticker_hint: str = "") -> str:
 # ─────────────────────────────────────────
 # FORMAT STOCK DATA FOR PROMPT
 # ─────────────────────────────────────────
+def attach_sentiment(rows):
+    """Add the stored news sentiment (scored within the last day) to stock rows. No LLM call, so it is free and fast."""
+    tickers = [r["ticker"] for r in rows if r.get("ticker") and r.get("news_sentiment") is None]
+    if not tickers:
+        return rows
+    try:
+        from screener import get_db_connection
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT ticker, score FROM stocks_sentiment WHERE score IS NOT NULL AND updated_at >= DATE_SUB(NOW(), INTERVAL 1 DAY) AND ticker IN (%s)"
+                        % ",".join(["%s"] * len(tickers)), tickers)
+            scores = {t: float(sc) for t, sc in cur.fetchall()}
+        finally:
+            conn.close()
+        for r in rows:
+            if r.get("ticker") in scores:
+                r["news_sentiment"] = scores[r["ticker"]]
+    except Exception:
+        pass  # sentiment has never been scored, or the database is busy: answer without it
+    return rows
+
+
+def _conflict_note(s: dict) -> str:
+    """The prediction run's warning when its technical signal and its forecast disagree."""
+    factors = s.get("key_factors")
+    if isinstance(factors, (str, bytes)):
+        try:
+            factors = json.loads(factors)
+        except ValueError:
+            factors = []
+    for f in factors or []:
+        if isinstance(f, str) and f.startswith("⚠️"):
+            return f"\nNote: {f[2:].strip()}"
+    return ""
+
+
 def format_stock(s: dict) -> str:
     price = s.get('current_price') or 0
     target = s.get('target_1w') or price
@@ -459,7 +592,8 @@ PE Ratio: {s.get('pe_ratio') or 'N/A'} | Revenue Growth: {f'{rev_growth}%' if re
 Profit Margin: {f'{margin}%' if margin is not None else 'N/A'} | Debt/Equity: {s.get('debt_to_equity') or 'N/A'}
 Dividend Yield: {f'{div}%' if div else 'None'} | Beta: {s.get('beta') or 'N/A'}
 Model Signal: {s.get('buy_signal')} | Trend: {s.get('trend')} | Risk: {s.get('risk_level')}
-Momentum Score: {s.get('momentum_score')} | Confidence: {s.get('confidence_pct')}%"""
+Momentum Score: {s.get('momentum_score')} | Backtest hit rate: {s.get('confidence_pct')}%{
+    (chr(10) + 'News Sentiment: ' + ('Positive' if s['news_sentiment'] >= 0.15 else 'Negative' if s['news_sentiment'] <= -0.15 else 'Neutral') + f" ({s['news_sentiment']:+.2f})") if isinstance(s.get('news_sentiment'), (int, float)) else ''}{_conflict_note(s)}"""
 
 
 # ─────────────────────────────────────────
@@ -469,8 +603,9 @@ def generate_recommendation(user_query: str, stocks: list, context: str = "", ch
     if not stocks:
         return "I couldn't find stocks matching that criteria in our database. Try a broader search — for example 'show me profitable technology stocks' or 'find dividend paying stocks'."
 
-    top_stocks = stocks[:8]
+    top_stocks = attach_sentiment(stocks[:8])
     stock_summary = "".join([format_stock(s) for s in top_stocks])
+    few = len(stocks) < 5
 
     try:
         sectors = get_sector_summary()
@@ -484,8 +619,9 @@ def generate_recommendation(user_query: str, stocks: list, context: str = "", ch
 
 The user asked: "{user_query}"
 
-Here are the matching stocks from our live database:
+Here are the matching stocks from our live database ({len(stocks)} matched in total):
 {stock_summary}
+{'Only a few stocks matched. Say so plainly, present just these, and do not pad the answer or suggest stocks that are not listed.' if few else ''}
 
 Market context: {market_context}
 {f'Additional context: {context}' if context else ''}
@@ -506,72 +642,6 @@ Rules:
 """
 
     prompt = with_history(prompt, chat_history)
-    response = llm_create(messages=[{"role": "user", "content": prompt}],
-        temperature=0.3
-    )
-
-    return response.choices[0].message.content.strip()
-
-
-# ─────────────────────────────────────────
-# PORTFOLIO REVIEW
-# ─────────────────────────────────────────
-def review_portfolio(tickers: list) -> str:
-    portfolio_data = ""
-
-    for ticker in tickers:
-        s = get_stock_snapshot(ticker.upper().strip())
-        if not s:
-            portfolio_data += f"\n{ticker}: Not found in our database\n---"
-            continue
-
-        price = s.get('current_price') or 0
-        target = s.get('target_1w') or price
-        target_chg = ((target - price) / price * 100) if price > 0 else 0
-        rev_growth = round(s.get('revenue_growth', 0) * 100, 1) if s.get('revenue_growth') else None
-        margin = round(s.get('profit_margin', 0) * 100, 1) if s.get('profit_margin') else None
-
-        portfolio_data += f"""
-━━━━━━━━━━━━━━━━━━━━━━━━
-{s.get('ticker')} — {s.get('company_name')}
-Sector: {s.get('sector')}
-Current Price: ${price:.2f} | Today: {s.get('price_change_pct') or 0:.2f}%
-7-Day Estimate: ${target:.2f} ({'+' if target_chg >= 0 else ''}{target_chg:.1f}%)
-PE Ratio: {s.get('pe_ratio') or 'N/A'} | Revenue Growth: {f'{rev_growth}%' if rev_growth is not None else 'N/A'}
-Profit Margin: {f'{margin}%' if margin is not None else 'N/A'} | Debt/Equity: {s.get('debt_to_equity') or 'N/A'}
-Model Signal: {s.get('buy_signal')} | Trend: {s.get('trend')} | Risk: {s.get('risk_level')}
-Momentum Score: {s.get('momentum_score')} | Confidence: {s.get('confidence_pct')}%"""
-
-    prompt = f"""
-You are a professional portfolio analyst at Stock Market Pro.
-
-The user's portfolio:
-{portfolio_data}
-
-Review each stock in detail. For each one write:
-
-📌 [TICKER] — [Company Name]
-Action: HOLD / ADD MORE / CAUTION / CONSIDER SWAPPING
-Current Price: $X.XX | 7-Day Model Estimate: $X.XX ([+/-]X.X%)
-
-Analysis:
-Write 3-5 sentences explaining the action in plain English. Be specific and honest:
-- What the model signal and trend say about this stock right now
-- What the key financial data (margins, growth, debt) reveals
-- Whether current price movement supports or contradicts holding
-- If CONSIDER SWAPPING: explain clearly why this stock may not be the best use of capital right now, and what type of replacement would be better suited (do not invent specific tickers)
-- If CAUTION: explain what specific risk the user should watch for and what would be a trigger to reconsider the position
-- If HOLD or ADD MORE: explain what makes this stock worth keeping or increasing
-
-Make it feel like a real analyst wrote it — honest, specific, and backed by the numbers. Avoid vague phrases like "the stock looks uncertain". Say exactly WHY using the actual data provided.
-
-Rules:
-- Only use numbers from the data above. Never invent figures.
-- Plain English — no financial jargon
-- Every action must be clearly justified with data points
-- End with: "⚠️ These are model-based estimates, not financial advice. Always invest within your risk tolerance."
-"""
-
     response = llm_create(messages=[{"role": "user", "content": prompt}],
         temperature=0.3
     )
@@ -618,6 +688,7 @@ def resolve_compare_tickers(route: dict, user_query: str) -> tuple:
 
 
 def generate_comparison(user_query: str, snapshots: list, chat_history: list = None) -> str:
+    attach_sentiment(snapshots)
     stock_data = "".join(format_stock(s) for s in snapshots)
     tickers = ", ".join(s["ticker"] for s in snapshots)
 
@@ -664,6 +735,7 @@ def generate_single_stock_response(ticker: str, user_query: str, chat_history: l
     margin = round(s.get('profit_margin', 0) * 100, 1) if s.get('profit_margin') else None
     div = round(s.get('dividend_yield', 0), 2) if s.get('dividend_yield') else None
 
+    attach_sentiment([s])
     stock_data = format_stock(s)
 
     prompt = f"""You are a professional stock analyst at Stock Market Pro.
@@ -998,8 +1070,22 @@ Quote current numbers only from the live data above and describe what they show.
 
     # ── COMPARE: side-by-side comparison of specific stocks ──
     if intent == "compare":
+        commodities = detect_commodities(user_query)
+        if len(commodities) >= 2:
+            return compare_commodities(user_query, commodities, chat_history)
+
         tickers, missing = resolve_compare_tickers(route, user_query)
         snapshots = [s for s in (get_stock_snapshot(t) for t in tickers) if s]
+
+        peer_note = ""
+        if len(snapshots) == 1 and re.search(r"competitor|peer|rival|alternative|similar compan|its industry", user_query.lower()):
+            from peers import suggest_peers  # imported here so peers.py and agent.py can import each other
+            found = suggest_peers(snapshots[0]["ticker"], 3)
+            if found and found["peers"]:
+                extra = [x for x in (get_stock_snapshot(p["ticker"]) for p in found["peers"]) if x]
+                snapshots += extra
+                peer_note = (f"Compared with its closest competitors ({', '.join(x['ticker'] for x in extra)}), "
+                             f"{'chosen by AI from the same industry' if found['source'] == 'ai' else 'picked by industry and market-cap closeness'}.\n\n")
 
         if len(snapshots) < 2:
             if missing:
@@ -1010,7 +1096,7 @@ Quote current numbers only from the live data above and describe what they show.
                 msg = "Tell me which stocks to compare, for example 'compare AAPL and MSFT' or 'Tesla vs Rivian'."
             return {"intent": "compare", "stocks_found": len(snapshots), "recommendation": msg, "portfolio_review": None, "top_stocks": snapshots, "all_stocks": snapshots}
 
-        recommendation = generate_comparison(user_query, snapshots, chat_history)
+        recommendation = peer_note + generate_comparison(user_query, snapshots, chat_history)
         if missing:
             recommendation = f"Note: I couldn't find {', '.join(missing)} in our database, so it's left out.\n\n" + recommendation
         return {

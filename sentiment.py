@@ -131,16 +131,54 @@ def label_for(score, n_articles=0):
     return "Neutral"
 
 
-def combine(headlines, now=None):
-    """Recency-weighted average of headline scores, or None if there is nothing to average."""
-    now = now or time.time()
-    total = weight_sum = 0.0
+_STOPWORDS = {"the", "a", "an", "and", "or", "of", "to", "in", "on", "for", "as", "at", "by", "with", "is", "are", "after",
+              "from", "its", "it", "this", "that", "new", "says", "say", "stock", "stocks", "shares", "share", "report", "reports", "reported"}
+
+
+def _stem(word):
+    for suffix in ("ing", "ed", "es", "s"):
+        if word.endswith(suffix) and len(word) - len(suffix) >= 3:
+            return word[: -len(suffix)]
+    return word
+
+
+def _title_tokens(title):
+    return {_stem(w) for w in re.findall(r"[a-z0-9%]+", title.lower()) if w not in _STOPWORDS and len(w) > 1}
+
+
+def story_groups(headlines):
+    """
+    Group headlines that are probably the same story, so five outlets reporting one event count once.
+    Greedy: a headline joins the first group whose combined words cover at least half of its own
+    (and at least 4 words), otherwise it starts a new group.
+    """
+    groups = []
     for h in headlines:
-        if h.get("score") is None or h.get("relevant") is False:
-            continue
-        age_hours = max(0.0, (now - h["published"]) / 3600) if h.get("published") else 72.0  # undated: treat as 3 days old
-        w = 0.5 ** (age_hours / HALF_LIFE_HOURS)
-        total += w * h["score"]
+        words = _title_tokens(h.get("title", ""))
+        for g in groups:
+            if len(words & g["words"]) >= 4 and len(words & g["words"]) / max(1, len(words)) >= 0.5:
+                g["items"].append(h)
+                g["words"] |= words
+                break
+        else:
+            groups.append({"items": [h], "words": set(words)})
+    return [g["items"] for g in groups]
+
+
+def combine(headlines, now=None):
+    """
+    Recency-weighted average of story scores, or None if there is nothing to average.
+    Headlines about the same story are averaged together first. A story reported by many outlets counts more, but only by the square root of the coverage, so five articles are not five votes.
+    """
+    now = now or time.time()
+    rated = [h for h in headlines if h.get("score") is not None and h.get("relevant") is not False]
+    total = weight_sum = 0.0
+    for group in story_groups(rated):
+        story_score = sum(h["score"] for h in group) / len(group)
+        stamps = [h["published"] for h in group if h.get("published")]
+        age_hours = max(0.0, (now - max(stamps)) / 3600) if stamps else 72.0  # undated: treat as 3 days old
+        w = (0.5 ** (age_hours / HALF_LIFE_HOURS)) * (len(group) ** 0.5)  # wider coverage counts more, but not in proportion
+        total += w * story_score
         weight_sum += w
     return round(total / weight_sum, 2) if weight_sum else None
 
@@ -208,6 +246,7 @@ def _public(result, cached, stale=False):
         "ticker": result["ticker"], "score": result["score"], "label": result["label"],
         "n_articles": result["n_articles"], "headlines": result["headlines"],
         "n_relevant": sum(1 for h in result["headlines"] if h.get("score") is not None),
+        "n_stories": len(story_groups([h for h in result["headlines"] if h.get("score") is not None])),
         "counts": {
             "positive": sum(1 for h in result["headlines"] if (h.get("score") or 0) >= LABEL_THRESHOLD),
             "negative": sum(1 for h in result["headlines"] if (h.get("score") or 0) <= -LABEL_THRESHOLD),
