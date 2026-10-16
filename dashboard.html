@@ -2,7 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover,interactive-widget=resizes-content"/>
+<meta name="theme-color" content="#08080e"/>
+<meta name="color-scheme" content="dark"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-title" content="Stock Pro"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<link rel="manifest" href="/manifest.webmanifest"/>
+<link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png"/>
 <title>Stock Market Pro — AYEIM Ventures</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
@@ -265,12 +274,12 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     </div>
   </div>
   <div class="ntabs">
-    <button class="ntab on" onclick="showPage('market',this)">📊 Market</button>
-    <button class="ntab" id="ntab-ipos" onclick="showPage('ipos',this)">🚀 IPOs</button>
-    <button class="ntab" onclick="showPage('watchlist',this)">⭐ Watchlist</button>
-    <button class="ntab" onclick="showPage('commodities',this)">🏗️ Commodities</button>
-    <button class="ntab" onclick="showPage('portfolio',this)">💼 Portfolio</button>
-    <button class="ntab" onclick="showPage('transactions',this)">🔄 Transactions</button>
+    <button class="ntab on" onclick="showPage('market',this)"><span class="ico">📊</span><span class="lbl">Market</span></button>
+    <button class="ntab" id="ntab-ipos" onclick="showPage('ipos',this)"><span class="ico">🚀</span><span class="lbl">IPOs</span></button>
+    <button class="ntab" onclick="showPage('watchlist',this)"><span class="ico">⭐</span><span class="lbl">Watchlist</span></button>
+    <button class="ntab" onclick="showPage('commodities',this)"><span class="ico">🏗️</span><span class="lbl" data-short="Commod.">Commodities</span></button>
+    <button class="ntab" onclick="showPage('portfolio',this)"><span class="ico">💼</span><span class="lbl">Portfolio</span></button>
+    <button class="ntab" onclick="showPage('transactions',this)"><span class="ico">🔄</span><span class="lbl" data-short="Trades">Transactions</span></button>
   </div>
   <div class="nav-r">
     <div class="lpill"><span class="ldot"></span>Live</div>
@@ -1124,6 +1133,7 @@ function showPage(n,btn){
   document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('on'));
   document.getElementById('page-'+n).classList.add('on');
   btn.classList.add('on');
+  if(typeof window!=='undefined'&&window.scrollTo)window.scrollTo(0,0);   // a new tab starts at the top, not where the last one was scrolled
   if(n==='portfolio')loadPortfolio();
   if(n==='transactions')loadTx();
   if(n==='commodities'){loadCommodities();loadMacro();loadComCo();}
@@ -1140,6 +1150,7 @@ function showFST(t,btn){
   document.querySelectorAll('.fstab').forEach(b=>b.classList.remove('on'));
   document.getElementById('fss-'+t).classList.add('on');
   btn.classList.add('on');
+  if(btn.scrollIntoView)btn.scrollIntoView({inline:'center',block:'nearest',behavior:'smooth'});   // keep the chosen tab visible in the scrolling tab strip on phones
   if(t==='charts')loadPxChart();
   if(t==='financials')drawHistCharts();
   if(t==='intelligence')loadPrediction();
@@ -4170,7 +4181,143 @@ function loadPortfolioTickers() {
 .ipo-mini .ipo-mn{font-weight:700;color:var(--t1);}
 .ipo-mini .ipo-mm{color:var(--t3);font-weight:600;white-space:nowrap;}
 .linkbtn{background:none;border:none;color:var(--cyan);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);padding:0;}
-@media(max-width:480px){#bounty-win{width:calc(100vw - 16px);right:8px;height:75vh;bottom:80px;}}
+/* ── Phone and tablet layout ──
+   The page is built for a wide screen. Below 900px the six tabs move to a bottom bar and the top bar keeps only the
+   brand and status; below 700px everything becomes a single-column app: grids collapse, form fields use 16px text
+   (iOS zooms into anything smaller), the stock view's tabs scroll sideways and Bounty opens as a full-screen sheet. */
+html{-webkit-text-size-adjust:100%;}
+button,select,.ntab,.fstab,.stab,.fbtn,.pgbtn{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+.ntab .ico{margin-right:6px;}
+@media(max-width:900px){
+  body{min-height:100dvh;}
+  .nav{height:auto;min-height:calc(54px + env(safe-area-inset-top));padding:env(safe-area-inset-top) calc(14px + env(safe-area-inset-right)) 0 calc(14px + env(safe-area-inset-left));gap:8px;}
+  .brand{gap:9px;min-width:0;}
+  .brand-icon{width:32px;height:32px;font-size:15px;flex-shrink:0;}
+  .brand-title{font-size:16px;white-space:nowrap;}
+  .brand-sub{font-size:9px;letter-spacing:1.5px;white-space:nowrap;}
+  .nav-r{gap:8px;flex-shrink:0;}
+  .nav-r #nconn{display:none;}
+  .nav-r .ntime{font-size:11px;}
+  .lpill{padding:3px 9px;font-size:11px;}
+  /* the tabs become a bottom bar, in easy reach of a thumb */
+  .ntabs{position:fixed;left:0;right:0;bottom:0;z-index:300;gap:0;border:0;border-top:1px solid var(--b1);border-radius:0;background:rgba(8,8,14,0.96);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);padding:4px calc(4px + env(safe-area-inset-right)) calc(4px + env(safe-area-inset-bottom)) calc(4px + env(safe-area-inset-left));}
+  .ntab{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 2px;min-height:50px;border-radius:9px;font-size:10px;font-weight:700;}
+  .ntab .ico{margin:0;font-size:19px;line-height:1;}
+  .ntab .lbl{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:-0.1px;}
+  .ntab.on{background:rgba(79,142,247,0.16);color:var(--blue);}
+  .page{padding:14px calc(14px + env(safe-area-inset-right)) calc(92px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left));}
+  #bounty-btn{right:calc(14px + env(safe-area-inset-right));bottom:calc(78px + env(safe-area-inset-bottom));width:52px;height:52px;font-size:22px;}
+  /* six currency tiles and four macro tiles are too many across a tablet-width screen */
+  #currency-grid{grid-template-columns:repeat(3,1fr)!important;}
+  #macro-grid{grid-template-columns:repeat(2,1fr)!important;}
+  .ic{min-width:0;}
+}
+@media(max-width:700px){
+  .g4,.mgrid,.intgrid,.fs4{grid-template-columns:repeat(2,1fr);gap:8px;}
+  .g3,.g2,.g31,.fs2{grid-template-columns:1fr;}
+  .sc{padding:12px;}
+  .sc-v{font-size:21px;}
+  .ic{padding:12px;}
+  .ic-v{font-size:19px;}
+  .card{padding:14px 12px;}
+  /* grids with their column count written inline in the markup */
+  #currency-grid,#macro-grid{grid-template-columns:repeat(2,1fr)!important;}
+  #heatmap-wrap{grid-template-columns:repeat(3,1fr)!important;}
+  [style*="repeat(3,1fr)"]{grid-template-columns:repeat(2,1fr)!important;}
+  [style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important;}
+  [style*="minmax(300px,1fr)"]{grid-template-columns:minmax(0,1fr)!important;}   /* 300px columns are wider than a very small phone */
+  .nt{overflow-wrap:anywhere;}
+  .nm{flex-wrap:wrap;gap:2px 12px;}
+  [style*="grid-template-columns:2fr"] span{font-size:10.5px!important;}
+  #px-wrap,#pred-wrap{height:260px!important;}
+  /* forms: 16px stops iOS zooming in on focus, and fields share the row instead of fixed widths */
+  input,select,textarea{font-size:16px!important;}
+  .srch[style*="width"]{width:100%!important;}
+  .toolbar .srch{flex:1 1 100%;min-width:0;}
+  .toolbar .sel{flex:1 1 calc(50% - 8px);min-width:0;}
+  .toolbar .fbtn{flex:1 1 auto;}
+  .ai-wrap{padding:16px 14px;}
+  .ai-input{min-width:0;flex:1 1 100%;}
+  .ai-btn{flex:1 1 100%;min-height:44px;}
+  #ai-stock-select{min-width:0!important;flex:1 1 100%!important;}
+  .ai-risk{flex-wrap:wrap;}
+  .period-lbl{min-width:0;flex:1 1 100%;}
+  .period-bar .srch[style*="width"]{width:auto!important;flex:1 1 120px;}
+  .period-change{font-size:22px;}
+  .sent-gauge{min-width:100px;}
+  .peer-add{flex:1 1 100%;}
+  .peer-suggest{min-width:0;right:0;}
+  .peer-table .peer-sub{max-width:84px;}
+  .acgrid,.ai-stocks-grid{grid-template-columns:repeat(2,minmax(0,1fr));}   /* minmax(0,..) so a long company name is cut with … instead of widening the column */
+  .accard,.ai-stock-card{min-width:0;}
+  .accard [style*="justify-content:space-between"]>div:first-child{min-width:0;flex:1;}
+  .ipo-strip{grid-template-columns:1fr;}
+  .intbox{padding:14px 12px;}
+  .intval{font-size:15px;}
+  /* tap targets of about 40px */
+  .fbtn,.pgbtn,.ai-risk-btn,.btn{min-height:40px;}
+  .fbtn{padding:9px 14px;}
+  #chart-line-btn,#chart-candle-btn{padding:9px 12px!important;}
+  .linkbtn{padding:8px 0;}
+  .stabs{overflow-x:auto;scrollbar-width:none;}
+  .stabs::-webkit-scrollbar{display:none;}
+  .stab{flex:0 0 auto;white-space:nowrap;min-height:38px;}
+  /* tables scroll sideways with the first column pinned */
+  thead th,tbody td{padding:10px 8px;}
+  .tw{-webkit-overflow-scrolling:touch;background:linear-gradient(to left,var(--bg2) 30%,rgba(12,12,22,0)) right center/36px 100% no-repeat local,radial-gradient(farthest-side at 100% 50%,rgba(0,0,0,0.6),rgba(0,0,0,0)) right center/12px 100% no-repeat scroll;}   /* a shadow on the right edge says "scroll for more" until the end is reached */
+  .tw table th:first-child,.tw table td:first-child{position:sticky;left:0;z-index:1;background:var(--bg2);box-shadow:1px 0 0 var(--b1);}
+  .tw table thead th:first-child{z-index:2;}
+  .peer-table .peer-grp td:first-child{background:var(--bg3);}
+  .peer-table th:first-child,.peer-table tr:not(.peer-grp) td:first-child{width:104px;min-width:104px;max-width:104px;white-space:normal;line-height:1.25;}
+  .secname{width:104px;font-size:11px;}
+  .secpct{width:52px;}
+  .allocname{font-size:12px;min-width:0;}
+  .allocbarbg{width:56px;}
+  .allocval{width:72px;}
+  /* stock view */
+  .fsnav{height:auto;min-height:56px;padding:calc(8px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) 8px calc(12px + env(safe-area-inset-left));gap:8px;align-items:flex-start;}
+  .fsnav-l{gap:2px 10px;align-items:baseline;min-width:0;flex:1;}
+  .fsnav-l #fs-logo{align-self:center;}
+  .fssym{font-size:20px;}
+  .fspx{font-size:18px;}
+  .fsname{flex-basis:100%;order:9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .fscls{flex-shrink:0;min-height:40px;padding:8px 12px;}
+  .fsm{overscroll-behavior:contain;-webkit-overflow-scrolling:touch;}
+  .fsbody{padding:12px calc(12px + env(safe-area-inset-right)) calc(40px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left));}
+  .fstabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  .fstabs::-webkit-scrollbar{display:none;}
+  .fstab{flex:0 0 auto;white-space:nowrap;padding:10px 14px;}
+  /* Bounty chat: a full-screen sheet */
+  body:has(#bounty-win.open) #bounty-btn{display:none;}
+  #bounty-win{top:0;left:0;right:0;bottom:0;width:100%;height:100%;max-height:none;border:0;border-radius:0;}
+  #bounty-hdr{padding:calc(12px + env(safe-area-inset-top)) 14px 12px;}
+  .b-hdr-btn{font-size:20px;padding:8px 12px;}
+  #bounty-msgs{padding:12px;}
+  .bm-body{max-width:86%;}
+  #bounty-input-wrap{padding:10px 12px calc(10px + env(safe-area-inset-bottom));}
+  #bounty-send-row{justify-content:flex-end;}
+  .b-footer{display:none;}
+  #bounty-send{min-height:44px;padding:11px 26px;}
+}
+@media(max-width:560px){
+  /* six labels do not fit side by side on a phone, so the two long ones show a short form (the full text stays for screen readers) */
+  .ntab .lbl[data-short]{font-size:0;}
+  .ntab .lbl[data-short]::after{content:attr(data-short);font-size:10px;letter-spacing:-0.1px;}
+}
+@media(max-width:400px){
+  .nav-r .ntime{display:none;}
+  .acgrid,.ai-stocks-grid{grid-template-columns:minmax(0,1fr);}   /* two analyst cards side by side no longer fit */
+}
+/* touch screens have no hover: show what used to appear on hover, and stop a tap leaving a button stuck in its hover colour */
+@media(hover:none){
+  .bm-actions{display:flex;}
+  .bm-act{padding:6px 10px;font-size:11px;}
+  .accard:hover,.ai-stock-card:hover,#bounty-btn:hover{transform:none;}
+  tbody tr:hover{background:none;}
+  .ntab:not(.on):hover,.fstab:not(.on):hover,.stab:not(.on):hover{color:var(--t3);}
+  .fbtn:not(.on):hover,.pgbtn:not(.on):hover{background:var(--bg3);color:var(--t3);border-color:var(--b1);}
+  thead th:hover{color:var(--t3);}
+}
 </style>
 
 <!-- Bounty Button -->

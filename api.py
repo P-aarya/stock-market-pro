@@ -33,7 +33,16 @@ SESSION_DAYS = 14
 SESSION_COOKIE = "smp_session"
 LOGIN_MAX_FAILURES = 5          # wrong passwords allowed per client ...
 LOGIN_WINDOW_SECONDS = 300      # ... in this many seconds
-_OPEN_PATHS = {"/login", "/logout", "/health", "/api/auth/status", "/favicon.ico"}
+# Files a phone fetches for "Add to Home Screen" (app icon + manifest). The browser asks for them without the login
+# cookie, and they hold nothing private, so they stay reachable when APP_PASSWORD is set.
+_STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+_APP_ASSETS = {
+    "/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json"),
+    "/apple-touch-icon.png": ("apple-touch-icon.png", "image/png"),
+    "/icon-192.png": ("icon-192.png", "image/png"),
+    "/icon-512.png": ("icon-512.png", "image/png"),
+}
+_OPEN_PATHS = {"/login", "/logout", "/health", "/api/auth/status", "/favicon.ico"} | set(_APP_ASSETS)
 _login_failures = defaultdict(deque)
 
 
@@ -140,6 +149,17 @@ def serve_root():
 def serve_dashboard():
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard.html")
     return FileResponse(path)
+
+def _app_asset_route(filename: str, media_type: str):
+    def serve():
+        path = os.path.join(_STATIC_DIR, filename)
+        if not os.path.exists(path):
+            return JSONResponse({"detail": "Not found"}, status_code=404)
+        return FileResponse(path, media_type=media_type, headers={"Cache-Control": "public, max-age=86400"})
+    return serve
+
+for _route, (_file, _type) in _APP_ASSETS.items():
+    app.add_api_route(_route, _app_asset_route(_file, _type), methods=["GET"], include_in_schema=False)
 
 @app.get("/health")
 def health():
