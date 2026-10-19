@@ -52,15 +52,7 @@ class Manifest(unittest.TestCase):
 
 
 class Serving(unittest.TestCase):
-    def setUp(self):
-        self.saved = api.APP_PASSWORD
-        api._login_failures.clear()
-
-    def tearDown(self):
-        api.APP_PASSWORD = self.saved
-
     def test_served_with_the_right_content_types(self):
-        api.APP_PASSWORD = ""
         c = TestClient(api.app)
         for path, (_, media_type) in api._APP_ASSETS.items():
             r = c.get(path)
@@ -70,9 +62,8 @@ class Serving(unittest.TestCase):
         self.assertEqual(c.get("/manifest.webmanifest").json()["short_name"], "Stock Pro")
         self.assertEqual(c.get("/apple-touch-icon.png").content[:4], b"\x89PNG")
 
-    def test_still_reachable_when_the_app_is_password_protected(self):
+    def test_reachable_without_signing_in(self):
         # A phone fetches the icon and manifest without the login cookie; they hold nothing private.
-        api.APP_PASSWORD = "correct horse"
         c = TestClient(api.app, follow_redirects=False)
         for path in api._APP_ASSETS:
             self.assertEqual(c.get(path).status_code, 200, path)

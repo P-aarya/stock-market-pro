@@ -1,7 +1,8 @@
 # ============================================================
 # STOCK MARKET PRO - api.py (Final Clean Version)
 # ============================================================
-from fastapi import FastAPI, Body, Request
+from fastapi import Depends, FastAPI, Body, HTTPException, Request
+from starlette.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 import mysql.connector
@@ -18,111 +19,143 @@ import time
 import urllib.parse
 from collections import defaultdict, deque
 from dotenv import load_dotenv
+from html import escape as _escape_html
 load_dotenv()
+
+import auth
+import auth_pages
 
 app = FastAPI(title="Stock Market Pro API")
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(",") if o.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 
-# ── Optional password protection ──
-# Set APP_PASSWORD in .env to require a login for the whole app: pages, data and every endpoint that changes anything.
-# Leave it unset (the default) and the app stays open, which is fine on your own machine but not when it is exposed
-# to the internet, for example through a tunnel. APP_SECRET (optional) changes the key sessions are signed with.
-APP_PASSWORD = os.getenv("APP_PASSWORD", "")
-SESSION_DAYS = 14
+# ── Accounts ──
+# Every page and endpoint needs a signed-in user (see auth.py). The session cookie carries the user's id; the middleware
+# below puts it on request.state.user_id, and the endpoints that read or change personal data take it from there.
+#   ALLOW_SIGNUP=false  closes registration (accounts can still be made with manage_users.py)
+#   SIGNUP_CODE=...     keeps registration open only for people who know the code
+#   APP_SECRET=...      the key sessions are signed with (otherwise a random one is kept in .app_secret)
+ALLOW_SIGNUP = os.getenv("ALLOW_SIGNUP", "true").strip().lower() not in ("false", "0", "no")
+SIGNUP_CODE = os.getenv("SIGNUP_CODE", "")
 SESSION_COOKIE = "smp_session"
-LOGIN_MAX_FAILURES = 5          # wrong passwords allowed per client ...
-LOGIN_WINDOW_SECONDS = 300      # ... in this many seconds
+_login_by_client = auth.RateLimiter(5, 300)     # wrong passwords per client in 5 minutes ...
+_login_by_email = auth.RateLimiter(10, 900)     # ... and per account in 15 minutes
+_signups = auth.RateLimiter(5, 3600)            # sign-up attempts per client in an hour
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Files a phone fetches for "Add to Home Screen" (app icon + manifest). The browser asks for them without the login
-# cookie, and they hold nothing private, so they stay reachable when APP_PASSWORD is set.
-_STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+# cookie, and they hold nothing private, so they stay reachable before sign-in.
+_STATIC_DIR = os.path.join(_BASE_DIR, "static")
 _APP_ASSETS = {
     "/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json"),
     "/apple-touch-icon.png": ("apple-touch-icon.png", "image/png"),
     "/icon-192.png": ("icon-192.png", "image/png"),
     "/icon-512.png": ("icon-512.png", "image/png"),
 }
-_OPEN_PATHS = {"/login", "/logout", "/health", "/api/auth/status", "/favicon.ico"} | set(_APP_ASSETS)
-_login_failures = defaultdict(deque)
-
-
-def _session_key() -> bytes:
-    return hashlib.sha256(("smp|" + (os.getenv("APP_SECRET") or APP_PASSWORD)).encode()).digest()
-
-
-def _sign(expires: int) -> str:
-    return hmac.new(_session_key(), str(expires).encode(), hashlib.sha256).hexdigest()
-
-
-def make_session_token() -> str:
-    expires = int(time.time()) + SESSION_DAYS * 86400
-    return f"{expires}.{_sign(expires)}"
-
-
-def valid_session_token(token: str) -> bool:
-    try:
-        expires, signature = token.split(".", 1)
-        return int(expires) > time.time() and hmac.compare_digest(signature, _sign(int(expires)))
-    except (ValueError, AttributeError):
-        return False
+_OPEN_PATHS = {"/login", "/register", "/logout", "/health", "/api/auth/status", "/favicon.ico"} | set(_APP_ASSETS)
 
 
 @app.middleware("http")
 async def require_login(request: Request, call_next):
-    if not APP_PASSWORD or request.method == "OPTIONS" or request.url.path in _OPEN_PATHS \
-            or valid_session_token(request.cookies.get(SESSION_COOKIE, "")):
+    request.state.user_id = auth.read_token(request.cookies.get(SESSION_COOKIE, ""))
+    if request.method == "OPTIONS" or request.url.path in _OPEN_PATHS or request.state.user_id is not None:
         return await call_next(request)
     if request.url.path.startswith(("/api/", "/agent/")):
         return JSONResponse({"status": "error", "message": "Please sign in."}, status_code=401)
     return RedirectResponse("/login", status_code=302)
 
 
-def _login_page(error: str = "") -> str:
-    message = f'<p class="err">{error}</p>' if error else ""
-    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sign in</title><style>
-:root{{--bg:#0b0d17;--card:#12152a;--line:#242a4a;--text:#e8ecf8;--muted:#8d97b8;--accent:#00c8ff;--red:#ff5c5c}}
-@media (prefers-color-scheme: light){{:root{{--bg:#f3f5fb;--card:#fff;--line:#d9deef;--text:#16192b;--muted:#5d6785;--accent:#0a7bd1;--red:#c62828}}}}
-*{{box-sizing:border-box}}body{{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--text);font:15px system-ui,sans-serif}}
-form{{width:min(360px,calc(100vw - 32px));background:var(--card);border:1px solid var(--line);border-radius:14px;padding:28px}}
-h1{{margin:0 0 4px;font-size:20px}}p{{margin:0 0 18px;color:var(--muted);font-size:13px}}
-input{{width:100%;padding:11px 12px;border-radius:9px;border:1px solid var(--line);background:transparent;color:var(--text);font-size:15px}}
-input:focus{{outline:2px solid var(--accent);outline-offset:1px}}
-button{{margin-top:14px;width:100%;padding:11px;border:0;border-radius:9px;background:var(--accent);color:#fff;font-weight:700;font-size:15px;cursor:pointer}}
-.err{{color:var(--red);font-weight:600;margin:12px 0 0}}</style></head><body>
-<form method="post" action="/login"><h1>Stock Market Pro</h1><p>Enter the password to continue.</p>
-<input type="password" name="password" placeholder="Password" autocomplete="current-password" autofocus required>
-<button type="submit">Sign in</button>{message}</form></body></html>"""
+def current_user_id(request: Request) -> int:
+    """The signed-in user's id, for endpoints that read or change personal data (the middleware has already checked it)."""
+    user_id = getattr(request.state, "user_id", None)
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Please sign in.")
+    return user_id
+
+
+def _is_https(request: Request) -> bool:
+    return request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
+
+
+def _start_session(request: Request, user_id: int) -> RedirectResponse:
+    response = RedirectResponse("/", status_code=303)
+    response.set_cookie(SESSION_COOKIE, auth.make_token(user_id), max_age=auth.SESSION_DAYS * 86400, httponly=True,
+                        samesite="lax", secure=_is_https(request))
+    return response
+
+
+async def _read_form(request: Request) -> dict:
+    body = (await request.body())[:10000]
+    return {k: v[0] for k, v in urllib.parse.parse_qs(body.decode("utf-8", "ignore"), keep_blank_values=True).items()}
 
 
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
-    if not APP_PASSWORD or valid_session_token(request.cookies.get(SESSION_COOKIE, "")):
-        return RedirectResponse("/", status_code=303)
-    return HTMLResponse(_login_page())
+    cookie = request.cookies.get(SESSION_COOKIE, "")
+    user_id = auth.read_token(cookie)
+    if user_id is not None:
+        try:
+            if auth.get_user(user_id):
+                return RedirectResponse("/", status_code=303)
+        except Exception:
+            return RedirectResponse("/", status_code=303)      # the database hiccuped: don't sign anyone out for that
+    response = HTMLResponse(auth_pages.login_page(signup_open=ALLOW_SIGNUP))
+    if cookie:
+        response.delete_cookie(SESSION_COOKIE)                # expired, forged, or for an account that no longer exists
+    return response
 
 
 @app.post("/login")
 async def login(request: Request):
-    if not APP_PASSWORD:
-        return RedirectResponse("/", status_code=303)
+    form = await _read_form(request)
+    email, password = auth.normalize_email(form.get("email")), form.get("password", "")
     client = _client_id(request)
-    now = time.time()
-    failures = _login_failures[client]
-    while failures and now - failures[0] > LOGIN_WINDOW_SECONDS:
-        failures.popleft()
-    if len(failures) >= LOGIN_MAX_FAILURES:
-        return HTMLResponse(_login_page("Too many wrong passwords. Please wait a few minutes and try again."), status_code=429)
-    form = urllib.parse.parse_qs((await request.body()).decode("utf-8", "ignore"))
-    attempt = form.get("password", [""])[0]
-    if hmac.compare_digest(attempt.encode(), APP_PASSWORD.encode()):
-        failures.clear()
-        response = RedirectResponse("/", status_code=303)
-        response.set_cookie(SESSION_COOKIE, make_session_token(), max_age=SESSION_DAYS * 86400, httponly=True, samesite="lax",
-                            secure=request.headers.get("x-forwarded-proto", request.url.scheme) == "https")
-        return response
-    failures.append(now)
-    return HTMLResponse(_login_page("That password isn't right."), status_code=401)
+    if _login_by_client.blocked(client) or _login_by_email.blocked(email):
+        return HTMLResponse(auth_pages.login_page("Too many failed attempts. Please wait a few minutes and try again.", email, ALLOW_SIGNUP), status_code=429)
+    try:
+        user = await run_in_threadpool(auth.authenticate, email, password)
+    except auth.AccountsNotSetUp:
+        return HTMLResponse(auth_pages.notice_page("Accounts aren't set up yet", "The site owner needs to run: python manage_users.py migrate"), status_code=503)
+    if user:
+        _login_by_client.clear(client)
+        _login_by_email.clear(email)
+        return _start_session(request, user["id"])
+    _login_by_client.record(client)
+    _login_by_email.record(email)
+    return HTMLResponse(auth_pages.login_page("That email or password isn't right.", email, ALLOW_SIGNUP), status_code=401)
+
+
+@app.get("/register", response_class=HTMLResponse)
+def register_page(request: Request):
+    if not ALLOW_SIGNUP:
+        return HTMLResponse(auth_pages.register_page(closed=True), status_code=403)
+    return HTMLResponse(auth_pages.register_page(needs_code=bool(SIGNUP_CODE)))
+
+
+@app.post("/register")
+async def register(request: Request):
+    if not ALLOW_SIGNUP:
+        return HTMLResponse(auth_pages.register_page(closed=True), status_code=403)
+    form = await _read_form(request)
+    email, password = auth.normalize_email(form.get("email")), form.get("password", "")
+    client = _client_id(request)
+
+    def again(message, status):
+        return HTMLResponse(auth_pages.register_page(message, email, bool(SIGNUP_CODE)), status_code=status)
+
+    if _signups.blocked(client):
+        return again("Too many sign-up attempts from your network. Please try again later.", 429)
+    _signups.record(client)
+    if SIGNUP_CODE and not hmac.compare_digest(form.get("code", "").strip().encode(), SIGNUP_CODE.encode()):
+        return again("That invite code isn't right.", 403)
+    if password != form.get("confirm", ""):
+        return again("The two passwords don't match.", 400)
+    try:
+        user = await run_in_threadpool(auth.register, email, password)
+    except auth.AuthError as e:
+        return again(e.message, e.status)
+    except auth.AccountsNotSetUp:
+        return HTMLResponse(auth_pages.notice_page("Accounts aren't set up yet", "The site owner needs to run: python manage_users.py migrate"), status_code=503)
+    return _start_session(request, user["id"])
 
 
 @app.get("/logout")
@@ -134,21 +167,45 @@ def logout():
 
 @app.get("/api/auth/status")
 def auth_status(request: Request):
-    return {"enabled": bool(APP_PASSWORD), "signed_in": (not APP_PASSWORD) or valid_session_token(request.cookies.get(SESSION_COOKIE, ""))}
+    user_id = auth.read_token(request.cookies.get(SESSION_COOKIE, ""))
+    if user_id is None:
+        return {"enabled": True, "signed_in": False, "user": None}
+    try:
+        user = auth.get_user(user_id)
+    except Exception:
+        return {"enabled": True, "signed_in": True, "user": None}   # a database hiccup shouldn't sign anyone out
+    return {"enabled": True, "signed_in": user is not None, "user": user}
 
 
 # ── Serve dashboard.html directly from port 8000 ──
+def _dashboard_response(request: Request):
+    path = os.path.join(_BASE_DIR, "dashboard.html")
+    if not os.path.exists(path):
+        return {"status": "running", "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+    with open(path, encoding="utf-8") as f:
+        page = f.read()
+    user_id = getattr(request.state, "user_id", None)
+    meta = ""
+    if user_id is not None:
+        try:
+            user = auth.get_user(user_id)
+        except Exception:
+            user = None
+        meta = (f'<meta name="smp-user-id" content="{int(user_id)}">'
+                f'<meta name="smp-user-email" content="{_escape_html((user or {}).get("email", ""), quote=True)}">')
+    # The page is different for every person, so it must never be stored by a browser cache or a shared proxy.
+    return HTMLResponse(page.replace("<!--SMP_USER-->", meta, 1), headers={"Cache-Control": "private, no-store"})
+
+
 @app.get("/")
-def serve_root():
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard.html")
-    if os.path.exists(path):
-        return FileResponse(path)
-    return {"status": "running", "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+def serve_root(request: Request):
+    return _dashboard_response(request)
+
 
 @app.get("/dashboard.html")
-def serve_dashboard():
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard.html")
-    return FileResponse(path)
+def serve_dashboard(request: Request):
+    return _dashboard_response(request)
+
 
 def _app_asset_route(filename: str, media_type: str):
     def serve():
@@ -176,6 +233,10 @@ def get_db():
     }
     if os.getenv("DB_SSL", "false").lower() == "true":
         config["ssl_disabled"] = False
+    # The web server opens many connections at once (one per request, on separate threads). The connector's C
+    # extension is not safe for that: concurrent first connections fail with "2059 Authentication plugin ... is
+    # already loaded" and can crash the whole process. The pure-Python connector has no such problem.
+    config["use_pure"] = True
     return mysql.connector.connect(**config)
 
 def query(sql, params=None):
@@ -419,11 +480,12 @@ def batch_commodity_companies(request: dict = Body(...)):
         placeholders = ','.join(['%s'] * len(tickers))
         results = query(f"""
             SELECT l.ticker, l.company_name, l.sector, l.current_price,
-                   l.price_change_pct, l.market_cap, l.market_cap_category,
+                   l.price_change_pct, l.market_cap, f.market_cap_category,
                    COALESCE(p.buy_signal, 'N/A') as buy_signal,
                    COALESCE(p.trend, 'NEUTRAL') as trend,
                    COALESCE(a.analyst_rating, 'N/A') as analyst_rating
             FROM stocks_live l
+            LEFT JOIN stocks_fundamentals f ON l.ticker = f.ticker
             LEFT JOIN stocks_predictions p ON l.ticker = p.ticker
             LEFT JOIN stocks_analyst a ON l.ticker = a.ticker
             WHERE l.ticker IN ({placeholders})
@@ -1230,6 +1292,7 @@ import peers
 import portfolio
 import sentiment
 import stock_period
+import watchlist
 from screener import get_top_movers, get_sector_summary, screen_stocks
 
 log = logging.getLogger("uvicorn.error")
@@ -1241,7 +1304,7 @@ def _valid_tickers(values):
     return [t.strip() for t in values if isinstance(t, str) and TICKER_RE.match(t.strip())]
 
 
-# ── Rate limit for the endpoints that spend LLM quota (per client, sliding 60s window) ──
+# ── Rate limit for the endpoints that spend LLM quota (per signed-in user, sliding 60s window) ──
 AGENT_RATE_LIMIT = int(os.getenv("AGENT_RATE_LIMIT", "20"))
 _agent_hits = defaultdict(deque)
 _agent_hits_lock = threading.Lock()
@@ -1260,7 +1323,8 @@ def agent_error(status_code: int, message: str) -> JSONResponse:
 def check_rate_limit(request: Request):
     """Returns an error response when the client is over the limit, else None."""
     now = time.time()
-    key = _client_id(request)
+    user_id = getattr(request.state, "user_id", None)
+    key = f"user:{user_id}" if user_id is not None else _client_id(request)
     with _agent_hits_lock:
         hits = _agent_hits[key]
         while hits and now - hits[0] > 60:
@@ -1359,9 +1423,9 @@ class HoldingEdit(BaseModel):
     notes: str = Field(default="", max_length=200)
 
 
-def holding_call(fn, *args):
+def holding_call(fn, user_id, *args):
     try:
-        return {"status": "success", **fn(*args)}
+        return {"status": "success", **fn(user_id, *args)}
     except portfolio.PortfolioError as e:
         return agent_error(e.status, e.message)
     except Exception:
@@ -1370,29 +1434,29 @@ def holding_call(fn, *args):
 
 
 @app.get("/api/portfolio")
-def get_portfolio():
-    return portfolio.list_holdings()
+def get_portfolio(user_id: int = Depends(current_user_id)):
+    return portfolio.list_holdings(user_id)
 
 
 @app.get("/api/portfolio/summary")
-def get_portfolio_summary():
-    return portfolio.summarize(portfolio.list_holdings())
+def get_portfolio_summary(user_id: int = Depends(current_user_id)):
+    return portfolio.summarize(portfolio.list_holdings(user_id))
 
 
 @app.post("/api/portfolio")
-def add_portfolio_holding(body: HoldingIn):
+def add_portfolio_holding(body: HoldingIn, user_id: int = Depends(current_user_id)):
     """Add a purchase. Buying more of a stock you already hold merges into one position at the weighted-average cost."""
-    return holding_call(portfolio.add_holding, body.ticker, body.quantity, body.avg_buy_price, body.buy_date, body.notes)
+    return holding_call(portfolio.add_holding, user_id, body.ticker, body.quantity, body.avg_buy_price, body.buy_date, body.notes)
 
 
 @app.put("/api/portfolio/{holding_id}")
-def edit_portfolio_holding(holding_id: int, body: HoldingEdit):
-    return holding_call(portfolio.update_holding, holding_id, body.quantity, body.avg_buy_price, body.buy_date, body.notes)
+def edit_portfolio_holding(holding_id: int, body: HoldingEdit, user_id: int = Depends(current_user_id)):
+    return holding_call(portfolio.update_holding, user_id, holding_id, body.quantity, body.avg_buy_price, body.buy_date, body.notes)
 
 
 @app.delete("/api/portfolio/{holding_id}")
-def delete_portfolio_holding(holding_id: int):
-    return holding_call(portfolio.delete_holding, holding_id)
+def delete_portfolio_holding(holding_id: int, user_id: int = Depends(current_user_id)):
+    return holding_call(portfolio.delete_holding, user_id, holding_id)
 
 
 class TxIn(BaseModel):
@@ -1413,41 +1477,66 @@ class TxEdit(BaseModel):
 
 
 @app.get("/api/transactions")
-def get_transactions():
-    return portfolio.list_transactions()
+def get_transactions(user_id: int = Depends(current_user_id)):
+    return portfolio.list_transactions(user_id)
 
 
 @app.get("/api/transactions/summary")
-def get_transactions_summary():
-    return portfolio.transaction_summary()
+def get_transactions_summary(user_id: int = Depends(current_user_id)):
+    return portfolio.transaction_summary(user_id)
 
 
 @app.post("/api/transactions")
-def add_transaction_entry(body: TxIn):
-    return holding_call(portfolio.add_transaction, body.ticker, body.transaction_type, body.quantity, body.price,
+def add_transaction_entry(body: TxIn, user_id: int = Depends(current_user_id)):
+    return holding_call(portfolio.add_transaction, user_id, body.ticker, body.transaction_type, body.quantity, body.price,
                         body.transaction_date, body.notes, body.apply_to_holdings)
 
 
 @app.put("/api/transactions/{tx_id}")
-def edit_transaction_entry(tx_id: int, body: TxEdit):
-    return holding_call(portfolio.update_transaction, tx_id, body.quantity, body.price, body.transaction_date, body.notes)
+def edit_transaction_entry(tx_id: int, body: TxEdit, user_id: int = Depends(current_user_id)):
+    return holding_call(portfolio.update_transaction, user_id, tx_id, body.quantity, body.price, body.transaction_date, body.notes)
 
 
 @app.delete("/api/transactions/{tx_id}")
-def delete_transaction_entry(tx_id: int):
-    return holding_call(portfolio.delete_transaction, tx_id)
+def delete_transaction_entry(tx_id: int, user_id: int = Depends(current_user_id)):
+    return holding_call(portfolio.delete_transaction, user_id, tx_id)
 
 
 @app.get("/api/portfolio/performance")
-def portfolio_performance():
+def portfolio_performance(user_id: int = Depends(current_user_id)):
     """Portfolio value against the same dollars invested in the S&P 500, plus risk measures."""
     try:
-        return {"status": "success", **portfolio.performance()}
+        return {"status": "success", **portfolio.performance(user_id)}
     except portfolio.PortfolioError as e:
         return agent_error(e.status, e.message)
     except Exception:
         log.exception("Portfolio performance failed")
         return agent_error(500, "Something went wrong working out performance.")
+
+
+class WatchlistBody(BaseModel):
+    tickers: List[str] = Field(default_factory=list, max_length=200)
+
+
+@app.get("/api/watchlist")
+def get_watchlist(user_id: int = Depends(current_user_id)):
+    try:
+        return {"status": "success", "tickers": watchlist.get_watchlist(user_id)}
+    except Exception:
+        log.exception("Watchlist load failed")
+        return agent_error(500, "Something went wrong loading your watchlist.")
+
+
+@app.put("/api/watchlist")
+def put_watchlist(body: WatchlistBody, user_id: int = Depends(current_user_id)):
+    """Replace the whole watchlist (the dashboard sends the full list after each change)."""
+    try:
+        return {"status": "success", "tickers": watchlist.save_watchlist(user_id, body.tickers)}
+    except watchlist.WatchlistError as e:
+        return agent_error(e.status, e.message)
+    except Exception:
+        log.exception("Watchlist save failed")
+        return agent_error(500, "Something went wrong saving your watchlist.")
 
 
 def _tracked_stock(ticker: str) -> bool:
@@ -1595,7 +1684,7 @@ def agent_explain_stock(request: Request, body: ExplainRequest):
 
 
 @app.post("/agent/portfolio-review")
-def agent_portfolio_review(request: Request, body: PortfolioRequest):
+def agent_portfolio_review(request: Request, body: PortfolioRequest, user_id: int = Depends(current_user_id)):
     limited = check_rate_limit(request)
     if limited:
         return limited
@@ -1604,7 +1693,7 @@ def agent_portfolio_review(request: Request, body: PortfolioRequest):
 
     def call():
         try:
-            result = portfolio.review(body.tickers, body.use_holdings)
+            result = portfolio.review(user_id, body.tickers, body.use_holdings)
         except portfolio.PortfolioError as e:
             return agent_error(e.status, e.message)
         return {"status": "success", **result}

@@ -3,10 +3,9 @@ from datetime import date
 
 import numpy as np
 import pandas as pd
-from fastapi.testclient import TestClient
-
 import _path  # noqa: F401
 import api
+from _accounts import signed_in_client
 import stock_period as SP
 
 
@@ -96,12 +95,11 @@ class Endpoints(unittest.TestCase):
     """The endpoints with the price download replaced by synthetic prices."""
 
     def setUp(self):
-        api.APP_PASSWORD = ""
         self.saved = (SP.full_history, api._tracked_stock)
         stock = series("2020-01-01", np.linspace(100, 300, 1800)); bench = series("2020-01-01", np.linspace(300, 500, 1800))
         SP.full_history = lambda t: bench if t.upper() == "SPY" else (stock if t.upper() == "TEST" else (_ for _ in ()).throw(SP.PeriodError("No price history is available for X.", 404)))
         api._tracked_stock = lambda t: t.upper() in ("TEST", "NOPRICE")
-        self.c = TestClient(api.app)
+        self.c = signed_in_client(1)
 
     def tearDown(self):
         SP.full_history, api._tracked_stock = self.saved

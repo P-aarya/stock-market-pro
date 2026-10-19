@@ -13,6 +13,10 @@ def get_db_connection():
     }
     if os.getenv("DB_SSL", "false").lower() == "true":
         config["ssl_disabled"] = False
+    # The web server opens many connections at once (one per request, on separate threads). The connector's C
+    # extension is not safe for that: concurrent first connections fail with "2059 Authentication plugin ... is
+    # already loaded" and can crash the whole process. The pure-Python connector has no such problem.
+    config["use_pure"] = True
     return mysql.connector.connect(**config)
 
 # The prediction model stores Strong Buy / Buy / Hold / Sell / Strong Sell.

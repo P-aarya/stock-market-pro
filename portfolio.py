@@ -1,6 +1,10 @@
 """
 Portfolio holdings: validated add / edit / delete, correct summary maths, and an AI review that uses the
 user's real positions (quantity, cost basis, weight) instead of rating each ticker in isolation.
+
+Everything here belongs to one account. Every function that reads or changes holdings or transactions takes the
+signed-in `user_id` first, and every SQL statement on those tables filters by it, so one person can never see or
+touch another person's records.
 """
 import math
 import re
@@ -87,7 +91,7 @@ def with_values(rows):
     return out
 
 
-def list_holdings():
+def list_holdings(user_id):
     rows = _query("""
         SELECT p.id, p.ticker, p.company_name, p.quantity, p.avg_buy_price, p.buy_date, p.notes,
                IF(l.last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY), l.current_price, NULL) AS current_price,
@@ -97,7 +101,8 @@ def list_holdings():
         FROM portfolio p
         LEFT JOIN stocks_live l ON p.ticker = l.ticker
         LEFT JOIN stocks_analyst a ON p.ticker = a.ticker
-    """)
+        WHERE p.user_id = %s
+    """, (user_id,))
     rows = with_values(rows)
     rows.sort(key=lambda r: (r["current_value"] is None, -(r["current_value"] or 0)))  # biggest first, unpriced last
     return rows
@@ -162,7 +167,7 @@ def merge_lots(lots, quantity, price):
 
 # ── add / edit / delete ───────────────────────────────────
 
-def add_holding(ticker, quantity, avg_buy_price, buy_date, notes=""):
+def add_holding(user_id, ticker, quantity, avg_buy_price, buy_date, notes=""):
     ticker = (ticker or "").strip().upper()
     if not TICKER_RE.match(ticker):
         raise PortfolioError("That doesn't look like a ticker symbol.")
@@ -175,7 +180,7 @@ def add_holding(ticker, quantity, avg_buy_price, buy_date, notes=""):
         stock = cur.fetchone()
         if not stock:
             raise PortfolioError(f"{ticker} isn't a stock we track, so it can't be added.")
-        cur.execute("SELECT id, quantity, avg_buy_price, buy_date, notes FROM portfolio WHERE ticker = %s ORDER BY id", (ticker,))
+        cur.execute("SELECT id, quantity, avg_buy_price, buy_date, notes FROM portfolio WHERE user_id = %s AND ticker = %s ORDER BY id", (user_id, ticker))
         lots = [{k: _plain(v) for k, v in row.items()} for row in cur.fetchall()]
 
         if lots:  # buying more of a stock you hold: one position at the weighted-average cost
@@ -183,15 +188,15 @@ def add_holding(ticker, quantity, avg_buy_price, buy_date, notes=""):
             first = lots[0]
             earliest = min([d] + [l["buy_date"] for l in lots if l["buy_date"]])
             note = notes or first.get("notes") or ""
-            cur.execute("UPDATE portfolio SET quantity=%s, avg_buy_price=%s, buy_date=%s, notes=%s WHERE id=%s",
-                        (total_q, round(avg, 4), earliest, note, first["id"]))
+            cur.execute("UPDATE portfolio SET quantity=%s, avg_buy_price=%s, buy_date=%s, notes=%s WHERE id=%s AND user_id=%s",
+                        (total_q, round(avg, 4), earliest, note, first["id"], user_id))
             for extra in lots[1:]:
-                cur.execute("DELETE FROM portfolio WHERE id = %s", (extra["id"],))
+                cur.execute("DELETE FROM portfolio WHERE id = %s AND user_id = %s", (extra["id"], user_id))
             holding_id, message = first["id"], f"Added {q:g} more {ticker}. Position is now {total_q:g} shares at ${avg:,.2f}."
         else:
-            cur.execute("""INSERT INTO portfolio (ticker, company_name, quantity, avg_buy_price, buy_date, sector, notes)
-                           VALUES (%s,%s,%s,%s,%s,%s,%s)""",
-                        (ticker, stock["company_name"] or ticker, q, p, d, stock["sector"] or "Unknown", notes))
+            cur.execute("""INSERT INTO portfolio (user_id, ticker, company_name, quantity, avg_buy_price, buy_date, sector, notes)
+                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
+                        (user_id, ticker, stock["company_name"] or ticker, q, p, d, stock["sector"] or "Unknown", notes))
             holding_id, message = cur.lastrowid, f"Added {q:g} shares of {ticker}."
         conn.commit()
         return {"id": holding_id, "ticker": ticker, "message": message}
@@ -202,17 +207,17 @@ def add_holding(ticker, quantity, avg_buy_price, buy_date, notes=""):
         conn.close()
 
 
-def update_holding(holding_id, quantity, avg_buy_price, buy_date, notes=""):
+def update_holding(user_id, holding_id, quantity, avg_buy_price, buy_date, notes=""):
     q, p, d, notes = _check_position(quantity, avg_buy_price, buy_date, notes)
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT ticker FROM portfolio WHERE id = %s", (holding_id,))
+        cur.execute("SELECT ticker FROM portfolio WHERE id = %s AND user_id = %s", (holding_id, user_id))
         row = cur.fetchone()
         if not row:
             raise PortfolioError("That holding no longer exists.", 404)
-        cur.execute("UPDATE portfolio SET quantity=%s, avg_buy_price=%s, buy_date=%s, notes=%s WHERE id=%s",
-                    (q, p, d, notes, holding_id))
+        cur.execute("UPDATE portfolio SET quantity=%s, avg_buy_price=%s, buy_date=%s, notes=%s WHERE id=%s AND user_id=%s",
+                    (q, p, d, notes, holding_id, user_id))
         conn.commit()
         return {"id": holding_id, "ticker": row[0], "message": f"{row[0]} updated."}
     except Exception:
@@ -222,15 +227,15 @@ def update_holding(holding_id, quantity, avg_buy_price, buy_date, notes=""):
         conn.close()
 
 
-def delete_holding(holding_id):
+def delete_holding(user_id, holding_id):
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT ticker FROM portfolio WHERE id = %s", (holding_id,))
+        cur.execute("SELECT ticker FROM portfolio WHERE id = %s AND user_id = %s", (holding_id, user_id))
         row = cur.fetchone()
         if not row:
             raise PortfolioError("That holding no longer exists.", 404)
-        cur.execute("DELETE FROM portfolio WHERE id = %s", (holding_id,))
+        cur.execute("DELETE FROM portfolio WHERE id = %s AND user_id = %s", (holding_id, user_id))
         conn.commit()
         return {"id": holding_id, "ticker": row[0], "message": f"{row[0]} removed."}
     except Exception:
@@ -367,7 +372,7 @@ def _position_line(p, with_positions):
     return "- " + " | ".join(bits)
 
 
-def review(entries=None, use_holdings=False):
+def review(user_id, entries=None, use_holdings=False):
     """
     AI review of the user's saved holdings (use_holdings=True) or of an ad-hoc list of tickers / company names.
     Returns {"review", "tickers_reviewed", "not_found"}.
@@ -376,7 +381,7 @@ def review(entries=None, use_holdings=False):
 
     not_found = []
     if use_holdings:
-        held = list_holdings()
+        held = list_holdings(user_id)
         if not held:
             raise PortfolioError("You have no holdings yet. Add some below, or type a few stocks to review.")
         held = [h for h in held if h["current_value"] is not None][:MAX_REVIEW_STOCKS]
@@ -442,8 +447,8 @@ TX_TYPES = ("BUY", "SELL", "DIVIDEND")
 _TX_COLUMNS = "id, ticker, company_name, transaction_type, quantity, price, total_value, transaction_date, notes"
 
 
-def list_transactions():
-    return _query(f"SELECT {_TX_COLUMNS} FROM transactions ORDER BY transaction_date DESC, id DESC")
+def list_transactions(user_id):
+    return _query(f"SELECT {_TX_COLUMNS} FROM transactions WHERE user_id = %s ORDER BY transaction_date DESC, id DESC", (user_id,))
 
 
 def realized_pnl(txs):
@@ -475,8 +480,8 @@ def realized_pnl(txs):
             "unmatched_sells": {k: round(v, 4) for k, v in unmatched.items()}}
 
 
-def transaction_summary():
-    rows = _query(f"SELECT {_TX_COLUMNS} FROM transactions")
+def transaction_summary(user_id):
+    rows = _query(f"SELECT {_TX_COLUMNS} FROM transactions WHERE user_id = %s", (user_id,))
     trades = [r for r in rows if r["transaction_type"] in ("BUY", "SELL")]
     value = lambda r: round((r["quantity"] or 0) * (r["price"] or 0), 2)
     pnl = realized_pnl(rows)
@@ -500,26 +505,26 @@ def _check_tx(tx_type, quantity, price, tx_date, notes):
     return tx_type, q, px, d, notes
 
 
-def _net_shares(ticker, up_to, exclude_id=None):
+def _net_shares(user_id, ticker, up_to, exclude_id=None):
     """Shares of `ticker` the transaction history says you held on `up_to`."""
     net = 0.0
-    for r in _query("SELECT id, transaction_type, quantity, transaction_date FROM transactions WHERE ticker = %s", (ticker,)):
+    for r in _query("SELECT id, transaction_type, quantity, transaction_date FROM transactions WHERE user_id = %s AND ticker = %s", (user_id, ticker)):
         if r["id"] == exclude_id or r["transaction_date"] is None or str(r["transaction_date"]) > str(up_to):
             continue
         net += r["quantity"] if r["transaction_type"] == "BUY" else -r["quantity"] if r["transaction_type"] == "SELL" else 0
     return net
 
 
-def _held_quantity(ticker):
-    rows = _query("SELECT quantity FROM portfolio WHERE ticker = %s", (ticker,))
+def _held_quantity(user_id, ticker):
+    rows = _query("SELECT quantity FROM portfolio WHERE user_id = %s AND ticker = %s", (user_id, ticker))
     return sum(r["quantity"] for r in rows)
 
 
-def _reduce_holding(ticker, quantity):
+def _reduce_holding(user_id, ticker, quantity):
     conn = get_db_connection()
     try:
         cur = conn.cursor(dictionary=True)
-        cur.execute("SELECT id, quantity FROM portfolio WHERE ticker = %s ORDER BY id", (ticker,))
+        cur.execute("SELECT id, quantity FROM portfolio WHERE user_id = %s AND ticker = %s ORDER BY id", (user_id, ticker))
         lots = cur.fetchall()
         held = sum(float(l["quantity"]) for l in lots)
         if not lots:
@@ -529,11 +534,11 @@ def _reduce_holding(ticker, quantity):
         remaining = held - quantity
         keep, rest = lots[0], lots[1:]
         for l in rest:
-            cur.execute("DELETE FROM portfolio WHERE id = %s", (l["id"],))
+            cur.execute("DELETE FROM portfolio WHERE id = %s AND user_id = %s", (l["id"], user_id))
         if remaining <= 1e-9:
-            cur.execute("DELETE FROM portfolio WHERE id = %s", (keep["id"],))
+            cur.execute("DELETE FROM portfolio WHERE id = %s AND user_id = %s", (keep["id"], user_id))
         else:
-            cur.execute("UPDATE portfolio SET quantity = %s WHERE id = %s", (remaining, keep["id"]))
+            cur.execute("UPDATE portfolio SET quantity = %s WHERE id = %s AND user_id = %s", (remaining, keep["id"], user_id))
         conn.commit()
         return remaining
     except Exception:
@@ -543,7 +548,7 @@ def _reduce_holding(ticker, quantity):
         conn.close()
 
 
-def add_transaction(ticker, tx_type, quantity, price, tx_date, notes="", apply_to_holdings=False):
+def add_transaction(user_id, ticker, tx_type, quantity, price, tx_date, notes="", apply_to_holdings=False):
     ticker = (ticker or "").strip().upper()
     if not TICKER_RE.match(ticker):
         raise PortfolioError("That doesn't look like a ticker symbol.")
@@ -552,16 +557,16 @@ def add_transaction(ticker, tx_type, quantity, price, tx_date, notes="", apply_t
     if not stock:
         raise PortfolioError(f"{ticker} isn't a stock we track, so it can't be recorded.")
     if tx_type == "SELL":
-        allowed = max(_net_shares(ticker, d), _held_quantity(ticker))
+        allowed = max(_net_shares(user_id, ticker, d), _held_quantity(user_id, ticker))
         if q > allowed + 1e-9:
             raise PortfolioError(f"You can't sell {q:g} {ticker}: your records show only {allowed:g} shares.")
 
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        cur.execute("""INSERT INTO transactions (ticker, company_name, transaction_type, quantity, price, total_value, transaction_date, notes)
-                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
-                    (ticker, stock[0]["company_name"] or ticker, tx_type, q, px, round(q * px, 2), d, notes))
+        cur.execute("""INSERT INTO transactions (user_id, ticker, company_name, transaction_type, quantity, price, total_value, transaction_date, notes)
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                    (user_id, ticker, stock[0]["company_name"] or ticker, tx_type, q, px, round(q * px, 2), d, notes))
         tx_id = cur.lastrowid
         conn.commit()
     finally:
@@ -571,40 +576,40 @@ def add_transaction(ticker, tx_type, quantity, price, tx_date, notes="", apply_t
     if apply_to_holdings and tx_type != "DIVIDEND":
         try:
             if tx_type == "BUY":
-                message += " " + add_holding(ticker, q, px, d, notes)["message"]
+                message += " " + add_holding(user_id, ticker, q, px, d, notes)["message"]
             else:
-                left = _reduce_holding(ticker, q)
+                left = _reduce_holding(user_id, ticker, q)
                 message += f" Holdings now show {left:g} shares." if left > 0 else f" {ticker} is no longer in your holdings."
         except Exception:
-            delete_transaction(tx_id)  # keep the two records consistent: undo the entry we just made
+            delete_transaction(user_id, tx_id)  # keep the two records consistent: undo the entry we just made
             raise
     return {"id": tx_id, "ticker": ticker, "message": message}
 
 
-def update_transaction(tx_id, quantity, price, tx_date, notes=""):
-    rows = _query("SELECT ticker, transaction_type FROM transactions WHERE id = %s", (tx_id,))
+def update_transaction(user_id, tx_id, quantity, price, tx_date, notes=""):
+    rows = _query("SELECT ticker, transaction_type FROM transactions WHERE id = %s AND user_id = %s", (tx_id, user_id))
     if not rows:
         raise PortfolioError("That transaction no longer exists.", 404)
     _, q, px, d, notes = _check_tx(rows[0]["transaction_type"], quantity, price, tx_date, notes)
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        cur.execute("UPDATE transactions SET quantity=%s, price=%s, total_value=%s, transaction_date=%s, notes=%s WHERE id=%s",
-                    (q, px, round(q * px, 2), d, notes, tx_id))
+        cur.execute("UPDATE transactions SET quantity=%s, price=%s, total_value=%s, transaction_date=%s, notes=%s WHERE id=%s AND user_id=%s",
+                    (q, px, round(q * px, 2), d, notes, tx_id, user_id))
         conn.commit()
     finally:
         conn.close()
     return {"id": tx_id, "ticker": rows[0]["ticker"], "message": f"{rows[0]['ticker']} transaction updated. (Holdings are not changed by editing a past transaction.)"}
 
 
-def delete_transaction(tx_id):
-    rows = _query("SELECT ticker FROM transactions WHERE id = %s", (tx_id,))
+def delete_transaction(user_id, tx_id):
+    rows = _query("SELECT ticker FROM transactions WHERE id = %s AND user_id = %s", (tx_id, user_id))
     if not rows:
         raise PortfolioError("That transaction no longer exists.", 404)
     conn = get_db_connection()
     try:
         cur = conn.cursor()
-        cur.execute("DELETE FROM transactions WHERE id = %s", (tx_id,))
+        cur.execute("DELETE FROM transactions WHERE id = %s AND user_id = %s", (tx_id, user_id))
         conn.commit()
     finally:
         conn.close()
@@ -647,7 +652,7 @@ def risk_metrics(daily_returns, benchmark_returns, weights):
     return out
 
 
-def performance():
+def performance(user_id):
     """
     How the portfolio compares with putting the same dollars into the S&P 500 on the same dates.
 
@@ -659,7 +664,7 @@ def performance():
     import yfinance as yf
     from concurrent.futures import ThreadPoolExecutor
 
-    held = [h for h in list_holdings() if h.get("buy_date") and h.get("quantity") and h.get("avg_buy_price")]
+    held = [h for h in list_holdings(user_id) if h.get("buy_date") and h.get("quantity") and h.get("avg_buy_price")]
     if not held:
         return {"empty": True}
     sig = tuple((h["ticker"], h["quantity"], h["avg_buy_price"], str(h["buy_date"])) for h in held)
@@ -732,7 +737,7 @@ def performance():
             daily.append(ret_sum / prev_total)
             spy_daily.append(spy[i] / spy[i - 1] - 1)
 
-    now = list_holdings()
+    now = list_holdings(user_id)
     weights = [h["current_value"] for h in now if h.get("current_value")]
     risk = risk_metrics(daily, spy_daily, weights)
 

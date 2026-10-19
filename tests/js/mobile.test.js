@@ -45,6 +45,12 @@ const tablet = mediaBlock('max-width:900px'), phone = mediaBlock('max-width:700p
     assert(/\.ntab \.lbl\[data-short\]::after\{content:attr\(data-short\)/.test(html));
   });
 
+  await t('the desktop top bar never wraps: it drops items in steps as the window narrows', () => {
+    assert(/\.ntab,\.brand-title,\.nuser,\.nsignout,\.ntime,#nconn\{white-space:nowrap;\}/.test(html));
+    const steps = [['1500px', /#nconn\{display:none/], ['1400px', /\.nuser\{display:none/], ['1200px', /\.ntime\{display:none/], ['1130px', /\.ntab\{padding:7px 12px/], ['1000px', /\.lpill\{display:none/]];
+    for (const [width, rule] of steps) assert(rule.test(mediaBlock(`max-width:${width}`)), `@media(max-width:${width})`);
+  });
+
   await t('on a phone the tabs sit in a fixed bottom bar that respects the home indicator', () => {
     assert(/\.ntabs\{position:fixed;left:0;right:0;bottom:0/.test(tablet));
     assert(/\.ntabs\{[^}]*safe-area-inset-bottom/.test(tablet));

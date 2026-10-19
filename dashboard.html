@@ -10,6 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="Stock Pro"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <link rel="manifest" href="/manifest.webmanifest"/>
+<!--SMP_USER-->
 <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png"/>
 <title>Stock Market Pro — AYEIM Ventures</title>
@@ -38,6 +39,9 @@ body{background:var(--bg0);color:var(--t1);font-family:var(--sans);min-height:10
 .ntab:hover{color:var(--t1);}
 .ntab.on{background:var(--blue);color:#fff;}
 .nav-r{display:flex;align-items:center;gap:12px;}
+.nuser{font-size:12px;font-weight:600;color:var(--t2);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.nsignout{font-size:12px;font-weight:700;color:var(--t3);text-decoration:none;padding:6px 2px;}
+.nsignout:hover{color:var(--t1);}
 .lpill{display:flex;align-items:center;gap:5px;background:rgba(0,230,118,0.08);border:1px solid rgba(0,230,118,0.2);border-radius:20px;padding:4px 12px;font-size:12px;font-weight:700;color:var(--green);}
 .ldot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:ldot 2s infinite;}
 @keyframes ldot{0%,100%{opacity:1;}50%{opacity:0.3;}}
@@ -1076,7 +1080,11 @@ const DOMAIN_MAP={'AAPL':'apple.com','MSFT':'microsoft.com','GOOGL':'google.com'
 function getLogoUrl(ticker){return DOMAIN_MAP[ticker]?`https://www.google.com/s2/favicons?domain=${DOMAIN_MAP[ticker]}&sz=32`:null;}
 function logoImg(ticker,companyName,size=20){const url=getLogoUrl(ticker);if(url){return `<img src="${url}" style="width:${size}px;height:${size}px;border-radius:4px;object-fit:contain;vertical-align:middle;margin-right:5px;" onerror="this.style.display='none'"/>`;}const colors=['#00c8ff','#6464ff','#00e676','#ff9800','#e040fb','#ff4081'];const col=colors[(ticker||'A').charCodeAt(0)%colors.length];return `<div style="width:${size}px;height:${size}px;border-radius:4px;background:${col};display:inline-flex;align-items:center;justify-content:center;font-size:${Math.floor(size*0.45)}px;font-weight:900;color:#000;vertical-align:middle;margin-right:5px;flex-shrink:0;">${(ticker||'?').charAt(0)}</div>`;}
 
-const API=window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'?'http://localhost:8000':window.location.origin;
+// The server that sends this page also answers the API, so call it at the address the page was opened at. A sign-in cookie
+// belongs to one host name: reaching the API as "localhost" from a page opened at "127.0.0.1" would arrive signed out.
+const API=(location.protocol==='http:'||location.protocol==='https:')?location.origin:'http://localhost:8000';
+// The signed-in person. The server writes their id and email into <head> when it sends this page.
+const ME=(()=>{const g=n=>document.querySelector('meta[name="'+n+'"]')?.content||'';return{id:g('smp-user-id'),email:g('smp-user-email')};})();
 const C=['#4f8ef7','#00d4ff','#00e676','#a55eea','#ffc800','#ff4444','#ff4fa3','#ff6b35','#00c8a0','#b8ff5b','#c084fc','#ff8fab','#38d9f5','#57ff8f','#ffe066','#f97316'];
 let aStocks=[],fStocks=[],pg=1,SZ=50,sortK='market_cap',sortA=false;
 let aIntel=[],fIntel=[],miPg=1,MI_SZ=24;
@@ -1122,11 +1130,30 @@ const mi=(l,v,c='')=>`<div class="mi"><div class="ml">${l}</div><div class="mv $
 
 setInterval(()=>{document.getElementById('ntime').textContent=new Date().toLocaleTimeString('en-US',{hour12:false});},1000);
 
-// When the app is password-protected and the session has ended, any API call answers 401: go to the login page.
-function signedOut(res){if(res&&res.status===401&&!location.pathname.startsWith('/login')){location.href='/login';return true;}return false;}
+// When the session has ended, any API call answers 401: go to the login page.
+function signedOut(res){
+  if(!(res&&res.status===401&&!location.pathname.startsWith('/login')))return false;
+  // The login page sends anyone who is already signed in straight back here. If we were refused again within seconds of
+  // being sent there, the sign-in is not reaching the server, so say so instead of bouncing between the two pages forever.
+  let last=0;try{last=+sessionStorage.getItem('smp_login_redirect')||0;}catch(e){}
+  if(Date.now()-last<10000){showSignInProblem();return true;}
+  try{sessionStorage.setItem('smp_login_redirect',String(Date.now()));}catch(e){}
+  location.href='/login';return true;
+}
+function showSignInProblem(){
+  if(document.getElementById('signin-problem'))return;
+  const d=document.createElement('div');d.id='signin-problem';
+  d.style.cssText='position:fixed;top:0;left:0;right:0;z-index:100000;background:#7a1f1f;color:#fff;padding:12px 16px;font:600 13px/1.4 system-ui,sans-serif;text-align:center';
+  d.innerHTML='Your sign-in is not reaching the server, so data cannot load. Open the app at the address the server prints, or <a href="/logout" style="color:#fff;text-decoration:underline">sign out and sign in again</a>.';
+  document.body.appendChild(d);
+}
 async function api(url){try{const r=await fetch(API+url);if(signedOut(r))return null;if(!r.ok)throw new Error(r.status);return await r.json();}catch(e){console.error('API:',url,e);return null;}}
-// A "Sign out" link, shown only when the server has a password set
-(async()=>{try{const r=await fetch(API+'/api/auth/status');const d=await r.json();if(d.enabled&&d.signed_in){const a=document.createElement('a');a.href='/logout';a.textContent='Sign out';a.style.cssText='font-size:12px;font-weight:700;color:var(--t3);text-decoration:none;margin-left:12px';document.querySelector('.nav-r')?.appendChild(a);}}catch(e){}})();
+// Who is signed in, and a way to sign out
+(()=>{const nav=document.querySelector('.nav-r');if(!nav)return;
+  if(ME.email){const u=document.createElement('span');u.className='nuser';u.textContent=ME.email;u.title='Signed in as '+ME.email;nav.appendChild(u);}
+  const a=document.createElement('a');a.href='/logout';a.className='nsignout';a.textContent='Sign out';if(ME.email)a.title='Signed in as '+ME.email;nav.appendChild(a);})();
+// A session for an account that has since been removed still passes the cookie check: send that person to the login page
+(async()=>{try{const r=await fetch(API+'/api/auth/status');const d=await r.json();if(d&&d.signed_in===false)location.href='/login';}catch(e){}})();
 
 function showPage(n,btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
@@ -3360,7 +3387,7 @@ function selectWlStock(ticker, name, e){
   document.getElementById('wl-add-input').value='';
   if(watchlist.includes(ticker)){ alert(ticker+' is already in your watchlist'); return; }
   watchlist.push(ticker);
-  localStorage.setItem('wl_tickers', JSON.stringify(watchlist));
+  saveWatchlist();
   loadWatchlist();
 }
 
@@ -3706,7 +3733,48 @@ async function loadMacro(){
 }
 
 // ─── WATCHLIST ─────────────────────────────────────────
-let watchlist = JSON.parse(localStorage.getItem('wl_tickers')||'[]');
+const WL_LEGACY_KEY = 'wl_tickers';   // before accounts, the list was kept only in this browser
+let watchlist = [];
+
+function readLegacyWatchlist(){
+  try{
+    const old = JSON.parse(localStorage.getItem(WL_LEGACY_KEY)||'[]');
+    return Array.isArray(old) ? old.filter(t => typeof t === 'string' && t.trim()).map(t => t.trim().toUpperCase()) : [];
+  }catch(e){ return []; }
+}
+
+// Saves are queued so they reach the server in the order they were made, each carrying the whole list.
+let wlSaveQueue = Promise.resolve();
+function saveWatchlist(){
+  const snapshot = [...watchlist];
+  wlSaveQueue = wlSaveQueue.then(async () => {
+    try{
+      const r = await fetch(API+'/api/watchlist', {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tickers:snapshot})});
+      if(signedOut(r)) return;
+      if(!r.ok) throw new Error(r.status);
+    }catch(e){
+      console.error('Watchlist save failed', e);
+      alert('Could not save your watchlist. Please check your connection and try again.');
+    }
+  });
+  return wlSaveQueue;
+}
+
+async function initWatchlist(){
+  try{
+    const r = await fetch(API+'/api/watchlist');
+    if(signedOut(r)) return;
+    if(!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    watchlist = Array.isArray(d.tickers) ? d.tickers : [];
+    // A list saved in this browser before accounts existed moves to the first account that opens the page here,
+    // then the browser copy is deleted so it can never end up on a second person's account.
+    const legacy = readLegacyWatchlist();
+    if(legacy.length && !watchlist.length){ watchlist = legacy; await saveWatchlist(); }
+    try{ localStorage.removeItem(WL_LEGACY_KEY); }catch(e){}
+  }catch(e){ console.error('Watchlist load failed', e); }
+  if(document.getElementById('page-watchlist')?.classList.contains('on')) loadWatchlist();
+}
 
 function addToWatchlistManual(){
   const input = document.getElementById('wl-add-input');
@@ -3714,7 +3782,7 @@ function addToWatchlistManual(){
   if(!ticker){alert('Please type a ticker or company name first');return;}
   if(watchlist.includes(ticker)){alert(ticker+' is already in your watchlist');return;}
   watchlist.push(ticker);
-  localStorage.setItem('wl_tickers',JSON.stringify(watchlist));
+  saveWatchlist();
   input.value='';
   closeWlSuggestions();
   loadWatchlist();
@@ -3726,7 +3794,7 @@ function addToWatchlist(){
 
 function removeFromWatchlist(ticker){
   watchlist = watchlist.filter(t=>t!==ticker);
-  localStorage.setItem('wl_tickers',JSON.stringify(watchlist));
+  saveWatchlist();
   loadWatchlist();
 }
 
@@ -3788,7 +3856,7 @@ function addStockToWatchlist(ticker, e){
     return;
   }
   watchlist.push(ticker);
-  localStorage.setItem('wl_tickers',JSON.stringify(watchlist));
+  saveWatchlist();
   alert(ticker+' added to watchlist ⭐');
 }
 
@@ -4188,6 +4256,15 @@ function loadPortfolioTickers() {
 html{-webkit-text-size-adjust:100%;}
 button,select,.ntab,.fstab,.stab,.fbtn,.pgbtn{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
 .ntab .ico{margin-right:6px;}
+/* The top bar must never wrap. As the window narrows it drops the least useful items first: "Connected", the email,
+   then the clock, and the tabs tighten; below 900px the tabs move to the bottom bar. */
+.ntab,.brand-title,.nuser,.nsignout,.ntime,#nconn{white-space:nowrap;}
+.brand,.nav-r{flex-shrink:0;}
+@media(max-width:1500px){.nav-r #nconn{display:none;}}
+@media(max-width:1400px){.nav-r .nuser{display:none;}}
+@media(max-width:1200px){.nav-r .ntime{display:none;}}
+@media(max-width:1130px){.nav{padding:0 16px;}.ntab{padding:7px 12px;}}
+@media(max-width:1000px){.nav-r .lpill{display:none;}.ntab{padding:7px 8px;}}
 @media(max-width:900px){
   body{min-height:100dvh;}
   .nav{height:auto;min-height:calc(54px + env(safe-area-inset-top));padding:env(safe-area-inset-top) calc(14px + env(safe-area-inset-right)) 0 calc(14px + env(safe-area-inset-left));gap:8px;}
@@ -4196,7 +4273,8 @@ button,select,.ntab,.fstab,.stab,.fbtn,.pgbtn{touch-action:manipulation;-webkit-
   .brand-title{font-size:16px;white-space:nowrap;}
   .brand-sub{font-size:9px;letter-spacing:1.5px;white-space:nowrap;}
   .nav-r{gap:8px;flex-shrink:0;}
-  .nav-r #nconn{display:none;}
+  .nav-r #nconn,.nav-r .nuser{display:none;}
+  .nsignout{padding:10px 2px;}
   .nav-r .ntime{font-size:11px;}
   .lpill{padding:3px 9px;font-size:11px;}
   /* the tabs become a bottom bar, in easy reach of a thumb */
@@ -4304,6 +4382,7 @@ button,select,.ntab,.fstab,.stab,.fbtn,.pgbtn{touch-action:manipulation;-webkit-
   .ntab .lbl[data-short]{font-size:0;}
   .ntab .lbl[data-short]::after{content:attr(data-short);font-size:10px;letter-spacing:-0.1px;}
 }
+@media(max-width:360px){.lpill{display:none;}}   /* the brand, Live and Sign out no longer fit side by side */
 @media(max-width:400px){
   .nav-r .ntime{display:none;}
   .acgrid,.ai-stocks-grid{grid-template-columns:minmax(0,1fr);}   /* two analyst cards side by side no longer fit */
@@ -4405,7 +4484,8 @@ async function loadQuarterly(){
 }
 
 // ─── BOUNTY AI CHATBOT ─────────────────────────────────────
-const BOUNTY_STORE = 'bounty_chat_v1';
+const BOUNTY_LEGACY_KEY = 'bounty_chat_v1';   // before accounts the history was shared by everyone using this browser
+const BOUNTY_STORE = BOUNTY_LEGACY_KEY + ':' + ((typeof ME !== 'undefined' && ME.id) ? ME.id : 'anon');
 const BOUNTY_MAX_SAVED = 40;
 const BOUNTY_TIMEOUT_MS = 90000;
 
@@ -4461,7 +4541,19 @@ function saveBounty(){
   } catch(e) {}
 }
 
+// The history kept before accounts moves to the first account that opens the page in this browser, then the old copy is
+// deleted so it can never show up for a second person.
+function adoptLegacyBounty(){
+  try {
+    const old = localStorage.getItem(BOUNTY_LEGACY_KEY);
+    if(old === null) return;
+    if(localStorage.getItem(BOUNTY_STORE) === null) localStorage.setItem(BOUNTY_STORE, old);
+    localStorage.removeItem(BOUNTY_LEGACY_KEY);
+  } catch(e) {}
+}
+
 function loadBounty(){
+  adoptLegacyBounty();
   try {
     const saved = JSON.parse(localStorage.getItem(BOUNTY_STORE) || '[]');
     return Array.isArray(saved) ? saved.filter(m => m && typeof m.text === 'string' && (m.role === 'user' || m.role === 'ai')) : [];
@@ -4803,6 +4895,12 @@ function clearBounty(){
 
 // Show badge after 4 seconds
 setTimeout(()=>{ if(!bountyOpen) document.getElementById('bounty-badge').style.display='block'; }, 4000);
+
+// Browser-only data from before accounts goes to the first account that opens the page here (see adoptLegacyBounty)
+adoptLegacyBounty();
+
+// Load this account's watchlist from the server
+initWatchlist();
 </script>
 </body>
 </html>

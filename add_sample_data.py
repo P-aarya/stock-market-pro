@@ -1,14 +1,27 @@
+"""
+Fills ONE account with sample holdings and transactions, replacing whatever that account had.
+Other accounts are never touched.
+
+    python add_sample_data.py YOU@EXAMPLE.COM
+"""
+import sys
+
 import mysql.connector
 import db
 
 def get_db():
     return db.get_connection()
 
-def main():
+def main(email):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM portfolio")
-    cursor.execute("DELETE FROM transactions")
+    cursor.execute("SELECT id FROM users WHERE email = %s", (email.strip().lower(),))
+    row = cursor.fetchone()
+    if not row:
+        sys.exit(f"No account found for {email}. Create it first: python manage_users.py create-user {email}")
+    user_id = row[0]
+    cursor.execute("DELETE FROM portfolio WHERE user_id = %s", (user_id,))
+    cursor.execute("DELETE FROM transactions WHERE user_id = %s", (user_id,))
     conn.commit()
 
     holdings = [
@@ -26,8 +39,8 @@ def main():
 
     for h in holdings:
         cursor.execute("""INSERT INTO portfolio 
-            (ticker,company_name,quantity,avg_buy_price,buy_date,sector,notes)
-            VALUES (%s,%s,%s,%s,%s,%s,%s)""", h)
+            (user_id,ticker,company_name,quantity,avg_buy_price,buy_date,sector,notes)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""", (user_id, *h))
     conn.commit()
     print(f"✅ Added {len(holdings)} portfolio holdings")
 
@@ -57,13 +70,15 @@ def main():
     for t in transactions:
         ticker,name,ttype,qty,price,tdate,notes = t
         cursor.execute("""INSERT INTO transactions
-            (ticker,company_name,transaction_type,quantity,price,total_value,transaction_date,notes)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
-            (ticker,name,ttype,qty,price,round(qty*price,2),tdate,notes))
+            (user_id,ticker,company_name,transaction_type,quantity,price,total_value,transaction_date,notes)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+            (user_id,ticker,name,ttype,qty,price,round(qty*price,2),tdate,notes))
     conn.commit()
     print(f"✅ Added {len(transactions)} transactions")
     cursor.close(); conn.close()
     print("\n✅ Done! Refresh dashboard to see Portfolio and Transactions pages.")
 
 if __name__=="__main__":
-    main()
+    if len(sys.argv) != 2:
+        sys.exit("Usage: python add_sample_data.py YOU@EXAMPLE.COM   (the account to fill with sample data)")
+    main(sys.argv[1])

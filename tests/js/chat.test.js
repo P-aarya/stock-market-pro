@@ -138,7 +138,7 @@ const asNormal = (data = NORMAL, status = 200) => (url) => url.endsWith('/stream
     a.registry['bounty-input'].value = 'hi there'; await a.run('sendBounty()');
     const b = makeEnv(() => ok({}), store); b.run('initBountyChat()');
     assert.equal(b.run('bountyMsgs.map(m=>m.text).join("|")'), 'hi there|remember me');
-    b.run('clearBounty()'); assert.equal(b.run('bountyMsgs.length'), 1); assert.equal(JSON.parse(store.bounty_chat_v1).length, 1);
+    b.run('clearBounty()'); assert.equal(b.run('bountyMsgs.length'), 1); assert.equal(JSON.parse(store['bounty_chat_v1:anon']).length, 1);
   });
 
   await t('A timeout or network failure shows a friendly error and unlocks the UI', async () => {

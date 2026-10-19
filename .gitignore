@@ -7,3 +7,4 @@ ngrok-v3-stable-windows-amd64/
 .DS_Store
 venv/
 cloudflared*
+.app_secret
