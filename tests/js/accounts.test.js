@@ -44,8 +44,9 @@ function watchlistEnv({ list = [], legacy, getStatus = 200, putStatus = 200, pag
     const src = between('const ME=', '\nconst C=[');
     const metas = { 'smp-user-id': '12', 'smp-user-email': 'a@b.co' };
     const make = (m) => { const ctx = { document: { querySelector: sel => { const k = sel.match(/name="([^"]+)"/)[1]; return k in m ? { content: m[k] } : null; } } }; vm.createContext(ctx); vm.runInContext(src + ';this.ME=ME', ctx); return ctx.ME; };
-    assert.deepStrictEqual({ ...make(metas) }, { id: '12', email: 'a@b.co' });
-    assert.deepStrictEqual({ ...make({}) }, { id: '', email: '' });
+    assert.deepStrictEqual({ ...make(metas) }, { id: '12', email: 'a@b.co', admin: false });
+    assert.strictEqual(make({ ...metas, 'smp-user-admin': '1' }).admin, true);
+    assert.deepStrictEqual({ ...make({}) }, { id: '', email: '', admin: false });
   });
 
   await t('the top bar shows the email and a Sign out link, and a removed account is sent to the login page', () => {

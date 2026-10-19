@@ -12,7 +12,7 @@ import _path  # noqa: F401
 import agent
 import api
 import auth
-from _accounts import AccountsTestCase, FakeStore, signed_in_client
+from _accounts import AccountsTestCase, FakeStore, add_user, signed_in_client
 
 GOOD = "correct horse battery"
 
@@ -104,6 +104,12 @@ class Limiter(unittest.TestCase):
 
 
 class Registration(AccountsTestCase, unittest.TestCase):
+    """Sign-up with REQUIRE_APPROVAL off, where a new account is let in at once. The approval flow is in test_admin.py."""
+
+    def setUp(self):
+        super().setUp()
+        api.REQUIRE_APPROVAL = False
+
     def client(self):
         return TestClient(api.app, follow_redirects=False)
 
@@ -185,7 +191,7 @@ class Registration(AccountsTestCase, unittest.TestCase):
 class SigningIn(AccountsTestCase, unittest.TestCase):
     def setUp(self):
         super().setUp()
-        auth.register("me@example.com", GOOD)
+        auth.register("me@example.com", GOOD, status="approved")
 
     def client(self):
         return TestClient(api.app, follow_redirects=False)
@@ -228,12 +234,12 @@ class SigningIn(AccountsTestCase, unittest.TestCase):
             self.assertEqual(self.login(c, password="x").status_code, 401)
 
     def test_the_login_page_sends_signed_in_people_to_the_dashboard(self):
-        auth.store.users[1] = {"id": 1, "email": "x@y.co", "password_hash": ""}
+        add_user("x@y.co", user_id=1)
         r = signed_in_client(1, follow_redirects=False).get("/login")
         self.assertEqual((r.status_code, r.headers["location"]), (303, "/"))
 
     def test_a_session_for_a_deleted_account_is_cleared_instead_of_looping(self):
-        c = signed_in_client(99, follow_redirects=False)           # no such user
+        c = signed_in_client(99, create=False, follow_redirects=False)           # no such user
         r = c.get("/login")
         self.assertEqual(r.status_code, 200); self.assertIn("smp_session=", r.headers.get("set-cookie", ""))
         self.assertFalse(c.get("/api/auth/status").json()["signed_in"])
@@ -242,7 +248,7 @@ class SigningIn(AccountsTestCase, unittest.TestCase):
         c = signed_in_client(1, follow_redirects=False)
         auth.store.fail_with = RuntimeError("db down")
         self.assertEqual(c.get("/login").status_code, 303)
-        self.assertEqual(c.get("/api/auth/status").json(), {"enabled": True, "signed_in": True, "user": None})
+        self.assertEqual(c.get("/api/auth/status").json(), {"enabled": True, "signed_in": True, "user": None, "admin": False})
 
     def test_logging_out_clears_the_cookie(self):
         r = self.client().get("/logout")
@@ -258,8 +264,8 @@ class SigningIn(AccountsTestCase, unittest.TestCase):
 class AccessControl(AccountsTestCase, unittest.TestCase):
     def setUp(self):
         super().setUp()
-        auth.store.users[1] = {"id": 1, "email": "one@example.com", "password_hash": ""}
-        auth.store.users[2] = {"id": 2, "email": "two@example.com", "password_hash": ""}
+        add_user("one@example.com", user_id=1)
+        add_user("two@example.com", user_id=2)
 
     def test_strangers_are_sent_to_the_login_page_or_refused(self):
         c = TestClient(api.app, follow_redirects=False)
@@ -273,7 +279,7 @@ class AccessControl(AccountsTestCase, unittest.TestCase):
         c = TestClient(api.app, follow_redirects=False)
         for path in ("/login", "/register", "/health", "/api/auth/status", "/manifest.webmanifest", "/icon-192.png", "/apple-touch-icon.png"):
             self.assertEqual(c.get(path).status_code, 200, path)
-        self.assertEqual(c.get("/api/auth/status").json(), {"enabled": True, "signed_in": False, "user": None})
+        self.assertEqual(c.get("/api/auth/status").json(), {"enabled": True, "signed_in": False, "user": None, "admin": False})
 
     def test_a_forged_or_edited_cookie_is_a_stranger(self):
         c = TestClient(api.app, follow_redirects=False)
@@ -292,13 +298,13 @@ class AccessControl(AccountsTestCase, unittest.TestCase):
         self.assertIn('id="page-ipos"', signed_in_client(1).get("/dashboard.html").text)
 
     def test_an_email_cannot_break_out_of_the_page_head(self):
-        auth.store.users[3] = {"id": 3, "email": '"><script>x@y.co', "password_hash": ""}
+        add_user('"><script>x@y.co', user_id=3)
         text = signed_in_client(3).get("/").text
         self.assertNotIn('"><script>x@y.co', text); self.assertIn("&quot;&gt;&lt;script&gt;x@y.co", text)
 
     def test_the_status_endpoint(self):
-        self.assertEqual(signed_in_client(1).get("/api/auth/status").json(), {"enabled": True, "signed_in": True, "user": {"id": 1, "email": "one@example.com"}})
-        self.assertFalse(signed_in_client(77).get("/api/auth/status").json()["signed_in"])
+        self.assertEqual(signed_in_client(1).get("/api/auth/status").json(), {"enabled": True, "signed_in": True, "user": {"id": 1, "email": "one@example.com"}, "admin": False})
+        self.assertFalse(signed_in_client(77, create=False).get("/api/auth/status").json()["signed_in"])
 
     def test_ai_requests_are_limited_per_person_not_per_network(self):
         saved_limit, saved_client = api.AGENT_RATE_LIMIT, agent.client

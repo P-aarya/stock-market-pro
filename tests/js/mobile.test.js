@@ -5,10 +5,8 @@ const assert = require('assert');
 const { html, between, suite, vm } = require('./harness');
 const { t, done } = suite('Phone layout (dashboard.html)');
 
-/** The CSS inside the last `@media(<query>){ ... }` (the phone rules come after the older ones), found by matching braces. */
-function mediaBlock(query) {
-  const start = html.lastIndexOf(`@media(${query}){`);
-  if (start < 0) throw new Error(`No @media(${query}) block in dashboard.html`);
+/** The CSS of the `@media(...){ ... }` block that starts at `start`, found by matching braces (the block holds other braces). */
+function blockAt(start, query) {
   let depth = 0;
   for (let i = html.indexOf('{', start); i < html.length; i++) {
     if (html[i] === '{') depth++;
@@ -16,7 +14,19 @@ function mediaBlock(query) {
   }
   throw new Error(`Unbalanced braces after @media(${query})`);
 }
-const tablet = mediaBlock('max-width:900px'), phone = mediaBlock('max-width:700px');
+/** The last `@media(<query>){ ... }` (the phone rules come after the older ones). */
+function mediaBlock(query) {
+  const start = html.lastIndexOf(`@media(${query}){`);
+  if (start < 0) throw new Error(`No @media(${query}) block in dashboard.html`);
+  return blockAt(start, query);
+}
+/** True when some `@media(<query>){ ... }` block (there can be several for one width) contains `rule`. */
+function anyMedia(query, rule) {
+  const blocks = []; let from = 0;
+  for (let i; (i = html.indexOf(`@media(${query}){`, from)) >= 0; from = i + 1) blocks.push(blockAt(i, query));
+  return blocks.some(b => rule.test(b));
+}
+const tablet = mediaBlock('max-width:960px'), phone = mediaBlock('max-width:700px');
 
 (async () => {
   await t('the viewport fits the device width, uses the full screen, and never blocks pinch-zoom', () => {
@@ -48,7 +58,10 @@ const tablet = mediaBlock('max-width:900px'), phone = mediaBlock('max-width:700p
   await t('the desktop top bar never wraps: it drops items in steps as the window narrows', () => {
     assert(/\.ntab,\.brand-title,\.nuser,\.nsignout,\.ntime,#nconn\{white-space:nowrap;\}/.test(html));
     const steps = [['1500px', /#nconn\{display:none/], ['1400px', /\.nuser\{display:none/], ['1200px', /\.ntime\{display:none/], ['1130px', /\.ntab\{padding:7px 12px/], ['1000px', /\.lpill\{display:none/]];
-    for (const [width, rule] of steps) assert(rule.test(mediaBlock(`max-width:${width}`)), `@media(max-width:${width})`);
+    for (const [width, rule] of steps) assert(anyMedia(`max-width:${width}`, rule), `@media(max-width:${width})`);
+    // an administrator's bar carries one more link, so it sheds the same items sooner
+    for (const [width, rule] of [['1280px', /\.has-admin \.ntime\{display:none/], ['1200px', /\.has-admin \.na-text\{display:none/], ['1150px', /\.has-admin \.ntab\{padding:7px 12px/], ['1100px', /\.has-admin \.lpill\{display:none/]])
+      assert(anyMedia(`max-width:${width}`, rule), `admin: @media(max-width:${width})`);
   });
 
   await t('on a phone the tabs sit in a fixed bottom bar that respects the home indicator', () => {

@@ -32,10 +32,12 @@ app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_methods=["*
 # ── Accounts ──
 # Every page and endpoint needs a signed-in user (see auth.py). The session cookie carries the user's id; the middleware
 # below puts it on request.state.user_id, and the endpoints that read or change personal data take it from there.
+#   REQUIRE_APPROVAL=false  lets new accounts in at once (the default is that an administrator approves each one)
 #   ALLOW_SIGNUP=false  closes registration (accounts can still be made with manage_users.py)
 #   SIGNUP_CODE=...     keeps registration open only for people who know the code
 #   APP_SECRET=...      the key sessions are signed with (otherwise a random one is kept in .app_secret)
 ALLOW_SIGNUP = os.getenv("ALLOW_SIGNUP", "true").strip().lower() not in ("false", "0", "no")
+REQUIRE_APPROVAL = os.getenv("REQUIRE_APPROVAL", "true").strip().lower() not in ("false", "0", "no")
 SIGNUP_CODE = os.getenv("SIGNUP_CODE", "")
 SESSION_COOKIE = "smp_session"
 _login_by_client = auth.RateLimiter(5, 300)     # wrong passwords per client in 5 minutes ...
@@ -54,10 +56,38 @@ _APP_ASSETS = {
 _OPEN_PATHS = {"/login", "/register", "/logout", "/health", "/api/auth/status", "/favicon.ico"} | set(_APP_ASSETS)
 
 
+_SETUP_HINT = "The accounts tables need a database update. Run: python manage_users.py migrate"
+
+
+async def _approved_user(request: Request):
+    """The account behind the session cookie if it still exists and is approved, else None. Uses the short-lived cache."""
+    user_id = auth.read_token(request.cookies.get(SESSION_COOKIE, ""))
+    if user_id is None:
+        return None
+    user = await run_in_threadpool(auth.access_for, user_id)
+    return user if user and user["status"] == "approved" else None
+
+
+def _unavailable(request: Request, status: int, message: str):
+    if request.url.path.startswith(("/api/", "/agent/")):
+        return JSONResponse({"status": "error", "message": message}, status_code=status)
+    return HTMLResponse(auth_pages.notice_page("Temporarily unavailable", message), status_code=status)
+
+
 @app.middleware("http")
 async def require_login(request: Request, call_next):
-    request.state.user_id = auth.read_token(request.cookies.get(SESSION_COOKIE, ""))
-    if request.method == "OPTIONS" or request.url.path in _OPEN_PATHS or request.state.user_id is not None:
+    request.state.user_id, request.state.is_admin = None, False
+    if request.method == "OPTIONS" or request.url.path in _OPEN_PATHS:
+        return await call_next(request)
+    try:
+        user = await _approved_user(request)
+    except auth.AccountsNotSetUp:
+        return _unavailable(request, 503, _SETUP_HINT)
+    except Exception:
+        log.exception("Could not check access")
+        return _unavailable(request, 503, "We couldn't check your access just now. Please try again in a moment.")
+    if user:
+        request.state.user_id, request.state.is_admin = user["id"], bool(user["is_admin"])
         return await call_next(request)
     if request.url.path.startswith(("/api/", "/agent/")):
         return JSONResponse({"status": "error", "message": "Please sign in."}, status_code=401)
@@ -70,6 +100,23 @@ def current_user_id(request: Request) -> int:
     if user_id is None:
         raise HTTPException(status_code=401, detail="Please sign in.")
     return user_id
+
+
+def require_admin(request: Request) -> int:
+    """The signed-in administrator's id. Checked against the database each time, so a block or demotion applies at once."""
+    user_id = current_user_id(request)
+    user = auth.get_user(user_id)
+    if not user or user["status"] != "approved" or not user["is_admin"]:
+        raise HTTPException(status_code=403, detail="Administrator access required.")
+    return user_id
+
+
+def require_admin_action(request: Request, admin_id: int = Depends(require_admin)) -> int:
+    """Changes made by an administrator must come from the admin page's own script, which sends this header. A page on
+    another site can't add it without the browser asking this server's permission first."""
+    if request.headers.get("x-requested-with") != "fetch":
+        raise HTTPException(status_code=403, detail="This action must be made from the admin page.")
+    return admin_id
 
 
 def _is_https(request: Request) -> bool:
@@ -94,13 +141,14 @@ def login_page(request: Request):
     user_id = auth.read_token(cookie)
     if user_id is not None:
         try:
-            if auth.get_user(user_id):
+            user = auth.access_for(user_id)
+            if user and user["status"] == "approved":
                 return RedirectResponse("/", status_code=303)
         except Exception:
             return RedirectResponse("/", status_code=303)      # the database hiccuped: don't sign anyone out for that
     response = HTMLResponse(auth_pages.login_page(signup_open=ALLOW_SIGNUP))
     if cookie:
-        response.delete_cookie(SESSION_COOKIE)                # expired, forged, or for an account that no longer exists
+        response.delete_cookie(SESSION_COOKIE)                # expired, forged, blocked, or for an account that no longer exists
     return response
 
 
@@ -118,6 +166,10 @@ async def login(request: Request):
     if user:
         _login_by_client.clear(client)
         _login_by_email.clear(email)
+        if user["status"] == "pending":
+            return HTMLResponse(auth_pages.pending_page(user["email"]), status_code=403)
+        if user["status"] != "approved":
+            return HTMLResponse(auth_pages.blocked_page(), status_code=403)
         return _start_session(request, user["id"])
     _login_by_client.record(client)
     _login_by_email.record(email)
@@ -150,11 +202,13 @@ async def register(request: Request):
     if password != form.get("confirm", ""):
         return again("The two passwords don't match.", 400)
     try:
-        user = await run_in_threadpool(auth.register, email, password)
+        user = await run_in_threadpool(auth.register, email, password, "pending" if REQUIRE_APPROVAL else "approved")
     except auth.AuthError as e:
         return again(e.message, e.status)
     except auth.AccountsNotSetUp:
         return HTMLResponse(auth_pages.notice_page("Accounts aren't set up yet", "The site owner needs to run: python manage_users.py migrate"), status_code=503)
+    if user["status"] == "pending":
+        return HTMLResponse(auth_pages.pending_page(user["email"]), status_code=200)      # no session until an administrator approves
     return _start_session(request, user["id"])
 
 
@@ -169,12 +223,14 @@ def logout():
 def auth_status(request: Request):
     user_id = auth.read_token(request.cookies.get(SESSION_COOKIE, ""))
     if user_id is None:
-        return {"enabled": True, "signed_in": False, "user": None}
+        return {"enabled": True, "signed_in": False, "user": None, "admin": False}
     try:
-        user = auth.get_user(user_id)
+        user = auth.access_for(user_id)
     except Exception:
-        return {"enabled": True, "signed_in": True, "user": None}   # a database hiccup shouldn't sign anyone out
-    return {"enabled": True, "signed_in": user is not None, "user": user}
+        return {"enabled": True, "signed_in": True, "user": None, "admin": False}   # a database hiccup shouldn't sign anyone out
+    if not user or user["status"] != "approved":
+        return {"enabled": True, "signed_in": False, "user": None, "admin": False}
+    return {"enabled": True, "signed_in": True, "user": {"id": user["id"], "email": user["email"]}, "admin": bool(user["is_admin"])}
 
 
 # ── Serve dashboard.html directly from port 8000 ──
@@ -192,7 +248,8 @@ def _dashboard_response(request: Request):
         except Exception:
             user = None
         meta = (f'<meta name="smp-user-id" content="{int(user_id)}">'
-                f'<meta name="smp-user-email" content="{_escape_html((user or {}).get("email", ""), quote=True)}">')
+                f'<meta name="smp-user-email" content="{_escape_html((user or {}).get("email", ""), quote=True)}">'
+                f'<meta name="smp-user-admin" content="{1 if getattr(request.state, "is_admin", False) else 0}">')
     # The page is different for every person, so it must never be stored by a browser cache or a shared proxy.
     return HTMLResponse(page.replace("<!--SMP_USER-->", meta, 1), headers={"Cache-Control": "private, no-store"})
 
@@ -1512,6 +1569,50 @@ def portfolio_performance(user_id: int = Depends(current_user_id)):
     except Exception:
         log.exception("Portfolio performance failed")
         return agent_error(500, "Something went wrong working out performance.")
+
+
+# ── Administration: who is allowed in ──
+@app.get("/admin")
+def admin_page(request: Request):
+    user = auth.get_user(request.state.user_id)
+    if not user or user["status"] != "approved" or not user["is_admin"]:
+        return HTMLResponse(auth_pages.notice_page("Administrators only", "You don't have access to this page.", "/", "Back to the dashboard"), status_code=403)
+    with open(os.path.join(_BASE_DIR, "admin.html"), encoding="utf-8") as f:
+        return HTMLResponse(f.read(), headers={"Cache-Control": "private, no-store"})
+
+
+class StatusBody(BaseModel):
+    status: Literal["approved", "blocked"]
+
+
+@app.get("/api/admin/users")
+def admin_list_users(admin_id: int = Depends(require_admin)):
+    try:
+        return {"status": "success", "you": admin_id, **auth.list_users()}
+    except Exception:
+        log.exception("Listing users failed")
+        return agent_error(500, "Something went wrong loading the accounts.")
+
+
+@app.get("/api/admin/summary")
+def admin_summary(admin_id: int = Depends(require_admin)):
+    try:
+        return {"status": "success", "pending": auth.pending_count()}
+    except Exception:
+        log.exception("Counting pending accounts failed")
+        return agent_error(500, "Something went wrong counting the pending accounts.")
+
+
+@app.post("/api/admin/users/{user_id}/status")
+def admin_set_status(user_id: int, body: StatusBody, admin_id: int = Depends(require_admin_action)):
+    """Approve or block an account. The change applies to that person's very next request on this server."""
+    try:
+        return {"status": "success", "user": auth.set_user_status(admin_id, user_id, body.status)}
+    except auth.AuthError as e:
+        return agent_error(e.status, e.message)
+    except Exception:
+        log.exception("Changing an account's status failed")
+        return agent_error(500, "Something went wrong saving that change.")
 
 
 class WatchlistBody(BaseModel):

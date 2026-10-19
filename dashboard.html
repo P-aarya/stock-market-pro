@@ -42,6 +42,9 @@ body{background:var(--bg0);color:var(--t1);font-family:var(--sans);min-height:10
 .nuser{font-size:12px;font-weight:600;color:var(--t2);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .nsignout{font-size:12px;font-weight:700;color:var(--t3);text-decoration:none;padding:6px 2px;}
 .nsignout:hover{color:var(--t1);}
+.nadmin{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:var(--cyan);text-decoration:none;white-space:nowrap;padding:5px 10px;border:1px solid rgba(0,212,255,0.3);border-radius:7px;}
+.nadmin:hover{background:rgba(0,212,255,0.1);}
+.nbadge{background:var(--yellow);color:#000;font-size:10px;font-weight:900;border-radius:9px;padding:1px 6px;min-width:18px;text-align:center;}
 .lpill{display:flex;align-items:center;gap:5px;background:rgba(0,230,118,0.08);border:1px solid rgba(0,230,118,0.2);border-radius:20px;padding:4px 12px;font-size:12px;font-weight:700;color:var(--green);}
 .ldot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:ldot 2s infinite;}
 @keyframes ldot{0%,100%{opacity:1;}50%{opacity:0.3;}}
@@ -1084,7 +1087,7 @@ function logoImg(ticker,companyName,size=20){const url=getLogoUrl(ticker);if(url
 // belongs to one host name: reaching the API as "localhost" from a page opened at "127.0.0.1" would arrive signed out.
 const API=(location.protocol==='http:'||location.protocol==='https:')?location.origin:'http://localhost:8000';
 // The signed-in person. The server writes their id and email into <head> when it sends this page.
-const ME=(()=>{const g=n=>document.querySelector('meta[name="'+n+'"]')?.content||'';return{id:g('smp-user-id'),email:g('smp-user-email')};})();
+const ME=(()=>{const g=n=>document.querySelector('meta[name="'+n+'"]')?.content||'';return{id:g('smp-user-id'),email:g('smp-user-email'),admin:g('smp-user-admin')==='1'};})();
 const C=['#4f8ef7','#00d4ff','#00e676','#a55eea','#ffc800','#ff4444','#ff4fa3','#ff6b35','#00c8a0','#b8ff5b','#c084fc','#ff8fab','#38d9f5','#57ff8f','#ffe066','#f97316'];
 let aStocks=[],fStocks=[],pg=1,SZ=50,sortK='market_cap',sortA=false;
 let aIntel=[],fIntel=[],miPg=1,MI_SZ=24;
@@ -1148,9 +1151,22 @@ function showSignInProblem(){
   document.body.appendChild(d);
 }
 async function api(url){try{const r=await fetch(API+url);if(signedOut(r))return null;if(!r.ok)throw new Error(r.status);return await r.json();}catch(e){console.error('API:',url,e);return null;}}
+// Administrators get a link to the user-access page, with the number of people waiting for approval
+function addAdminLink(nav){
+  const a=document.createElement('a');a.href='/admin';a.className='nadmin';a.title='User access';
+  a.innerHTML='<span class="na-icon">⚙</span><span class="na-text">Admin</span>';nav.appendChild(a);
+  nav.closest('.nav')?.classList.add('has-admin');
+  const refresh=async()=>{try{
+    const r=await fetch(API+'/api/admin/summary');if(!r.ok)return;const d=await r.json();
+    a.querySelector('.nbadge')?.remove();
+    if(d&&d.pending>0){const b=document.createElement('span');b.className='nbadge';b.textContent=d.pending>99?'99+':String(d.pending);a.title=d.pending+' waiting for approval';a.appendChild(b);}else a.title='User access';
+  }catch(e){}};
+  refresh();setInterval(()=>{if(!document.hidden)refresh();},60000);
+}
 // Who is signed in, and a way to sign out
 (()=>{const nav=document.querySelector('.nav-r');if(!nav)return;
   if(ME.email){const u=document.createElement('span');u.className='nuser';u.textContent=ME.email;u.title='Signed in as '+ME.email;nav.appendChild(u);}
+  if(ME.admin)addAdminLink(nav);
   const a=document.createElement('a');a.href='/logout';a.className='nsignout';a.textContent='Sign out';if(ME.email)a.title='Signed in as '+ME.email;nav.appendChild(a);})();
 // A session for an account that has since been removed still passes the cookie check: send that person to the login page
 (async()=>{try{const r=await fetch(API+'/api/auth/status');const d=await r.json();if(d&&d.signed_in===false)location.href='/login';}catch(e){}})();
@@ -4250,14 +4266,14 @@ function loadPortfolioTickers() {
 .ipo-mini .ipo-mm{color:var(--t3);font-weight:600;white-space:nowrap;}
 .linkbtn{background:none;border:none;color:var(--cyan);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);padding:0;}
 /* ── Phone and tablet layout ──
-   The page is built for a wide screen. Below 900px the six tabs move to a bottom bar and the top bar keeps only the
+   The page is built for a wide screen. Below 960px the six tabs move to a bottom bar and the top bar keeps only the
    brand and status; below 700px everything becomes a single-column app: grids collapse, form fields use 16px text
    (iOS zooms into anything smaller), the stock view's tabs scroll sideways and Bounty opens as a full-screen sheet. */
 html{-webkit-text-size-adjust:100%;}
 button,select,.ntab,.fstab,.stab,.fbtn,.pgbtn{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
 .ntab .ico{margin-right:6px;}
 /* The top bar must never wrap. As the window narrows it drops the least useful items first: "Connected", the email,
-   then the clock, and the tabs tighten; below 900px the tabs move to the bottom bar. */
+   then the clock, and the tabs tighten; below 960px the tabs move to the bottom bar. */
 .ntab,.brand-title,.nuser,.nsignout,.ntime,#nconn{white-space:nowrap;}
 .brand,.nav-r{flex-shrink:0;}
 @media(max-width:1500px){.nav-r #nconn{display:none;}}
@@ -4265,7 +4281,14 @@ button,select,.ntab,.fstab,.stab,.fbtn,.pgbtn{touch-action:manipulation;-webkit-
 @media(max-width:1200px){.nav-r .ntime{display:none;}}
 @media(max-width:1130px){.nav{padding:0 16px;}.ntab{padding:7px 12px;}}
 @media(max-width:1000px){.nav-r .lpill{display:none;}.ntab{padding:7px 8px;}}
-@media(max-width:900px){
+/* An administrator's bar also holds the Admin link, so it sheds items sooner: the clock, then the word "Admin", then Live. */
+.na-icon{font-size:13px;line-height:1;}
+@media(max-width:1280px){.nav.has-admin .ntime{display:none;}}
+@media(max-width:1200px){.nav.has-admin .na-text{display:none;}}
+@media(max-width:1150px){.nav.has-admin{padding:0 16px;}.nav.has-admin .ntab{padding:7px 12px;}}
+@media(max-width:1100px){.nav.has-admin .lpill{display:none;}}
+@media(max-width:1000px){.nav.has-admin .ntab{padding:7px 8px;}}
+@media(max-width:960px){
   body{min-height:100dvh;}
   .nav{height:auto;min-height:calc(54px + env(safe-area-inset-top));padding:env(safe-area-inset-top) calc(14px + env(safe-area-inset-right)) 0 calc(14px + env(safe-area-inset-left));gap:8px;}
   .brand{gap:9px;min-width:0;}
@@ -4382,7 +4405,7 @@ button,select,.ntab,.fstab,.stab,.fbtn,.pgbtn{touch-action:manipulation;-webkit-
   .ntab .lbl[data-short]{font-size:0;}
   .ntab .lbl[data-short]::after{content:attr(data-short);font-size:10px;letter-spacing:-0.1px;}
 }
-@media(max-width:360px){.lpill{display:none;}}   /* the brand, Live and Sign out no longer fit side by side */
+@media(max-width:360px){.lpill,.na-text{display:none;}}   /* the brand, Live and Sign out no longer fit side by side */
 @media(max-width:400px){
   .nav-r .ntime{display:none;}
   .acgrid,.ai-stocks-grid{grid-template-columns:minmax(0,1fr);}   /* two analyst cards side by side no longer fit */

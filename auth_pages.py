@@ -81,6 +81,15 @@ def register_page(error: str = "", email: str = "", needs_code: bool = False, cl
 <p class="alt">Already have an account? <a href="/login">Sign in</a></p>{_SHOW_SCRIPT}""")
 
 
-def notice_page(title: str, message: str) -> str:
-    """A plain page for a problem that isn't the person's fault, such as the accounts tables not being set up yet."""
-    return _page(title, f'<h1>{html.escape(title)}</h1><p class="sub">{html.escape(message)}</p><p class="alt"><a href="/login">Back to sign in</a></p>')
+def notice_page(title: str, message: str, link: str = "/login", link_text: str = "Back to sign in") -> str:
+    """A plain page for something that isn't a form mistake: waiting for approval, no access, accounts not set up yet."""
+    return _page(title, f'<h1>{html.escape(title)}</h1><p class="sub">{html.escape(message)}</p><p class="alt"><a href="{html.escape(link, quote=True)}">{html.escape(link_text)}</a></p>')
+
+
+def pending_page(email: str = "") -> str:
+    who = f" for {email}" if email else ""
+    return notice_page("Waiting for approval", f"Your account{who} has been created. An administrator needs to approve it before you can sign in. Please check back later.")
+
+
+def blocked_page() -> str:
+    return notice_page("No access", "This account doesn't have access to Stock Market Pro. If you think that's a mistake, please contact the administrator.")

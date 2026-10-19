@@ -15,13 +15,18 @@ from _fakedb import FakeConn
 GOOD = "correct horse battery"
 
 
-def has_column(table_flags):
-    """Responder for the information_schema check: {'portfolio': True, ...} says which tables already have user_id."""
+def has_column(done):
+    """Responder for the information_schema check. `done` says which columns already exist: a table name (all its
+    columns), or a (table, column) pair."""
     def respond(sql, params):
         if "information_schema.columns" in sql:
-            return [{"n": 1 if table_flags.get(params[0]) else 0}]
+            table, column = params
+            return [{"n": 1 if done.get(table) or done.get((table, column)) else 0}]
         return []
     return respond
+
+
+ALL_DONE = {"portfolio": True, "transactions": True, "users": True}
 
 
 class Migrate(unittest.TestCase):
@@ -31,39 +36,54 @@ class Migrate(unittest.TestCase):
         self.assertEqual(len(conn.statements("CREATE TABLE IF NOT EXISTS users")), 1)
         self.assertEqual(len(conn.statements("CREATE TABLE IF NOT EXISTS watchlist")), 1)
         alters = [sql for sql, _ in conn.statements("ALTER TABLE")]
-        self.assertEqual(len(alters), 2)
         self.assertTrue(any(a.startswith("ALTER TABLE portfolio ADD COLUMN user_id INT NULL") for a in alters))
         self.assertTrue(any(a.startswith("ALTER TABLE transactions ADD COLUMN user_id INT NULL") for a in alters))
+        for column in ("status", "is_admin", "reviewed_at", "reviewed_by"):
+            self.assertTrue(any(a.startswith(f"ALTER TABLE users ADD COLUMN {column} ") for a in alters), column)
         self.assertEqual(conn.commits, 1)
         self.assertIn("portfolio: added user_id column", done); self.assertIn("transactions: added user_id column", done)
+        self.assertTrue(any("users: added status, is_admin" in line and "existing accounts are approved" in line for line in done))
+
+    def test_existing_accounts_are_approved_and_new_sign_ups_default_to_pending(self):
+        conn = FakeConn(has_column({"portfolio": True, "transactions": True}))
+        mu.migrate(conn)
+        alters = [sql for sql, _ in conn.statements("ALTER TABLE users")]
+        add_status = next(a for a in alters if "ADD COLUMN status" in a)
+        self.assertIn("DEFAULT 'approved'", add_status)                      # the rows that exist now keep their access
+        self.assertLess(alters.index(add_status), alters.index("ALTER TABLE users ALTER COLUMN status SET DEFAULT 'pending'"))
+        self.assertIn("status VARCHAR(10) NOT NULL DEFAULT 'pending'", mu.USERS_DDL)   # a brand-new table starts the right way round
 
     def test_running_it_again_changes_nothing(self):
-        conn = FakeConn(has_column({"portfolio": True, "transactions": True}))
+        conn = FakeConn(has_column(ALL_DONE))
         done = mu.migrate(conn)
         self.assertEqual(conn.statements("ALTER TABLE"), [])
         self.assertTrue(all("already there" in line for line in done[2:]))
 
     def test_a_half_finished_earlier_run_is_completed(self):
-        conn = FakeConn(has_column({"portfolio": True}))
+        conn = FakeConn(has_column({"portfolio": True, ("users", "status"): True, ("users", "is_admin"): True}))
         mu.migrate(conn)
         alters = [sql for sql, _ in conn.statements("ALTER TABLE")]
-        self.assertEqual(len(alters), 1); self.assertTrue(alters[0].startswith("ALTER TABLE transactions"))
+        self.assertEqual(sorted(a.split(" ADD COLUMN ")[0] + " " + a.split(" ADD COLUMN ")[1].split()[0] for a in alters),
+                         ["ALTER TABLE transactions user_id", "ALTER TABLE users reviewed_at", "ALTER TABLE users reviewed_by"])
 
     def test_it_only_ever_adds_never_removes_or_rewrites_data(self):
         conn = FakeConn(has_column({}))
         mu.migrate(conn)
         for sql, _ in conn.log:
-            self.assertRegex(sql, r"^(CREATE TABLE IF NOT EXISTS|SELECT|ALTER TABLE \w+ ADD COLUMN)", sql)
+            self.assertRegex(sql, r"^(CREATE TABLE IF NOT EXISTS|SELECT|ALTER TABLE \w+ ADD COLUMN|ALTER TABLE users ALTER COLUMN status SET DEFAULT)", sql)
             self.assertNotRegex(sql, r"\b(DROP|DELETE|TRUNCATE|UPDATE|RENAME|MODIFY|CHANGE)\b")
 
     def test_the_schema_matches_what_the_app_queries(self):
         users, watch = mu.USERS_DDL, mu.WATCHLIST_DDL
-        for column in ("id INT NOT NULL AUTO_INCREMENT", "email VARCHAR(254) NOT NULL", "password_hash VARCHAR(255) NOT NULL", "last_login_at", "UNIQUE KEY uq_users_email (email)"):
+        for column in ("id INT NOT NULL AUTO_INCREMENT", "email VARCHAR(254) NOT NULL", "password_hash VARCHAR(255) NOT NULL", "last_login_at", "is_admin TINYINT(1)",
+                       "reviewed_at", "reviewed_by", "UNIQUE KEY uq_users_email (email)"):
             self.assertIn(column, users)
         for column in ("user_id INT NOT NULL", "ticker VARCHAR(20) NOT NULL", "sort_order INT", "PRIMARY KEY (user_id, ticker)"):
             self.assertIn(column, watch)
-        self.assertEqual(auth.MAX_EMAIL, 254)                  # the column is as wide as the longest allowed email
+        self.assertEqual(auth.MAX_EMAIL, 254)                             # the column is as wide as the longest allowed email
         self.assertLessEqual(len(auth.hash_password(GOOD)), 255)          # and a hash fits its column
+        for status in auth.STATUSES:
+            self.assertLessEqual(len(status), 10)                         # every status fits the column
 
 
 class ClaimLegacy(unittest.TestCase):
@@ -110,7 +130,7 @@ class CommandLine(unittest.TestCase):
 
     def test_migrate_reports_what_it_did(self):
         out, conn = self.run_cli("migrate", conn=FakeConn(has_column({})))
-        self.assertIn("users table ready", out); self.assertIn("portfolio: added user_id column", out); self.assertIn("claim-legacy", out)
+        self.assertIn("users table ready", out); self.assertIn("portfolio: added user_id column", out); self.assertIn("make-admin", out)
         self.assertTrue(conn.closed)
 
     def test_create_user_stores_only_a_hash(self):
@@ -146,9 +166,53 @@ class CommandLine(unittest.TestCase):
         self.assertTrue(auth.verify_password(GOOD, params[0])); self.assertEqual(params[1], 5)
 
     def test_list_users(self):
-        rows = [{"a": 1, "b": "a@x.co", "c": datetime(2026, 1, 2), "d": datetime(2026, 2, 3)}, {"a": 2, "b": "b@x.co", "c": datetime(2026, 1, 5), "d": None}]
-        out, _ = self.run_cli("list-users", conn=FakeConn(lambda sql, p: rows if "FROM users ORDER" in sql else []))
-        self.assertIn("a@x.co", out); self.assertIn("last sign-in 2026-02-03", out); self.assertIn("never signed in", out)
+        rows = [{"a": 1, "b": "a@x.co", "s": "approved", "m": 1, "c": datetime(2026, 1, 2), "d": datetime(2026, 2, 3)},
+                {"a": 2, "b": "b@x.co", "s": "pending", "m": 0, "c": datetime(2026, 1, 5), "d": None}]
+        out, _ = self.run_cli("list-users", conn=FakeConn(lambda sql, p: rows if "FROM users" in sql else []))
+        self.assertIn("a@x.co", out); self.assertIn("admin", out); self.assertIn("last sign-in 2026-02-03", out)
+        self.assertIn("pending", out); self.assertIn("never signed in", out)
+
+    def test_list_users_can_show_only_those_waiting(self):
+        _, conn = self.run_cli("list-users", "--pending", conn=FakeConn(lambda sql, p: []))
+        self.assertIn("WHERE status = 'pending'", conn.log[0][0])
+
+    def test_approve_and_block_change_one_account(self):
+        for cmd, status in (("approve", "approved"), ("block", "blocked")):
+            conn = FakeConn(lambda sql, p: [{"id": 5}] if "SELECT id FROM users" in sql else [{"is_admin": 0}] if "SELECT is_admin" in sql else [])
+            out, conn = self.run_cli(cmd, "me@example.com", conn=conn)
+            (sql, params), = conn.statements("UPDATE users SET status")
+            self.assertEqual(params, (status, 5)); self.assertIn(status, out)
+
+    def test_an_administrator_cannot_be_blocked_from_the_command_line_either(self):
+        conn = FakeConn(lambda sql, p: [{"id": 5}] if "SELECT id FROM users" in sql else [{"is_admin": 1}] if "SELECT is_admin" in sql else [])
+        with mock.patch.object(mu, "_connect", return_value=conn), self.assertRaises(SystemExit) as cm:
+            mu.main(["block", "me@example.com"])
+        self.assertIn("remove-admin", str(cm.exception)); self.assertEqual(conn.statements("UPDATE"), [])
+
+    def test_make_admin_needs_an_approved_account_and_remove_admin_keeps_one_administrator(self):
+        def respond(admins=1, status="approved"):
+            return lambda sql, p: ([{"id": 5}] if "SELECT id FROM users" in sql else [{"status": status}] if "SELECT status" in sql
+                                   else [{"n": admins}] if "COUNT(*)" in sql else [])
+        out, conn = self.run_cli("make-admin", "me@example.com", conn=FakeConn(respond()))
+        self.assertEqual(conn.statements("UPDATE users SET is_admin")[0][1], (1, 5)); self.assertIn("now an administrator", out)
+        for status in ("pending", "blocked"):
+            conn = FakeConn(respond(status=status))
+            with mock.patch.object(mu, "_connect", return_value=conn), self.assertRaises(SystemExit) as cm:
+                mu.main(["make-admin", "me@example.com"])
+            self.assertIn("approved account", str(cm.exception)); self.assertEqual(conn.statements("UPDATE"), [])
+        out, conn = self.run_cli("remove-admin", "me@example.com", conn=FakeConn(respond(admins=1)))      # another admin exists
+        self.assertEqual(conn.statements("UPDATE users SET is_admin")[0][1], (0, 5))
+        conn = FakeConn(respond(admins=0))                                                              # the only one
+        with mock.patch.object(mu, "_connect", return_value=conn), self.assertRaises(SystemExit) as cm:
+            mu.main(["remove-admin", "me@example.com"])
+        self.assertIn("only administrator", str(cm.exception)); self.assertEqual(conn.statements("UPDATE"), [])
+
+    def test_create_user_can_make_an_administrator(self):
+        out, _ = self.run_cli("create-user", "boss@example.com", "--admin", passwords=[GOOD, GOOD])
+        row = auth.store.users[1]
+        self.assertEqual((row["status"], row["is_admin"]), ("approved", True)); self.assertIn("administrator", out)
+        self.run_cli("create-user", "plain@example.com", passwords=[GOOD, GOOD])
+        self.assertEqual((auth.store.users[2]["status"], auth.store.users[2]["is_admin"]), ("approved", False))
 
 
 if __name__ == "__main__":
