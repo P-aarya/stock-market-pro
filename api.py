@@ -151,7 +151,7 @@ def get_db():
         "host": os.getenv("DB_HOST", "localhost"),
         "port": int(os.getenv("DB_PORT", 3306)),
         "user": os.getenv("DB_USER", "root"),
-        "password": os.getenv("DB_PASSWORD", ""),
+        "password": os.getenv("DB_PASSWORD") or os.getenv("DB_PASS", ""),
         "database": os.getenv("DB_NAME", "stock_market_pro_db")
     }
     if os.getenv("DB_SSL", "false").lower() == "true":
@@ -1778,6 +1778,8 @@ FRED_SERIES = {"nfp": "PAYEMS", "unemp": "UNRATE", "adp": "ADPMNUSNERSA", "cpi":
 
 _FRED_CACHE = {}
 _FRED_TTL = 6 * 3600
+_FRED_FAIL = {}          # series_id -> time of last failed download
+_FRED_RETRY = 30 * 60   # wait 30 min before trying an unreachable FRED series again
 _ECO_CACHE = {}
 _ECO_TTL = 3 * 3600
 
@@ -1787,6 +1789,9 @@ def _fred_series(series_id):
     hit = _FRED_CACHE.get(series_id)
     if hit and time.time() - hit[0] < _FRED_TTL:
         return hit[1]
+    fail = _FRED_FAIL.get(series_id)
+    if fail and time.time() - fail < _FRED_RETRY:
+        return hit[1] if hit else {}   # FRED was unreachable a moment ago - don't wait on it again yet
     url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
     try:
         req = _ed_req.Request(url, headers={"User-Agent": "Mozilla/5.0 (StockMarketPro)"})
@@ -1805,6 +1810,7 @@ def _fred_series(series_id):
         return data
     except Exception as e:
         print(f"[eco] FRED {series_id}: could not load ({type(e).__name__})")
+        _FRED_FAIL[series_id] = time.time()
         return hit[1] if hit else {}
 
 
@@ -3034,46 +3040,10 @@ if __name__ == "__main__":
 
 
 # -- 4. PORTFOLIO ----------------------------------------------
-def get_db():
-    return mysql.connector.connect(
-        host=os.getenv("DB_HOST","localhost"),
-        user=os.getenv("DB_USER","root"),
-        password=os.getenv("DB_PASS",""),
-        database=os.getenv("DB_NAME","stock_market_pro_db")
-    )
-
-def ensure_portfolio_tables():
-    try:
-        db = get_db(); cur = db.cursor()
-        cur.execute("""CREATE TABLE IF NOT EXISTS portfolio (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            ticker VARCHAR(20) NOT NULL,
-            shares FLOAT NOT NULL,
-            avg_cost FLOAT NOT NULL,
-            added_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )""")
-        cur.execute("""CREATE TABLE IF NOT EXISTS transactions (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            ticker VARCHAR(20) NOT NULL,
-            type ENUM('buy','sell') NOT NULL,
-            shares FLOAT NOT NULL,
-            price FLOAT NOT NULL,
-            total FLOAT NOT NULL,
-            notes TEXT,
-            tx_date DATETIME DEFAULT CURRENT_TIMESTAMP
-        )""")
-        cur.execute("""CREATE TABLE IF NOT EXISTS price_alerts (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            ticker VARCHAR(20) NOT NULL,
-            target_price FLOAT NOT NULL,
-            condition_type ENUM('above','below') NOT NULL DEFAULT 'above',
-            triggered TINYINT(1) DEFAULT 0,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )""")
-        db.commit(); cur.close(); db.close()
-    except: pass
-
-ensure_portfolio_tables()
+# (An old get_db() and ensure_portfolio_tables() used to live here. On Render the app is
+#  imported, so code below "if __name__" DOES run there - that old get_db() replaced the
+#  real one with a version that ignored DB_PORT/DB_SSL, and every stock query timed out.
+#  Removed. Tables are created by the PORTFOLIO and PRICE ALERTS blocks above.)
 
 # (portfolio endpoints moved above "if __name__" - see PORTFOLIO & TRANSACTIONS block)
 
