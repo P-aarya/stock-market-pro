@@ -1,9 +1,20 @@
-.env
+﻿.env
 __pycache__/
 *.pyc
 *.pyo
 ngrok-v3-stable-windows-amd64/
 *.log
-.DS_Store
-venv/
-cloudflared*
+
+.env
+removed_stocks_backup.csv
+removed_duplicates_backup.csv
+dead_tickers.csv
+sync_cache.json
+tickers_before_*.py
+agent_backup.py
+cloudflared.exe
+cloudflared.exe.exe
+*.exe
+stock backup/
+backup/
+__pycache__/

@@ -1,40 +1,63 @@
 # ============================================================
 # STOCK MARKET PRO - fetch_stocks.py
-# Fetches all metrics for 955 stocks and saves to MySQL
+# Fetches all metrics for ~2000 stocks and saves to Aiven MySQL
+#
+# SAFE VERSION (Oct 2026):
+#  - Never replaces good data with empty data. If Yahoo sends nothing
+#    for a field, the value already in the database is kept.
+#  - If Yahoo sends no price at all, the stock is skipped (nothing written).
+#  - Price comes from .info, then fast_info, then price history.
+#  - Does NOT touch next_earnings_date (fetch_earnings.py owns it).
+#  - Does NOT write stocks_predictions (predict.py owns it).
+#
+# Run:  python fetch_stocks.py              -> all tickers in tickers.py
+#       python fetch_stocks.py --missing    -> only stocks with no details yet
+#       python fetch_stocks.py AAPL MSFT    -> just these tickers
 # ============================================================
 
 import yfinance as yf
 import mysql.connector
-import db
 import pandas as pd
+import math
+import sys
 import time
+import os
 from datetime import datetime
-from tickers import ALL_TICKERS as _FILE_TICKERS, TICKER_SECTOR_MAP
+from dotenv import load_dotenv
+from tickers import ALL_TICKERS, TICKER_SECTOR_MAP
 
-# tickers.py plus anything added to the database since
-ALL_TICKERS = list(dict.fromkeys(_FILE_TICKERS + db.get_db_tickers()))
-_DB_SECTORS = None
+try:
+    from yfinance.exceptions import YFRateLimitError
+except Exception:
+    class YFRateLimitError(Exception):
+        pass
 
-def resolve_sector(ticker):
-    """Sector from tickers.py, else the one already stored, else Unknown."""
-    global _DB_SECTORS
-    if ticker in TICKER_SECTOR_MAP:
-        return TICKER_SECTOR_MAP[ticker]
-    if _DB_SECTORS is None:
-        _DB_SECTORS = db.get_db_sectors()
-    return _DB_SECTORS.get(ticker, "Unknown")
+load_dotenv()
+
+# Futures tickers (=F suffix) - only price data, no fundamentals
+FUTURES_TICKERS = [t for t in ALL_TICKERS if "=F" in t]
+
+def is_futures(ticker):
+    return "=F" in ticker
 
 # ─────────────────────────────────────────
-# MySQL Connection
+# MySQL Connection (Aiven)
 # ─────────────────────────────────────────
 def get_connection():
-    return db.get_connection()
+    return mysql.connector.connect(
+        host=os.getenv("DB_HOST"),
+        port=int(os.getenv("DB_PORT", 3306)),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD") or os.getenv("DB_PASS"),
+        database=os.getenv("DB_NAME"),
+        ssl_disabled=False
+    )
 
 # ─────────────────────────────────────────
 # Create All Tables
 # ─────────────────────────────────────────
 def create_tables(cursor):
-    print("📦 Creating tables...")
+    print("Creating tables...")
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS stocks_live (
@@ -209,7 +232,20 @@ def create_tables(cursor):
         )
     """)
 
-    print("✅ All tables created!")
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS price_alerts (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            ticker VARCHAR(20),
+            alert_type VARCHAR(20),
+            target_price FLOAT,
+            current_price FLOAT,
+            triggered BOOLEAN DEFAULT FALSE,
+            created_at DATETIME,
+            triggered_at DATETIME
+        )
+    """)
+
+    print("All tables created!")
 
 # ─────────────────────────────────────────
 # Calculate RSI
@@ -240,243 +276,300 @@ def calculate_macd(prices):
         return None, None, None
 
 # ─────────────────────────────────────────
-# Generate Prediction (rule-based for now)
+# Safe-save helpers
 # ─────────────────────────────────────────
-def generate_prediction(current_price, rsi, macd, ma_50, ma_200, analyst_target):
+def clean(v):
+    """Turn NaN / Infinity / numpy values into normal Python values (or None)."""
+    if v is None:
+        return None
+    if isinstance(v, str):
+        return None if v.strip().lower() in ("", "nan", "infinity", "-infinity", "inf", "-inf", "none") else v
+    if isinstance(v, bool):
+        return v
     try:
-        score = 50  # neutral baseline
+        if hasattr(v, "item"):          # numpy number
+            v = v.item()
+        if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+            return None
+    except Exception:
+        return None
+    return v
 
-        # RSI signal
-        if rsi:
-            if rsi < 30: score += 20   # oversold = bullish
-            elif rsi > 70: score -= 20  # overbought = bearish
-            elif rsi < 50: score += 5
-            else: score -= 5
 
-        # MACD signal
-        if macd:
-            if macd > 0: score += 10
-            else: score -= 10
+def upsert(cursor, table, row, keys=("ticker",)):
+    """
+    Insert or update one row.  Empty (None) values NEVER overwrite what is
+    already saved: COALESCE(new, old) keeps the old value.
+    If every data field is empty, nothing is written at all.
+    """
+    row = {k: clean(v) for k, v in row.items()}
+    data_cols = [c for c in row if c not in keys and c != "last_updated"]
+    if not any(row[c] is not None for c in data_cols):
+        return False
+    cols = list(row)
+    sql = "INSERT INTO {} ({}) VALUES ({}) ON DUPLICATE KEY UPDATE {}".format(
+        table,
+        ", ".join(cols),
+        ", ".join(["%s"] * len(cols)),
+        ", ".join(
+            ["{0}=COALESCE(VALUES({0}), {0})".format(c) for c in data_cols]
+            + (["last_updated=VALUES(last_updated)"] if "last_updated" in row else [])
+        ),
+    )
+    cursor.execute(sql, [row[c] for c in cols])
+    return True
 
-        # Moving average signal
-        if ma_50 and ma_200 and current_price:
-            if current_price > ma_50 > ma_200: score += 15   # golden cross zone
-            elif current_price < ma_50 < ma_200: score -= 15  # death cross zone
 
-        # Analyst target
-        if analyst_target and current_price:
-            upside = ((analyst_target - current_price) / current_price) * 100
-            if upside > 20: score += 15
-            elif upside > 10: score += 8
-            elif upside < -10: score -= 15
-
-        score = max(0, min(100, score))
-
-        # Signal
-        if score >= 75:   buy_signal = "Strong Buy"
-        elif score >= 60: buy_signal = "Buy"
-        elif score >= 40: buy_signal = "Hold"
-        elif score >= 25: buy_signal = "Sell"
-        else:             buy_signal = "Strong Sell"
-
-        # Trend
-        if ma_50 and ma_200:
-            if ma_50 > ma_200: trend = "Uptrend"
-            elif ma_50 < ma_200: trend = "Downtrend"
-            else: trend = "Sideways"
-        else:
-            trend = "Sideways"
-
-        # Price targets (simple projection)
-        multiplier = (score - 50) / 500  # small % move
-        target_1w = round(current_price * (1 + multiplier), 2) if current_price else None
-        target_1m = round(current_price * (1 + multiplier * 3), 2) if current_price else None
-        target_3m = round(current_price * (1 + multiplier * 8), 2) if current_price else None
-
-        # Risk level
-        if score >= 60: risk = "Low"
-        elif score >= 40: risk = "Medium"
-        else: risk = "High"
-
-        confidence = round(abs(score - 50) * 1.5 + 40, 1)
-        confidence = min(95, confidence)
-
-        return buy_signal, trend, round(score, 1), risk, confidence, target_1w, target_1m, target_3m
-    except:
-        return "Hold", "Sideways", 50.0, "Medium", 50.0, None, None, None
-
-# ─────────────────────────────────────────
-# Fetch & Save One Stock
-# ─────────────────────────────────────────
-def fetch_and_save(ticker, cursor, conn):
-    try:
-        stock = yf.Ticker(ticker)
-        info = stock.info
-        sector = resolve_sector(ticker)
-        now = datetime.now()
-
-        current_price = info.get("currentPrice") or info.get("regularMarketPrice")
-        prev_close    = info.get("previousClose")
-        price_change  = round(current_price - prev_close, 4) if current_price and prev_close else None
-        price_chg_pct = round((price_change / prev_close) * 100, 4) if price_change and prev_close else None
-        avg_vol       = info.get("averageVolume")
-        volume        = info.get("volume")
-        rel_vol       = round(volume / avg_vol, 2) if volume and avg_vol else None
-
-        # ── stocks_live ──
-        cursor.execute("""
-            INSERT INTO stocks_live VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            ON DUPLICATE KEY UPDATE
-                sector=VALUES(sector), industry=VALUES(industry), company_name=VALUES(company_name),
-                current_price=VALUES(current_price), open_price=VALUES(open_price),
-                high=VALUES(high), low=VALUES(low), prev_close=VALUES(prev_close),
-                price_change=VALUES(price_change), price_change_pct=VALUES(price_change_pct),
-                week_52_high=VALUES(week_52_high), week_52_low=VALUES(week_52_low),
-                volume=VALUES(volume), avg_volume=VALUES(avg_volume),
-                relative_volume=VALUES(relative_volume), market_cap=VALUES(market_cap),
-                last_updated=VALUES(last_updated)
-        """, (
-            ticker, sector, info.get("industry"), info.get("longName"),
-            current_price, info.get("open"), info.get("dayHigh"), info.get("dayLow"),
-            prev_close, price_change, price_chg_pct,
-            info.get("fiftyTwoWeekHigh"), info.get("fiftyTwoWeekLow"),
-            volume, avg_vol, rel_vol, info.get("marketCap"), now
-        ))
-
-        # ── stocks_fundamentals ──
-        cursor.execute("""
-            INSERT INTO stocks_fundamentals VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-            ON DUPLICATE KEY UPDATE
-                pe_ratio=VALUES(pe_ratio), forward_pe=VALUES(forward_pe),
-                pb_ratio=VALUES(pb_ratio), ps_ratio=VALUES(ps_ratio),
-                ev_ebitda=VALUES(ev_ebitda), eps=VALUES(eps),
-                revenue=VALUES(revenue), net_income=VALUES(net_income),
-                profit_margin=VALUES(profit_margin), roe=VALUES(roe),
-                roa=VALUES(roa), debt_to_equity=VALUES(debt_to_equity),
-                current_ratio=VALUES(current_ratio), quick_ratio=VALUES(quick_ratio),
-                last_updated=VALUES(last_updated)
-        """, (
-            ticker,
-            info.get("trailingPE"), info.get("forwardPE"),
-            info.get("priceToBook"), info.get("priceToSalesTrailing12Months"),
-            info.get("enterpriseToEbitda"), info.get("trailingEps"),
-            info.get("totalRevenue"), info.get("netIncomeToCommon"),
-            info.get("profitMargins"), info.get("returnOnEquity"),
-            info.get("returnOnAssets"), info.get("debtToEquity"),
-            info.get("currentRatio"), info.get("quickRatio"), now
-        ))
-
-        # ── stocks_dividends ──
-        ex_div = info.get("exDividendDate")
-        ex_div_date = datetime.fromtimestamp(ex_div).date() if ex_div else None
-        cursor.execute("""
-            INSERT INTO stocks_dividends VALUES (%s,%s,%s,%s,%s,%s)
-            ON DUPLICATE KEY UPDATE
-                dividend_yield=VALUES(dividend_yield), dividend_rate=VALUES(dividend_rate),
-                payout_ratio=VALUES(payout_ratio), ex_dividend_date=VALUES(ex_dividend_date),
-                last_updated=VALUES(last_updated)
-        """, (
-            ticker, info.get("dividendYield"), info.get("dividendRate"),
-            info.get("payoutRatio"), ex_div_date, now
-        ))
-
-        # ── stocks_analyst ──
-        target = info.get("targetMeanPrice")
-        upside = round(((target - current_price) / current_price) * 100, 2) if target and current_price else None
-        cursor.execute("""
-            INSERT INTO stocks_analyst VALUES (%s,%s,%s,%s,%s,%s,%s)
-            ON DUPLICATE KEY UPDATE
-                target_price=VALUES(target_price), analyst_rating=VALUES(analyst_rating),
-                num_analysts=VALUES(num_analysts), upside_pct=VALUES(upside_pct),
-                recommendation=VALUES(recommendation), last_updated=VALUES(last_updated)
-        """, (
-            ticker, target, info.get("recommendationKey"),
-            info.get("numberOfAnalystOpinions"), upside,
-            info.get("recommendationMean"), now
-        ))
-
-        # ── stocks_smartmoney ──
-        cursor.execute("""
-            INSERT INTO stocks_smartmoney VALUES (%s,%s,%s,%s,%s,%s,%s)
-            ON DUPLICATE KEY UPDATE
-                institutional_ownership=VALUES(institutional_ownership),
-                insider_ownership=VALUES(insider_ownership),
-                short_interest=VALUES(short_interest),
-                short_ratio=VALUES(short_ratio),
-                shares_short=VALUES(shares_short),
-                last_updated=VALUES(last_updated)
-        """, (
-            ticker,
-            info.get("institutionOwnership"), info.get("insidersPercentHeld"),
-            info.get("shortPercentOfFloat"), info.get("shortRatio"),
-            info.get("sharesShort"), now
-        ))
-
-        # ── stocks_earnings ──
-        cursor.execute("""
-            INSERT INTO stocks_earnings VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
-            ON DUPLICATE KEY UPDATE
-                next_earnings_date=VALUES(next_earnings_date),
-                eps_estimate=VALUES(eps_estimate), eps_actual=VALUES(eps_actual),
-                earnings_surprise_pct=VALUES(earnings_surprise_pct),
-                revenue_estimate=VALUES(revenue_estimate),
-                revenue_actual=VALUES(revenue_actual),
-                last_updated=VALUES(last_updated)
-        """, (
-            ticker, None,
-            info.get("forwardEps"), info.get("trailingEps"),
-            None, None, info.get("totalRevenue"), now
-        ))
-
-        # ── stocks_technicals + predictions (need historical prices) ──
+def get_info(stock):
+    """stock.info with one retry if Yahoo rate-limits us. Returns {} on failure."""
+    for attempt in (1, 2):
         try:
-            hist = stock.history(period="1y")
-            if not hist.empty and len(hist) > 50:
-                closes = hist["Close"]
-                ma50  = round(float(closes.rolling(50).mean().iloc[-1]), 4)
-                ma200 = round(float(closes.rolling(200).mean().iloc[-1]), 4) if len(closes) >= 200 else None
-                rsi   = calculate_rsi(closes)
-                macd_val, macd_sig, macd_hist = calculate_macd(closes)
-                golden = bool(ma50 and ma200 and ma50 > ma200)
-                death  = bool(ma50 and ma200 and ma50 < ma200)
-                returns = closes.pct_change().dropna()
-                volatility = round(float(returns.std() * (252 ** 0.5) * 100), 2)
+            info = stock.info
+            return info if isinstance(info, dict) else {}
+        except YFRateLimitError:
+            if attempt == 1:
+                print("      Yahoo rate limit - waiting 30s and retrying...")
+                time.sleep(30)
+        except Exception:
+            return {}
+    return {}
 
-                cursor.execute("""
-                    INSERT INTO stocks_technicals VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                    ON DUPLICATE KEY UPDATE
-                        ma_50=VALUES(ma_50), ma_200=VALUES(ma_200), beta=VALUES(beta),
-                        rsi_14=VALUES(rsi_14), macd=VALUES(macd), macd_signal=VALUES(macd_signal),
-                        macd_hist=VALUES(macd_hist), golden_cross=VALUES(golden_cross),
-                        death_cross=VALUES(death_cross), volatility=VALUES(volatility),
-                        last_updated=VALUES(last_updated)
-                """, (
-                    ticker, ma50, ma200, info.get("beta"),
-                    rsi, macd_val, macd_sig, macd_hist,
-                    golden, death, volatility, now
-                ))
 
-                # predictions
-                buy_signal, trend, momentum, risk, confidence, t1w, t1m, t3m = generate_prediction(
-                    current_price, rsi, macd_val, ma50, ma200, target
-                )
-                cursor.execute("""
-                    INSERT INTO stocks_predictions VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                    ON DUPLICATE KEY UPDATE
-                        current_price=VALUES(current_price),
-                        target_1w=VALUES(target_1w), target_1m=VALUES(target_1m),
-                        target_3m=VALUES(target_3m), buy_signal=VALUES(buy_signal),
-                        trend=VALUES(trend), momentum_score=VALUES(momentum_score),
-                        risk_level=VALUES(risk_level), confidence_pct=VALUES(confidence_pct),
-                        last_updated=VALUES(last_updated)
-                """, (
-                    ticker, current_price, t1w, t1m, t3m,
-                    buy_signal, trend, momentum, risk, confidence, now
-                ))
-        except Exception as e:
+def get_history(stock, period="1y"):
+    try:
+        h = stock.history(period=period)
+        if h is not None and not h.empty:
+            return h.dropna(subset=["Close"])
+    except Exception:
+        pass
+    return pd.DataFrame()
+
+
+def num(v):
+    v = clean(v)
+    try:
+        return float(v) if v is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def price_block(stock, info, hist, futures=False):
+    """
+    Works out today's price numbers.  Order: .info -> fast_info -> price history.
+    Returns a dict, or None if Yahoo gave no price at all.
+    """
+    if futures:
+        cp = num(info.get("regularMarketPrice") or info.get("currentPrice") or info.get("ask") or info.get("bid"))
+        op = num(info.get("regularMarketOpen") or info.get("open"))
+        hi = num(info.get("regularMarketDayHigh") or info.get("dayHigh"))
+        lo = num(info.get("regularMarketDayLow") or info.get("dayLow"))
+    else:
+        cp = num(info.get("currentPrice") or info.get("regularMarketPrice"))
+        op = num(info.get("open") or info.get("regularMarketOpen"))
+        hi = num(info.get("dayHigh") or info.get("regularMarketDayHigh"))
+        lo = num(info.get("dayLow") or info.get("regularMarketDayLow"))
+    pc   = num(info.get("previousClose") or info.get("regularMarketPreviousClose"))
+    vol  = num(info.get("volume") or info.get("regularMarketVolume"))
+    avgv = num(info.get("averageVolume") or info.get("averageDailyVolume10Day"))
+    w52h = num(info.get("fiftyTwoWeekHigh"))
+    w52l = num(info.get("fiftyTwoWeekLow"))
+
+    # fallback 1: fast_info
+    if not cp:
+        try:
+            fi = stock.fast_info
+            cp   = num(fi.last_price)
+            pc   = pc or num(fi.previous_close)
+            op   = op or num(fi.open)
+            hi   = hi or num(fi.day_high)
+            lo   = lo or num(fi.day_low)
+            vol  = vol or num(fi.last_volume)
+            w52h = w52h or num(fi.year_high)
+            w52l = w52l or num(fi.year_low)
+        except Exception:
             pass
 
-        # ── stocks_historical (last 5 years) ──
+    # fallback 2: price history (most reliable)
+    if not hist.empty:
+        last = hist.iloc[-1]
+        if not cp:
+            cp  = num(last["Close"])
+            op  = op or num(last["Open"])
+            hi  = hi or num(last["High"])
+            lo  = lo or num(last["Low"])
+            vol = vol or num(last["Volume"])
+        if not pc and len(hist) > 1:
+            pc = num(hist["Close"].iloc[-2])
+        if not avgv and "Volume" in hist:
+            avgv = num(hist["Volume"].tail(63).mean())
+        w52h = w52h or num(hist["High"].max())
+        w52l = w52l or num(hist["Low"].min())
+
+    if not cp:
+        return None
+
+    chg     = round(cp - pc, 4) if pc else None
+    chg_pct = round(chg / pc * 100, 4) if (chg is not None and pc) else None
+    rel_vol = round(vol / avgv, 2) if (vol and avgv) else None
+    return {
+        "current_price": cp, "open_price": op, "high": hi, "low": lo,
+        "prev_close": pc, "price_change": chg, "price_change_pct": chg_pct,
+        "week_52_high": w52h, "week_52_low": w52l,
+        "volume": int(vol) if vol else None, "avg_volume": int(avgv) if avgv else None,
+        "relative_volume": rel_vol,
+    }
+
+
+def save_technicals(cursor, ticker, hist, beta, now, min_rows):
+    """stocks_technicals from 1 year of prices (same maths as before)."""
+    if hist.empty or len(hist) <= min_rows:
+        return
+    closes = hist["Close"]
+    ma50  = round(float(closes.rolling(50).mean().iloc[-1]), 4) if len(closes) >= 50 else None
+    ma200 = round(float(closes.rolling(200).mean().iloc[-1]), 4) if len(closes) >= 200 else None
+    rsi   = calculate_rsi(closes)
+    macd_val, macd_sig, macd_hist_v = calculate_macd(closes)
+    golden = bool(ma50 and ma200 and ma50 > ma200)
+    death  = bool(ma50 and ma200 and ma50 < ma200)
+    returns = closes.pct_change().dropna()
+    volatility = round(float(returns.std() * (252 ** 0.5) * 100), 2) if len(returns) > 1 else None
+    upsert(cursor, "stocks_technicals", {
+        "ticker": ticker, "ma_50": ma50, "ma_200": ma200, "beta": beta,
+        "rsi_14": rsi, "macd": macd_val, "macd_signal": macd_sig, "macd_hist": macd_hist_v,
+        "golden_cross": golden, "death_cross": death, "volatility": volatility,
+        "last_updated": now,
+    })
+
+
+# ─────────────────────────────────────────
+# Fetch & Save Futures (commodity futures)
+# Only saves price data - no fundamentals
+# ─────────────────────────────────────────
+def fetch_and_save_futures(ticker, cursor, conn):
+    try:
+        stock = yf.Ticker(ticker)
+        info  = get_info(stock)
+        hist  = get_history(stock)
+        now   = datetime.now()
+
+        p = price_block(stock, info, hist, futures=True)
+        if not p:
+            return False, "no price from Yahoo - old data kept"
+
+        upsert(cursor, "stocks_live", dict(
+            ticker=ticker,
+            sector=TICKER_SECTOR_MAP.get(ticker, "Commodities"),
+            industry="Commodity Futures",
+            company_name=info.get("longName") or info.get("shortName"),
+            last_updated=now, **p))
+
+        try:
+            save_technicals(cursor, ticker, hist, None, now, min_rows=30)
+        except Exception:
+            pass
+
+        conn.commit()
+        return True, ""
+    except Exception as e:
+        try: conn.rollback()
+        except Exception: pass
+        return False, "{}: {}".format(type(e).__name__, str(e)[:100])
+
+
+# ─────────────────────────────────────────
+# Fetch & Save One Stock (equities/ETFs)
+# ─────────────────────────────────────────
+def fetch_and_save(ticker, cursor, conn):
+    # Route futures to separate handler
+    if is_futures(ticker):
+        return fetch_and_save_futures(ticker, cursor, conn)
+
+    try:
+        stock = yf.Ticker(ticker)
+        info  = get_info(stock)
+        hist  = get_history(stock)
+        now   = datetime.now()
+
+        p = price_block(stock, info, hist)
+        if not p:
+            # Nothing usable from Yahoo -> write NOTHING, keep what we had
+            return False, "no price from Yahoo - old data kept"
+        current_price = p["current_price"]
+
+        # stocks_live
+        upsert(cursor, "stocks_live", dict(
+            ticker=ticker,
+            sector=TICKER_SECTOR_MAP.get(ticker),
+            industry=info.get("industry"),
+            company_name=info.get("longName") or info.get("shortName"),
+            market_cap=info.get("marketCap"),
+            last_updated=now, **p))
+
+        # stocks_fundamentals
+        upsert(cursor, "stocks_fundamentals", {
+            "ticker": ticker,
+            "pe_ratio": info.get("trailingPE"), "forward_pe": info.get("forwardPE"),
+            "pb_ratio": info.get("priceToBook"), "ps_ratio": info.get("priceToSalesTrailing12Months"),
+            "ev_ebitda": info.get("enterpriseToEbitda"), "eps": info.get("trailingEps"),
+            "revenue": info.get("totalRevenue"), "net_income": info.get("netIncomeToCommon"),
+            "profit_margin": info.get("profitMargins"), "roe": info.get("returnOnEquity"),
+            "roa": info.get("returnOnAssets"), "debt_to_equity": info.get("debtToEquity"),
+            "current_ratio": info.get("currentRatio"), "quick_ratio": info.get("quickRatio"),
+            "last_updated": now,
+        })
+
+        # stocks_dividends
+        ex_div_date = None
+        try:
+            ex_div = info.get("exDividendDate")
+            if ex_div:
+                ex_div_date = datetime.fromtimestamp(int(ex_div)).date()
+        except Exception:
+            pass
+        upsert(cursor, "stocks_dividends", {
+            "ticker": ticker,
+            "dividend_yield": info.get("dividendYield"), "dividend_rate": info.get("dividendRate"),
+            "payout_ratio": info.get("payoutRatio"), "ex_dividend_date": ex_div_date,
+            "last_updated": now,
+        })
+
+        # stocks_analyst
+        target = num(info.get("targetMeanPrice"))
+        upside = round(((target - current_price) / current_price) * 100, 2) if target and current_price else None
+        upsert(cursor, "stocks_analyst", {
+            "ticker": ticker,
+            "target_price": target, "analyst_rating": info.get("recommendationKey"),
+            "num_analysts": info.get("numberOfAnalystOpinions"), "upside_pct": upside,
+            "recommendation": info.get("recommendationMean"),
+            "last_updated": now,
+        })
+
+        # stocks_smartmoney  (Yahoo's real field names are heldPercent...)
+        upsert(cursor, "stocks_smartmoney", {
+            "ticker": ticker,
+            "institutional_ownership": info.get("heldPercentInstitutions") or info.get("institutionOwnership"),
+            "insider_ownership": info.get("heldPercentInsiders") or info.get("insidersPercentHeld"),
+            "short_interest": info.get("shortPercentOfFloat"), "short_ratio": info.get("shortRatio"),
+            "shares_short": info.get("sharesShort"),
+            "last_updated": now,
+        })
+
+        # stocks_earnings - only EPS / revenue.  next_earnings_date is left
+        # alone so the dates from fetch_earnings.py are never wiped.
+        upsert(cursor, "stocks_earnings", {
+            "ticker": ticker,
+            "eps_estimate": info.get("forwardEps"), "eps_actual": info.get("trailingEps"),
+            "revenue_actual": info.get("totalRevenue"),
+            "last_updated": now,
+        })
+
+        # stocks_technicals  (predictions are written by predict.py only)
+        try:
+            save_technicals(cursor, ticker, hist, info.get("beta"), now, min_rows=50)
+        except Exception:
+            pass
+
+        # stocks_historical
         try:
             financials = stock.financials
             if financials is not None and not financials.empty:
@@ -485,73 +578,141 @@ def fetch_and_save(ticker, cursor, conn):
                     def safe(key):
                         try: return int(financials.loc[key, col]) if key in financials.index else None
                         except: return None
-                    cursor.execute("""
-                        INSERT INTO stocks_historical
-                            (ticker, year, revenue, net_income, ebitda, operating_income, last_updated)
-                        VALUES (%s,%s,%s,%s,%s,%s,%s)
-                        ON DUPLICATE KEY UPDATE
-                            revenue=VALUES(revenue), net_income=VALUES(net_income),
-                            ebitda=VALUES(ebitda), operating_income=VALUES(operating_income),
-                            last_updated=VALUES(last_updated)
-                    """, (
-                        ticker, year,
-                        safe("Total Revenue"), safe("Net Income"),
-                        safe("EBITDA"), safe("Operating Income"), now
-                    ))
-        except:
+                    upsert(cursor, "stocks_historical", {
+                        "ticker": ticker, "year": year,
+                        "revenue": safe("Total Revenue"), "net_income": safe("Net Income"),
+                        "ebitda": safe("EBITDA"), "operating_income": safe("Operating Income"),
+                        "last_updated": now,
+                    }, keys=("ticker", "year"))
+        except Exception:
             pass
 
         conn.commit()
-        return True
+        got_details = any(info.get(k) for k in ("longName", "shortName", "marketCap", "trailingPE", "totalRevenue"))
+        return True, "" if got_details else "price only (Yahoo sent no details this time)"
 
     except Exception as e:
-        return False
+        try: conn.rollback()
+        except Exception: pass
+        return False, "{}: {}".format(type(e).__name__, str(e)[:100])
+
+
+# ─────────────────────────────────────────
+# Database connection that survives drop-outs
+# ─────────────────────────────────────────
+DB_ERROR_WORDS = ("OperationalError", "InterfaceError", "DatabaseError", "Lost connection",
+                  "not available", "gone away", "2013", "2055", "2006")
+
+def is_db_error(note):
+    return any(w in (note or "") for w in DB_ERROR_WORDS)
+
+def live_cursor(conn):
+    """Returns (conn, cursor) on a working connection - reconnects if it was dropped."""
+    for attempt in range(1, 6):
+        try:
+            if conn is not None and conn.is_connected():
+                return conn, conn.cursor()
+        except Exception:
+            pass
+        try:
+            if conn is not None:
+                conn.close()
+        except Exception:
+            pass
+        try:
+            conn = get_connection()
+            return conn, conn.cursor()
+        except Exception as e:
+            conn = None
+            wait = 10 * attempt
+            print("      database reconnect failed ({}) - trying again in {}s".format(type(e).__name__, wait))
+            time.sleep(wait)
+    raise RuntimeError("Cannot reach the database - check your internet / Aiven, then run again with --missing")
+
+
+# ─────────────────────────────────────────
+# Which tickers to run
+# ─────────────────────────────────────────
+def pick_tickers(conn):
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    if args:
+        return [a.upper() for a in args]
+    if "--missing" in sys.argv:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT l.ticker FROM stocks_live l
+            LEFT JOIN stocks_fundamentals f ON f.ticker = l.ticker
+            WHERE l.company_name IS NULL OR l.current_price IS NULL OR f.ticker IS NULL
+        """)
+        have_gaps = {r[0] for r in cur.fetchall()}
+        cur.execute("SELECT ticker FROM stocks_live")
+        in_db = {r[0] for r in cur.fetchall()}
+        cur.close()
+        return [t for t in ALL_TICKERS if t in have_gaps or t not in in_db]
+    return list(ALL_TICKERS)
+
 
 # ─────────────────────────────────────────
 # Main Run
 # ─────────────────────────────────────────
 def main():
-    print("=" * 60)
-    print("  STOCK MARKET PRO - Data Fetch Started")
-    print(f"  Total stocks to fetch: {len(ALL_TICKERS)}")
-    print(f"  Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print("=" * 60)
-
-    conn = get_connection()
-    cursor = conn.cursor()
-
+    conn, cursor = live_cursor(None)
     create_tables(cursor)
     conn.commit()
+    cursor.close()
+
+    tickers = pick_tickers(conn)
+
+    print("=" * 60)
+    print("  STOCK MARKET PRO - Data Fetch Started (safe mode)")
+    print("  Tickers to fetch: {}".format(len(tickers)))
+    print("  Futures tickers: {}".format(sum(1 for t in tickers if is_futures(t))))
+    print("  Started at: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    print("=" * 60)
 
     success = 0
+    partial = 0
     failed  = 0
     failed_list = []
 
-    for i, ticker in enumerate(ALL_TICKERS, 1):
-        result = fetch_and_save(ticker, cursor, conn)
-        if result:
+    for i, ticker in enumerate(tickers, 1):
+        # Aiven drops connections now and then -> always make sure we have a working one
+        conn, cursor = live_cursor(conn)
+        ok, note = fetch_and_save(ticker, cursor, conn)
+        if not ok and is_db_error(note):
+            # the connection died while saving this stock -> reconnect and try it once more
+            conn, cursor = live_cursor(None)
+            ok, note = fetch_and_save(ticker, cursor, conn)
+        try: cursor.close()
+        except Exception: pass
+
+        tag = "[F]" if is_futures(ticker) else "   "
+        if ok:
             success += 1
-            print(f"  ✅ [{i}/{len(ALL_TICKERS)}] {ticker:<10} saved")
+            if note:
+                partial += 1
+            print("  OK  {} [{}/{}] {} {}".format(tag, i, len(tickers), ticker, ("- " + note) if note else ""))
         else:
             failed += 1
             failed_list.append(ticker)
-            print(f"  ❌ [{i}/{len(ALL_TICKERS)}] {ticker:<10} failed")
+            print("  FAIL{} [{}/{}] {} - {}".format(tag, i, len(tickers), ticker, note))
 
-        # small pause every 50 stocks to avoid rate limiting
         if i % 50 == 0:
-            print(f"\n  ⏳ Pausing 5 seconds... ({success} saved, {failed} failed)\n")
+            print("\n  Pausing 5s... ({} saved, {} failed)\n".format(success, failed))
             time.sleep(5)
 
     print("\n" + "=" * 60)
-    print(f"  ✅ Successfully saved: {success} stocks")
-    print(f"  ❌ Failed: {failed} stocks")
+    print("  Successfully saved: {} tickers".format(success))
+    if partial:
+        print("    (of which {} got price only - run again later for their details)".format(partial))
+    print("  Failed: {} tickers  (their old data was NOT touched)".format(failed))
     if failed_list:
-        print(f"  Failed tickers: {', '.join(failed_list)}")
-    print(f"  Finished at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print("  Failed: {}".format(", ".join(failed_list)))
+    print("  Finished at: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
     print("=" * 60)
 
-    cursor.close()
-    conn.close()
+    try: conn.close()
+    except Exception: pass
 
 if __name__ == "__main__":
     main()

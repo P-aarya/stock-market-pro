@@ -6,14 +6,16 @@
 
 import yfinance as yf
 import mysql.connector
-import db
 import pandas as pd
 import json
 from datetime import datetime, timedelta
 import time
 
 def get_db():
-    return db.get_connection()
+    return mysql.connector.connect(
+        host="localhost", port=3306, user="root",
+        password="Aroot092325", database="stock_market_pro_db"
+    )
 
 def query(sql, params=None):
     conn = get_db()

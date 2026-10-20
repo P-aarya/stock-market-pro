@@ -12,3 +12,5 @@ python-dotenv
 requests
 pytz
 python-multipart
+
+vaderSentiment

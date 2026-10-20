@@ -3,10 +3,12 @@
 # ============================================================
 import yfinance as yf
 import mysql.connector
-import db
 from datetime import datetime
 
-conn = db.get_connection()
+conn = mysql.connector.connect(
+    host="localhost", port=3306, user="root",
+    password="Aroot092325", database="stock_market_pro_db"
+)
 cursor = conn.cursor()
 
 INDICES = {
