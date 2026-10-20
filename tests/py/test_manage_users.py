@@ -16,12 +16,14 @@ GOOD = "correct horse battery"
 
 
 def has_column(done):
-    """Responder for the information_schema check. `done` says which columns already exist: a table name (all its
-    columns), or a (table, column) pair."""
+    """Responder for the information_schema checks. `done` says which columns already exist: a table name (all its
+    columns), or a (table, column) pair. A ("table", name) key says an optional table exists at all."""
     def respond(sql, params):
         if "information_schema.columns" in sql:
             table, column = params
             return [{"n": 1 if done.get(table) or done.get((table, column)) else 0}]
+        if "information_schema.tables" in sql:
+            return [{"n": 1 if done.get(("table", params[0])) else 0}]
         return []
     return respond
 
@@ -53,11 +55,26 @@ class Migrate(unittest.TestCase):
         self.assertLess(alters.index(add_status), alters.index("ALTER TABLE users ALTER COLUMN status SET DEFAULT 'pending'"))
         self.assertIn("status VARCHAR(10) NOT NULL DEFAULT 'pending'", mu.USERS_DDL)   # a brand-new table starts the right way round
 
+    def test_price_alerts_get_an_owner_column_when_that_table_exists(self):
+        conn = FakeConn(has_column({("table", "price_alerts"): True}))
+        done = mu.migrate(conn)
+        self.assertTrue(any(sql.startswith("ALTER TABLE price_alerts ADD COLUMN user_id INT NULL") for sql, _ in conn.statements("ALTER TABLE")))
+        self.assertIn("price_alerts: added user_id column", done)
+        conn = FakeConn(has_column({**ALL_DONE, ("table", "price_alerts"): True, "price_alerts": True}))
+        self.assertIn("price_alerts: user_id column already there", mu.migrate(conn))
+        self.assertEqual(conn.statements("ALTER TABLE"), [])
+
+    def test_a_price_alerts_table_that_does_not_exist_yet_is_left_for_the_app_to_create(self):
+        conn = FakeConn(has_column({}))
+        done = mu.migrate(conn)
+        self.assertEqual(conn.statements("ALTER TABLE price_alerts"), [])
+        self.assertTrue(any(line.startswith("price_alerts: not created yet") for line in done))
+
     def test_running_it_again_changes_nothing(self):
         conn = FakeConn(has_column(ALL_DONE))
         done = mu.migrate(conn)
         self.assertEqual(conn.statements("ALTER TABLE"), [])
-        self.assertTrue(all("already there" in line for line in done[2:]))
+        self.assertTrue(all(("already there" in line or "not created yet" in line) for line in done[2:]))
 
     def test_a_half_finished_earlier_run_is_completed(self):
         conn = FakeConn(has_column({"portfolio": True, ("users", "status"): True, ("users", "is_admin"): True}))
@@ -96,11 +113,28 @@ class ClaimLegacy(unittest.TestCase):
         self.assertEqual(len(conn.statements("UPDATE")), 2); self.assertEqual(conn.commits, 1)
 
 
+class ClaimLegacyAlerts(unittest.TestCase):
+    def test_price_alerts_are_handed_over_too_when_the_table_exists(self):
+        def respond(sql, params):
+            if "information_schema.tables" in sql:
+                return [{"n": 1}]
+            return {"portfolio": 4, "transactions": 9, "price_alerts": 2}[next(t for t in ("portfolio", "transactions", "price_alerts") if t in sql)]
+        conn = FakeConn(respond)
+        self.assertEqual(mu.claim_legacy(conn, 5), {"portfolio": 4, "transactions": 9, "price_alerts": 2})
+        for sql, params in conn.statements("UPDATE"):
+            self.assertIn("WHERE user_id IS NULL", sql); self.assertEqual(params, (5,))
+
+
 class DeleteAccount(unittest.TestCase):
+    def test_price_alerts_go_with_the_account_when_the_table_exists(self):
+        conn = FakeConn(lambda sql, params: [{"n": 1}] if "information_schema.tables" in sql else [])
+        mu.delete_account(conn, 5)
+        self.assertEqual([re.search(r"FROM (\w+)", sql).group(1) for sql, _ in conn.statements("DELETE")], ["portfolio", "transactions", "price_alerts", "watchlist", "users"])
+
     def test_removes_the_account_and_everything_it_owns_in_one_transaction(self):
         conn = FakeConn()
         mu.delete_account(conn, 5)
-        deletes = [(sql, p) for sql, p in conn.log]
+        deletes = conn.statements("DELETE")
         self.assertEqual([re.search(r"FROM (\w+)", sql).group(1) for sql, _ in deletes], ["portfolio", "transactions", "watchlist", "users"])
         self.assertTrue(all(p == (5,) for _, p in deletes))
         self.assertTrue(all("user_id = %s" in sql for sql, _ in deletes[:3])); self.assertIn("WHERE id = %s", deletes[3][0])

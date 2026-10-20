@@ -25,6 +25,9 @@ class FakeCursor:
     def _shape(self, row):
         return row if self.dictionary else tuple(row.values())
 
+    def close(self):
+        pass
+
     def fetchone(self):
         return self._shape(self.rows[0]) if self.rows else None
 

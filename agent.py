@@ -1224,6 +1224,65 @@ Rules:
     return response.choices[0].message.content.strip()
 
 
+def review_portfolio(tickers: list, user_query: str = "", chat_history: list = None) -> dict:
+    """Review a portfolio of stocks and provide analysis."""
+    if not tickers:
+        return {
+            "intent": "portfolio",
+            "stocks_found": 0,
+            "recommendation": "No stocks in your portfolio to review.",
+            "portfolio_review": None,
+            "top_stocks": [],
+            "all_stocks": []
+        }
+
+    snapshots = [s for s in (get_stock_snapshot(t.upper()) for t in tickers) if s]
+    if not snapshots:
+        return {
+            "intent": "portfolio",
+            "stocks_found": 0,
+            "recommendation": "I couldn't find data for any of the stocks in your portfolio.",
+            "portfolio_review": None,
+            "top_stocks": [],
+            "all_stocks": []
+        }
+
+    attach_sentiment(snapshots)
+    stock_data = "".join(format_stock(s) for s in snapshots)
+    holdings = holdings_context(tickers)
+
+    prompt = f"""You are a portfolio analyst at Stock Market Pro.
+
+The user wants a portfolio review.
+{"User's question: " + user_query if user_query else ""}
+
+Portfolio holdings:
+{stock_data}
+
+Provide a portfolio review covering:
+1. Overall portfolio health (2-3 sentences)
+2. Sector concentration and diversification
+3. Risk assessment (beta, signal distribution)
+4. Top 2-3 actionable suggestions
+5. Any concerning positions
+
+Keep it concise and practical. End with: "⚠️ Model-based estimates, not financial advice."
+"""
+
+    prompt = with_history(prompt, chat_history)
+    response = llm_create(messages=[{"role": "user", "content": prompt}], temperature=0.3)
+    recommendation = response.choices[0].message.content.strip()
+
+    return {
+        "intent": "portfolio",
+        "stocks_found": len(snapshots),
+        "recommendation": recommendation,
+        "portfolio_review": recommendation,
+        "top_stocks": snapshots[:5],
+        "all_stocks": snapshots
+    }
+
+
 if __name__ == "__main__":
     result = run_agent("show me stocks with price above $100")
     print("\n" + "="*50)

@@ -57,10 +57,10 @@ const tablet = mediaBlock('max-width:960px'), phone = mediaBlock('max-width:700p
 
   await t('the desktop top bar never wraps: it drops items in steps as the window narrows', () => {
     assert(/\.ntab,\.brand-title,\.nuser,\.nsignout,\.ntime,#nconn\{white-space:nowrap;\}/.test(html));
-    const steps = [['1500px', /#nconn\{display:none/], ['1400px', /\.nuser\{display:none/], ['1200px', /\.ntime\{display:none/], ['1130px', /\.ntab\{padding:7px 12px/], ['1000px', /\.lpill\{display:none/]];
+    const steps = [['1500px', /#nconn\{display:none/], ['1400px', /\.nuser\{display:none/], ['1260px', /\.ntime\{display:none/], ['1160px', /\.ntab\{padding:7px 12px/], ['1060px', /\.lpill\{display:none/]];
     for (const [width, rule] of steps) assert(anyMedia(`max-width:${width}`, rule), `@media(max-width:${width})`);
     // an administrator's bar carries one more link, so it sheds the same items sooner
-    for (const [width, rule] of [['1280px', /\.has-admin \.ntime\{display:none/], ['1200px', /\.has-admin \.na-text\{display:none/], ['1150px', /\.has-admin \.ntab\{padding:7px 12px/], ['1100px', /\.has-admin \.lpill\{display:none/]])
+    for (const [width, rule] of [['1450px', /\.has-admin \.ntime\{display:none/], ['1300px', /\.has-admin \.na-text\{display:none/], ['1200px', /\.has-admin \.ntab\{padding:7px 12px/], ['1120px', /\.has-admin \.lpill\{display:none/], ['1060px', /\.has-admin \.ntab\{padding:7px 8px/]])
       assert(anyMedia(`max-width:${width}`, rule), `admin: @media(max-width:${width})`);
   });
 
@@ -75,11 +75,13 @@ const tablet = mediaBlock('max-width:960px'), phone = mediaBlock('max-width:700p
     // Only grids written inline (style="...") need an override here; the stylesheet's own grids are handled by the media queries.
     const found = new Set([...html.matchAll(/style="[^"]*?grid-template-columns:\s*((?:repeat\(\d+,\s*1fr\))|(?:1fr 1fr))/g)].map(m => m[1].replace(/,\s+/g, ',')));
     // These are the fixed layouts that exist today. A new one fails here until someone decides how it should look on a phone.
-    assert.deepStrictEqual([...found].sort(), ['1fr 1fr', 'repeat(3,1fr)', 'repeat(4,1fr)', 'repeat(6,1fr)'].sort());
+    // (repeat(7,1fr) is the row of seven quick-percentage buttons in the price-alert dialog: small buttons that fit a phone as they are)
+    assert.deepStrictEqual([...found].sort(), ['1fr 1fr', 'repeat(3,1fr)', 'repeat(4,1fr)', 'repeat(6,1fr)', 'repeat(7,1fr)'].sort());
     assert(/#currency-grid,#macro-grid\{grid-template-columns:repeat\(2,1fr\)!important/.test(phone));
     assert(/#heatmap-wrap\{grid-template-columns:repeat\(3,1fr\)!important/.test(phone));
     assert(/\[style\*="repeat\(3,1fr\)"\]\{grid-template-columns:repeat\(2,1fr\)!important/.test(phone));
     assert(/\[style\*="grid-template-columns:1fr 1fr"\]\{grid-template-columns:1fr!important/.test(phone));
+    assert(/\[style\*="grid-template-columns:58px 1fr auto auto"\]\{grid-template-columns:50px minmax\(0,1fr\) auto auto!important/.test(phone), 'the economic-calendar row can shrink on a phone');
     assert(/#currency-grid\{grid-template-columns:repeat\(3,1fr\)!important/.test(tablet), 'six across overflows a tablet');
     assert(/\.acgrid,\.ai-stocks-grid\{grid-template-columns:minmax\(0,1fr\)/.test(mediaBlock('max-width:400px')), 'one card per row on a very small phone');
     for (const id of ['currency-grid', 'macro-grid', 'heatmap-wrap']) assert(html.includes(`id="${id}"`), id);
@@ -120,7 +122,7 @@ const tablet = mediaBlock('max-width:960px'), phone = mediaBlock('max-width:700p
     const src = between('function showPage(n,btn){', 'function showSub');
     const make = (win) => {
       const calls = [], mk = () => ({ classList: { add() {}, remove() {} } });
-      const ctx = { document: { querySelectorAll: () => [mk()], getElementById: () => mk() }, loadPortfolio() { calls.push('pf'); }, loadTx() {}, loadCommodities() {}, loadMacro() {}, loadComCo() {}, loadWatchlist() {}, loadIPOs() {}, ipoFetchedAt: 1, IPO_REFRESH_MS: 1e12, Date };
+      const ctx = { document: { querySelectorAll: () => [mk()], getElementById: () => mk() }, loadPortfolio() { calls.push('pf'); }, loadBenchmark() { calls.push('bench'); }, loadTx() {}, loadCommodities() {}, loadMacro() {}, loadComCo() {}, loadWatchlist() {}, loadIPOs() {}, ipoFetchedAt: 1, IPO_REFRESH_MS: 1e12, Date };
       if (win) ctx.window = win;
       vm.createContext(ctx); vm.runInContext(src, ctx);
       return { ctx, calls };
@@ -128,9 +130,9 @@ const tablet = mediaBlock('max-width:960px'), phone = mediaBlock('max-width:700p
     const scrolled = [];
     const a = make({ scrollTo: (x, y) => scrolled.push([x, y]) });
     a.ctx.showPage('portfolio', mk0());
-    assert.deepStrictEqual(scrolled, [[0, 0]]); assert.deepStrictEqual(a.calls, ['pf']);
+    assert.deepStrictEqual(scrolled, [[0, 0]]); assert.deepStrictEqual(a.calls, ['pf', 'bench']);   // the Portfolio tab loads your holdings and Aarya's S&P 500 comparison
     const b = make(null);                                        // no window at all: must not throw
-    b.ctx.showPage('portfolio', mk0()); assert.deepStrictEqual(b.calls, ['pf']);
+    b.ctx.showPage('portfolio', mk0()); assert.deepStrictEqual(b.calls, ['pf', 'bench']);
     function mk0() { return { classList: { add() {}, remove() {} } }; }
   });
 
@@ -138,7 +140,7 @@ const tablet = mediaBlock('max-width:960px'), phone = mediaBlock('max-width:700p
     const src = between('function showFST(t,btn){', 'async function loadCompanyTab');
     assert(/scrollIntoView\(\{inline:'center',block:'nearest'/.test(src));
     const seen = [], el = () => ({ classList: { add() {}, remove() {} } });
-    const ctx = { document: { querySelectorAll: () => [el()], getElementById: () => el() }, loadPxChart() {}, drawHistCharts() {}, loadPrediction() {}, loadCompanyTab() {}, loadPeers() {}, loadSentiment() {}, loadQuarterly() {} };
+    const ctx = { document: { querySelectorAll: () => [el()], getElementById: () => el() }, loadPxChart() {}, drawHistCharts() {}, loadPrediction() {}, loadCompanyTab() {}, loadPeers() {}, loadNewsSentiment() {}, loadQuarterly() {} };
     vm.createContext(ctx); vm.runInContext(src, ctx);
     ctx.showFST('overview', { ...el(), scrollIntoView: o => seen.push(o) });
     assert.strictEqual(seen.length, 1); assert.strictEqual(seen[0].inline, 'center');

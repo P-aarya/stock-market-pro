@@ -20,38 +20,38 @@ const data = (o = {}) => ({ status: 'success', ticker: 'AAPL', score: -0.51, lab
 (async () => {
   const { t, done } = suite('News sentiment card');
   await t('Shows label, score, counts and the explanation', async () => {
-    const e = env(() => data()); await e.run('loadSentiment()'); const h = e.el.innerHTML;
+    const e = env(() => data()); await e.run('loadNewsSentiment()'); const h = e.el.innerHTML;
     assert(h.includes('badge br') && h.includes('Negative') && h.includes('-0.51') && h.includes('2 of 4 headlines are about AAPL') && h.includes('context, not a forecast'));
     assert(h.includes('left:24.5%'), 'gauge marker at (-0.51+1)/2');
   });
   await t('Mentions distinct stories only when several headlines are the same story', async () => {
-    let e = env(() => data({ n_relevant: 5, n_stories: 2 })); await e.run('loadSentiment()'); assert(e.el.innerHTML.includes('(2 distinct stories)'));
-    e = env(() => data({ n_relevant: 2, n_stories: 2 })); await e.run('loadSentiment()'); assert(!e.el.innerHTML.includes('distinct stories'));
+    let e = env(() => data({ n_relevant: 5, n_stories: 2 })); await e.run('loadNewsSentiment()'); assert(e.el.innerHTML.includes('(2 distinct stories)'));
+    e = env(() => data({ n_relevant: 2, n_stories: 2 })); await e.run('loadNewsSentiment()'); assert(!e.el.innerHTML.includes('distinct stories'));
   });
   await t('Headline and source text is escaped; only http(s) links are clickable', async () => {
-    const e = env(() => data()); await e.run('loadSentiment()'); const h = e.el.innerHTML;
+    const e = env(() => data()); await e.run('loadNewsSentiment()'); const h = e.el.innerHTML;
     assert(!h.includes('<b>orders') && h.includes('Apple cuts &lt;b&gt;orders&lt;/b&gt;') && h.includes('Src &amp; Co'));
     assert(h.includes('href="https://example.com/a?x=1&amp;y=&quot;2&quot;"') && !h.includes('javascript:'));
   });
   await t('Relevant headlines first; ignored ones tucked into a details block', async () => {
-    const e = env(() => data()); await e.run('loadSentiment()'); const h = e.el.innerHTML;
+    const e = env(() => data()); await e.run('loadNewsSentiment()'); const h = e.el.innerHTML;
     assert(h.indexOf('Apple cuts') < h.indexOf('<details>') && h.includes('2 headlines not about AAPL (ignored)') && h.includes('-0.80') && h.includes('+0.70') && h.includes('>n/a<'));
   });
   await t('Stale results are flagged; empty states read sensibly', async () => {
-    let e = env(() => data({ stale: true })); await e.run('loadSentiment()'); assert(e.el.innerHTML.includes('older result'));
-    e = env(() => data({ score: null, label: 'No relevant news', n_relevant: 0, counts: { positive: 0, neutral: 0, negative: 0 }, headlines: [data().headlines[2]] })); await e.run('loadSentiment()'); assert(e.el.innerHTML.includes('None of the recent headlines are about this company'));
-    e = env(() => data({ score: null, label: 'No recent news', n_articles: 0, n_relevant: 0, headlines: [] })); await e.run('loadSentiment()'); assert(e.el.innerHTML.includes('No recent headlines found'));
+    let e = env(() => data({ stale: true })); await e.run('loadNewsSentiment()'); assert(e.el.innerHTML.includes('older result'));
+    e = env(() => data({ score: null, label: 'No relevant news', n_relevant: 0, counts: { positive: 0, neutral: 0, negative: 0 }, headlines: [data().headlines[2]] })); await e.run('loadNewsSentiment()'); assert(e.el.innerHTML.includes('None of the recent headlines are about this company'));
+    e = env(() => data({ score: null, label: 'No recent news', n_articles: 0, n_relevant: 0, headlines: [] })); await e.run('loadNewsSentiment()'); assert(e.el.innerHTML.includes('No recent headlines found'));
   });
   await t('Loaded once per stock; a failure shows a working Retry', async () => {
-    const e = env(() => data()); await e.run('loadSentiment()'); await e.run('loadSentiment()'); assert.equal(e.calls.length, 1);
-    e.ctx.curTick = 'MSFT'; await e.run('loadSentiment()'); assert.equal(e.calls[1], '/api/sentiment/MSFT');
-    let n = 0; const f = env(() => (++n === 1 ? null : data())); await f.run('loadSentiment()'); assert(f.el.innerHTML.includes('Retry'));
-    f.el.dataset.state = ''; await f.run('loadSentiment()'); assert(f.el.innerHTML.includes('Negative'));
+    const e = env(() => data()); await e.run('loadNewsSentiment()'); await e.run('loadNewsSentiment()'); assert.equal(e.calls.length, 1);
+    e.ctx.curTick = 'MSFT'; await e.run('loadNewsSentiment()'); assert.equal(e.calls[1], '/api/sentiment/MSFT');
+    let n = 0; const f = env(() => (++n === 1 ? null : data())); await f.run('loadNewsSentiment()'); assert(f.el.innerHTML.includes('Retry'));
+    f.el.dataset.state = ''; await f.run('loadNewsSentiment()'); assert(f.el.innerHTML.includes('Negative'));
   });
   await t('Switching stocks mid-load ignores the stale response', async () => {
     let release; const gate = new Promise(r => { release = r; });
     const e = env(async u => { if (u.endsWith('AAPL')) { await gate; return data(); } return data({ ticker: 'MSFT', score: 0.4, label: 'Positive' }); });
-    const first = e.run('loadSentiment()'); await new Promise(r => setTimeout(r, 5)); e.ctx.curTick = 'MSFT'; await e.run('loadSentiment()'); release(); await first;
+    const first = e.run('loadNewsSentiment()'); await new Promise(r => setTimeout(r, 5)); e.ctx.curTick = 'MSFT'; await e.run('loadNewsSentiment()'); release(); await first;
     assert(e.el.innerHTML.includes('Positive') && !e.el.innerHTML.includes('Negative')); assert.equal(e.el.dataset.t, 'MSFT');
   });
   await t('Unsafe URLs are rejected and safe ones open without opener access', async () => {

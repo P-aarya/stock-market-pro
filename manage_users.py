@@ -7,12 +7,12 @@ Account administration. Run it from the project folder with the virtual environm
     python manage_users.py remove-admin EMAIL       take administrator rights away
     python manage_users.py approve EMAIL            let a pending or blocked account sign in
     python manage_users.py block EMAIL              stop an account signing in
-    python manage_users.py claim-legacy EMAIL       give the portfolio and transactions saved before accounts existed to EMAIL
+    python manage_users.py claim-legacy EMAIL       give the portfolio, transactions and price alerts saved before accounts existed to EMAIL
     python manage_users.py set-password EMAIL       reset someone's password (there is no "forgot password" email)
     python manage_users.py list-users [--pending]
-    python manage_users.py delete-user EMAIL --yes  delete an account together with its holdings, transactions and watchlist
+    python manage_users.py delete-user EMAIL --yes  delete an account together with its holdings, transactions, price alerts and watchlist
 
-Back the database up before the first `migrate`: it adds a column to the portfolio and transactions tables.
+Back the database up before the first `migrate`: it adds a column to the portfolio, transactions and (if it exists) price_alerts tables.
 """
 import argparse
 import getpass
@@ -43,6 +43,7 @@ WATCHLIST_DDL = """CREATE TABLE IF NOT EXISTS watchlist (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""
 
 PERSONAL_TABLES = ("portfolio", "transactions")      # tables whose rows belong to one account
+OPTIONAL_PERSONAL_TABLES = ("price_alerts",)         # the same, but the app creates them on first use, so they may not exist yet
 
 # Columns added to a users table made before approval existed. Accounts that already exist were let in when they
 # registered, so they are filled in as approved; the default for NEW rows is then switched to pending.
@@ -57,6 +58,17 @@ USERS_COLUMNS = (
 def _has_column(cur, table, column):
     cur.execute("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = %s AND column_name = %s", (table, column))
     return bool(cur.fetchone()[0])
+
+
+def _has_table(cur, table):
+    cur.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = %s", (table,))
+    row = cur.fetchone()
+    return bool(row and row[0])
+
+
+def owned_tables(cur):
+    """Every personal table that exists right now, required ones first."""
+    return [*PERSONAL_TABLES, *(t for t in OPTIONAL_PERSONAL_TABLES if _has_table(cur, t))]
 
 
 def add_user_id_column(cur, table):
@@ -89,6 +101,11 @@ def migrate(conn):
     done.append("users: added " + ", ".join(added) + " (existing accounts are approved)" if added else "users: approval columns already there")
     for table in PERSONAL_TABLES:
         done.append(f"{table}: added user_id column" if add_user_id_column(cur, table) else f"{table}: user_id column already there")
+    for table in OPTIONAL_PERSONAL_TABLES:
+        if _has_table(cur, table):
+            done.append(f"{table}: added user_id column" if add_user_id_column(cur, table) else f"{table}: user_id column already there")
+        else:
+            done.append(f"{table}: not created yet (the app adds it, with its owner column, the first time it is used)")
     conn.commit()
     return done
 
@@ -97,7 +114,7 @@ def claim_legacy(conn, user_id):
     """Give every row that has no owner yet to `user_id`. Returns {table: rows given}."""
     cur = conn.cursor()
     claimed = {}
-    for table in PERSONAL_TABLES:
+    for table in owned_tables(cur):
         cur.execute(f"UPDATE {table} SET user_id = %s WHERE user_id IS NULL", (user_id,))
         claimed[table] = cur.rowcount
     conn.commit()
@@ -108,7 +125,7 @@ def delete_account(conn, user_id):
     """Remove an account and everything it owns, all or nothing."""
     cur = conn.cursor()
     try:
-        for table in (*PERSONAL_TABLES, "watchlist"):
+        for table in (*owned_tables(cur), "watchlist"):
             cur.execute(f"DELETE FROM {table} WHERE user_id = %s", (user_id,))
         cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
         conn.commit()
