@@ -9,6 +9,7 @@ import json
 import re
 import types
 from datetime import datetime
+from ipo_data import get_ipos, IPOUnavailable
 
 # Groq API client. A missing key must not stop the whole API from starting.
 MODEL = "openai/gpt-oss-120b"
@@ -147,7 +148,7 @@ def get_commodity_linked_stocks(commodity_name: str, category: str = None) -> li
         cursor = conn.cursor(dictionary=True)
         placeholders = ','.join(['%s'] * len(tickers))
         cursor.execute(f"""
-            SELECT l.ticker, l.company_name, l.sector, l.current_price,
+            SELECT l.ticker, l.company_name, l.sector, l.current_price, 
                    l.price_change_pct, l.market_cap, f.market_cap_category,
                    COALESCE(p.buy_signal, 'N/A') as buy_signal,
                    COALESCE(p.trend, 'NEUTRAL') as trend,
@@ -905,16 +906,38 @@ def _run_agent(user_query: str, portfolio_tickers: list = None, chat_history: li
             answer = llm_text(with_history(f"As a financial expert, explain this in simple plain English (3-5 sentences, no jargon): {user_query}", chat_history))
         return {"intent": "education", "stocks_found": 0, "recommendation": answer, "portfolio_review": None, "top_stocks": [], "all_stocks": []}
 
-    # ── IPO: not available in this version ──
+    # ── IPO: upcoming and recent US IPOs, answered only from the calendar data ──
     if intent == "ipo":
-        return {
-            "intent": "ipo",
-            "stocks_found": 0,
-            "recommendation": "IPO calendar data is not available in this version. For upcoming IPOs, check nasdaq.com/market-activity/ipos or finance.yahoo.com/calendar/ipo.",
-            "portfolio_review": None,
-            "top_stocks": [],
-            "all_stocks": []
-        }
+        try:
+            calendar = get_ipos(days_back=7, days_ahead=45)
+        except IPOUnavailable:
+            return {"intent": "ipo", "stocks_found": 0, "recommendation": "I can't reach the IPO calendar right now. Please try again in a few minutes.",
+                    "portfolio_review": None, "top_stocks": [], "all_stocks": []}
+
+        def line(r):
+            terms = f"price range ${r['price_low']:.2f}" + (f"-${r['price_high']:.2f}" if r["price_high"] not in (None, r["price_low"]) else "") if r["price_low"] is not None else "terms not announced"
+            shares = f", {int(r['shares']):,} shares" if r["shares"] else ""
+            day = datetime.strptime(r["date"], "%Y-%m-%d").strftime("%A, %B %d, %Y")  # real weekday: the model must not work it out itself
+            return f"- {day} | {r['company']} ({r['ticker'] or 'no ticker yet'}) | {r['exchange'] or 'exchange TBA'} | {r['status']} | {terms}{shares}{' | SPAC' if r['is_spac'] else ''}"
+
+        upcoming = [r for r in calendar["ipos"] if r["days_until"] >= 0][:20]
+        recent = [r for r in calendar["ipos"] if r["days_until"] < 0][-8:]
+        data_block = "UPCOMING (soonest first):\n" + ("\n".join(map(line, upcoming)) or "- none on the calendar") + \
+                     "\n\nRECENT (last 7 days):\n" + ("\n".join(map(line, recent)) or "- none")
+        answer = llm_text(with_history(
+            f"""You are an IPO calendar assistant.
+
+The user asked: "{user_query}"
+
+Here is the complete US IPO calendar data you have:
+{data_block}
+
+Answer using ONLY this data, in plain English. Group by the dates shown (copy weekdays and dates exactly as given; do not work out or invent weekdays or week ranges), and mention price range and size where known; say "terms not announced yet" where they are not. Briefly say what a SPAC is if any are listed. Do not predict how an IPO will perform and do not invent companies, dates or prices. If nothing matches the question, say so.
+End with: "⚠️ IPO dates and terms change often. Not financial advice." """, chat_history))
+        stamp = calendar["as_of"][11:16]
+        return {"intent": "ipo", "stocks_found": len(upcoming),
+                "recommendation": f"{answer}\n\n🕒 IPO data retrieved {stamp} UTC (Yahoo Finance, Nasdaq)",
+                "portfolio_review": None, "top_stocks": [], "all_stocks": []}
 
     # ── IRRELEVANT ──
     if intent == "irrelevant":
@@ -1054,6 +1077,16 @@ Quote current numbers only from the live data above and describe what they show.
         tickers, missing = resolve_compare_tickers(route, user_query)
         snapshots = [s for s in (get_stock_snapshot(t) for t in tickers) if s]
 
+        peer_note = ""
+        if len(snapshots) == 1 and re.search(r"competitor|peer|rival|alternative|similar compan|its industry", user_query.lower()):
+            from peers import suggest_peers  # imported here so peers.py and agent.py can import each other
+            found = suggest_peers(snapshots[0]["ticker"], 3)
+            if found and found["peers"]:
+                extra = [x for x in (get_stock_snapshot(p["ticker"]) for p in found["peers"]) if x]
+                snapshots += extra
+                peer_note = (f"Compared with its closest competitors ({', '.join(x['ticker'] for x in extra)}), "
+                             f"{'chosen by AI from the same industry' if found['source'] == 'ai' else 'picked by industry and market-cap closeness'}.\n\n")
+
         if len(snapshots) < 2:
             if missing:
                 msg = f"I couldn't find {', '.join(missing)} in our database, so I can't compare them. Try the exact ticker symbols, for example 'compare AAPL and MSFT'."
@@ -1063,7 +1096,7 @@ Quote current numbers only from the live data above and describe what they show.
                 msg = "Tell me which stocks to compare, for example 'compare AAPL and MSFT' or 'Tesla vs Rivian'."
             return {"intent": "compare", "stocks_found": len(snapshots), "recommendation": msg, "portfolio_review": None, "top_stocks": snapshots, "all_stocks": snapshots}
 
-        recommendation = generate_comparison(user_query, snapshots, chat_history)
+        recommendation = peer_note + generate_comparison(user_query, snapshots, chat_history)
         if missing:
             recommendation = f"Note: I couldn't find {', '.join(missing)} in our database, so it's left out.\n\n" + recommendation
         return {

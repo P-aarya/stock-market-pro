@@ -1,12 +1,12 @@
-"""add_sample_data.py - puts back the July sample portfolio:
-10 holdings and 20 transactions.
+"""add_sample_data.py - fills ONE account with the sample portfolio: 10 holdings and 20 transactions.
 
-Run once from your project folder:   python add_sample_data.py
+    python add_sample_data.py YOU@EXAMPLE.COM
 
-Note: it empties the portfolio and transactions tables first, so running it
-again just resets them to this same sample data.
+It replaces only that account's holdings and transactions. Other accounts are never touched.
 """
 import os
+import sys
+
 import mysql.connector
 from dotenv import load_dotenv
 
@@ -65,38 +65,46 @@ TRANSACTIONS = [
 ]
 
 
-def main():
+def main(email):
     conn = get_db()
     cur = conn.cursor()
     print("Connected to", os.getenv("DB_HOST", "localhost"))
 
-    cur.execute("DELETE FROM portfolio")
-    cur.execute("DELETE FROM transactions")
+    cur.execute("SELECT id FROM users WHERE email = %s", (email.strip().lower(),))
+    row = cur.fetchone()
+    if not row:
+        sys.exit(f"No account found for {email}. Create it first: python manage_users.py create-user {email}")
+    user_id = row[0]
+
+    cur.execute("DELETE FROM portfolio WHERE user_id = %s", (user_id,))
+    cur.execute("DELETE FROM transactions WHERE user_id = %s", (user_id,))
 
     cur.executemany(
         """INSERT INTO portfolio
-           (ticker, company_name, quantity, avg_buy_price, buy_date, sector, notes)
-           VALUES (%s,%s,%s,%s,%s,%s,%s)""",
-        HOLDINGS,
+           (user_id, ticker, company_name, quantity, avg_buy_price, buy_date, sector, notes)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
+        [(user_id, *h) for h in HOLDINGS],
     )
     cur.executemany(
         """INSERT INTO transactions
-           (ticker, company_name, transaction_type, quantity, price, total_value, transaction_date, notes)
-           VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
-        [(t, n, ty, q, p, round(q * p, 2), d, note) for (t, n, ty, q, p, d, note) in TRANSACTIONS],
+           (user_id, ticker, company_name, transaction_type, quantity, price, total_value, transaction_date, notes)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+        [(user_id, t, n, ty, q, p, round(q * p, 2), d, note) for (t, n, ty, q, p, d, note) in TRANSACTIONS],
     )
     conn.commit()
 
-    cur.execute("SELECT COUNT(*) FROM portfolio")
+    cur.execute("SELECT COUNT(*) FROM portfolio WHERE user_id = %s", (user_id,))
     n_hold = cur.fetchone()[0]
-    cur.execute("SELECT COUNT(*) FROM transactions")
+    cur.execute("SELECT COUNT(*) FROM transactions WHERE user_id = %s", (user_id,))
     n_tx = cur.fetchone()[0]
     cur.close()
     conn.close()
-    print(f"Portfolio holdings in database: {n_hold}")
-    print(f"Transactions in database:       {n_tx}")
-    print("Done. Restart api.py and open the Portfolio tab.")
+    print(f"Portfolio holdings for {email}: {n_hold}")
+    print(f"Transactions for {email}:       {n_tx}")
+    print("Done. Refresh the dashboard and open the Portfolio tab.")
 
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) != 2:
+        sys.exit("Usage: python add_sample_data.py YOU@EXAMPLE.COM   (the account to fill with sample data)")
+    main(sys.argv[1])

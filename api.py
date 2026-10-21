@@ -1,7 +1,8 @@
 # ============================================================
 # STOCK MARKET PRO - api.py (Final Clean Version)
 # ============================================================
-from fastapi import FastAPI, Body, Request
+from fastapi import Depends, FastAPI, Body, HTTPException, Request
+from starlette.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 import mysql.connector
@@ -18,102 +19,197 @@ import time
 import urllib.parse
 from collections import defaultdict, deque
 from dotenv import load_dotenv
+from html import escape as _escape_html
 load_dotenv()
+
+import auth
+import auth_pages
 
 app = FastAPI(title="Stock Market Pro API")
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(",") if o.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 
-# -- Optional password protection --
-# Set APP_PASSWORD in .env to require a login for the whole app: pages, data and every endpoint that changes anything.
-# Leave it unset (the default) and the app stays open, which is fine on your own machine but not when it is exposed
-# to the internet, for example through a tunnel. APP_SECRET (optional) changes the key sessions are signed with.
-APP_PASSWORD = os.getenv("APP_PASSWORD", "")
-SESSION_DAYS = 14
+# ── Accounts ──
+# Every page and endpoint needs a signed-in user (see auth.py). The session cookie carries the user's id; the middleware
+# below puts it on request.state.user_id, and the endpoints that read or change personal data take it from there.
+#   REQUIRE_APPROVAL=false  lets new accounts in at once (the default is that an administrator approves each one)
+#   ALLOW_SIGNUP=false  closes registration (accounts can still be made with manage_users.py)
+#   SIGNUP_CODE=...     keeps registration open only for people who know the code
+#   APP_SECRET=...      the key sessions are signed with (otherwise a random one is kept in .app_secret)
+ALLOW_SIGNUP = os.getenv("ALLOW_SIGNUP", "true").strip().lower() not in ("false", "0", "no")
+REQUIRE_APPROVAL = os.getenv("REQUIRE_APPROVAL", "true").strip().lower() not in ("false", "0", "no")
+SIGNUP_CODE = os.getenv("SIGNUP_CODE", "")
 SESSION_COOKIE = "smp_session"
-LOGIN_MAX_FAILURES = 5          # wrong passwords allowed per client ...
-LOGIN_WINDOW_SECONDS = 300      # ... in this many seconds
-_OPEN_PATHS = {"/login", "/logout", "/health", "/api/auth/status", "/favicon.ico"}
-_login_failures = defaultdict(deque)
+_login_by_client = auth.RateLimiter(5, 300)     # wrong passwords per client in 5 minutes ...
+_login_by_email = auth.RateLimiter(10, 900)     # ... and per account in 15 minutes
+_signups = auth.RateLimiter(5, 3600)            # sign-up attempts per client in an hour
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Files a phone fetches for "Add to Home Screen" (app icon + manifest). The browser asks for them without the login
+# cookie, and they hold nothing private, so they stay reachable before sign-in.
+_STATIC_DIR = os.path.join(_BASE_DIR, "static")
+_APP_ASSETS = {
+    "/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json"),
+    "/apple-touch-icon.png": ("apple-touch-icon.png", "image/png"),
+    "/icon-192.png": ("icon-192.png", "image/png"),
+    "/icon-512.png": ("icon-512.png", "image/png"),
+}
+_OPEN_PATHS = {"/login", "/register", "/logout", "/health", "/api/auth/status", "/favicon.ico"} | set(_APP_ASSETS)
 
 
-def _session_key() -> bytes:
-    return hashlib.sha256(("smp|" + (os.getenv("APP_SECRET") or APP_PASSWORD)).encode()).digest()
+_SETUP_HINT = "The accounts tables need a database update. Run: python manage_users.py migrate"
 
 
-def _sign(expires: int) -> str:
-    return hmac.new(_session_key(), str(expires).encode(), hashlib.sha256).hexdigest()
+async def _approved_user(request: Request):
+    """The account behind the session cookie if it still exists and is approved, else None. Uses the short-lived cache."""
+    user_id = auth.read_token(request.cookies.get(SESSION_COOKIE, ""))
+    if user_id is None:
+        return None
+    user = await run_in_threadpool(auth.access_for, user_id)
+    return user if user and user["status"] == "approved" else None
 
 
-def make_session_token() -> str:
-    expires = int(time.time()) + SESSION_DAYS * 86400
-    return f"{expires}.{_sign(expires)}"
-
-
-def valid_session_token(token: str) -> bool:
-    try:
-        expires, signature = token.split(".", 1)
-        return int(expires) > time.time() and hmac.compare_digest(signature, _sign(int(expires)))
-    except (ValueError, AttributeError):
-        return False
+def _unavailable(request: Request, status: int, message: str):
+    if request.url.path.startswith(("/api/", "/agent/")):
+        return JSONResponse({"status": "error", "message": message}, status_code=status)
+    return HTMLResponse(auth_pages.notice_page("Temporarily unavailable", message), status_code=status)
 
 
 @app.middleware("http")
 async def require_login(request: Request, call_next):
-    if not APP_PASSWORD or request.method == "OPTIONS" or request.url.path in _OPEN_PATHS \
-            or valid_session_token(request.cookies.get(SESSION_COOKIE, "")):
+    request.state.user_id, request.state.is_admin = None, False
+    if request.method == "OPTIONS" or request.url.path in _OPEN_PATHS:
+        return await call_next(request)
+    try:
+        user = await _approved_user(request)
+    except auth.AccountsNotSetUp:
+        return _unavailable(request, 503, _SETUP_HINT)
+    except Exception:
+        log.exception("Could not check access")
+        return _unavailable(request, 503, "We couldn't check your access just now. Please try again in a moment.")
+    if user:
+        request.state.user_id, request.state.is_admin = user["id"], bool(user["is_admin"])
         return await call_next(request)
     if request.url.path.startswith(("/api/", "/agent/")):
         return JSONResponse({"status": "error", "message": "Please sign in."}, status_code=401)
     return RedirectResponse("/login", status_code=302)
 
 
-def _login_page(error: str = "") -> str:
-    message = f'<p class="err">{error}</p>' if error else ""
-    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sign in</title><style>
-:root{{--bg:#0b0d17;--card:#12152a;--line:#242a4a;--text:#e8ecf8;--muted:#8d97b8;--accent:#00c8ff;--red:#ff5c5c}}
-@media (prefers-color-scheme: light){{:root{{--bg:#f3f5fb;--card:#fff;--line:#d9deef;--text:#16192b;--muted:#5d6785;--accent:#0a7bd1;--red:#c62828}}}}
-*{{box-sizing:border-box}}body{{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--text);font:15px system-ui,sans-serif}}
-form{{width:min(360px,calc(100vw - 32px));background:var(--card);border:1px solid var(--line);border-radius:14px;padding:28px}}
-h1{{margin:0 0 4px;font-size:20px}}p{{margin:0 0 18px;color:var(--muted);font-size:13px}}
-input{{width:100%;padding:11px 12px;border-radius:9px;border:1px solid var(--line);background:transparent;color:var(--text);font-size:15px}}
-input:focus{{outline:2px solid var(--accent);outline-offset:1px}}
-button{{margin-top:14px;width:100%;padding:11px;border:0;border-radius:9px;background:var(--accent);color:#fff;font-weight:700;font-size:15px;cursor:pointer}}
-.err{{color:var(--red);font-weight:600;margin:12px 0 0}}</style></head><body>
-<form method="post" action="/login"><h1>Stock Market Pro</h1><p>Enter the password to continue.</p>
-<input type="password" name="password" placeholder="Password" autocomplete="current-password" autofocus required>
-<button type="submit">Sign in</button>{message}</form></body></html>"""
+def current_user_id(request: Request) -> int:
+    """The signed-in user's id, for endpoints that read or change personal data (the middleware has already checked it)."""
+    user_id = getattr(request.state, "user_id", None)
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Please sign in.")
+    return user_id
+
+
+def require_admin(request: Request) -> int:
+    """The signed-in administrator's id. Checked against the database each time, so a block or demotion applies at once."""
+    user_id = current_user_id(request)
+    user = auth.get_user(user_id)
+    if not user or user["status"] != "approved" or not user["is_admin"]:
+        raise HTTPException(status_code=403, detail="Administrator access required.")
+    return user_id
+
+
+def require_admin_action(request: Request, admin_id: int = Depends(require_admin)) -> int:
+    """Changes made by an administrator must come from the admin page's own script, which sends this header. A page on
+    another site can't add it without the browser asking this server's permission first."""
+    if request.headers.get("x-requested-with") != "fetch":
+        raise HTTPException(status_code=403, detail="This action must be made from the admin page.")
+    return admin_id
+
+
+def _is_https(request: Request) -> bool:
+    return request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
+
+
+def _start_session(request: Request, user_id: int) -> RedirectResponse:
+    response = RedirectResponse("/", status_code=303)
+    response.set_cookie(SESSION_COOKIE, auth.make_token(user_id), max_age=auth.SESSION_DAYS * 86400, httponly=True,
+                        samesite="lax", secure=_is_https(request))
+    return response
+
+
+async def _read_form(request: Request) -> dict:
+    body = (await request.body())[:10000]
+    return {k: v[0] for k, v in urllib.parse.parse_qs(body.decode("utf-8", "ignore"), keep_blank_values=True).items()}
 
 
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
-    if not APP_PASSWORD or valid_session_token(request.cookies.get(SESSION_COOKIE, "")):
-        return RedirectResponse("/", status_code=303)
-    return HTMLResponse(_login_page())
+    cookie = request.cookies.get(SESSION_COOKIE, "")
+    user_id = auth.read_token(cookie)
+    if user_id is not None:
+        try:
+            user = auth.access_for(user_id)
+            if user and user["status"] == "approved":
+                return RedirectResponse("/", status_code=303)
+        except Exception:
+            return RedirectResponse("/", status_code=303)      # the database hiccuped: don't sign anyone out for that
+    response = HTMLResponse(auth_pages.login_page(signup_open=ALLOW_SIGNUP))
+    if cookie:
+        response.delete_cookie(SESSION_COOKIE)                # expired, forged, blocked, or for an account that no longer exists
+    return response
 
 
 @app.post("/login")
 async def login(request: Request):
-    if not APP_PASSWORD:
-        return RedirectResponse("/", status_code=303)
+    form = await _read_form(request)
+    email, password = auth.normalize_email(form.get("email")), form.get("password", "")
     client = _client_id(request)
-    now = time.time()
-    failures = _login_failures[client]
-    while failures and now - failures[0] > LOGIN_WINDOW_SECONDS:
-        failures.popleft()
-    if len(failures) >= LOGIN_MAX_FAILURES:
-        return HTMLResponse(_login_page("Too many wrong passwords. Please wait a few minutes and try again."), status_code=429)
-    form = urllib.parse.parse_qs((await request.body()).decode("utf-8", "ignore"))
-    attempt = form.get("password", [""])[0]
-    if hmac.compare_digest(attempt.encode(), APP_PASSWORD.encode()):
-        failures.clear()
-        response = RedirectResponse("/", status_code=303)
-        response.set_cookie(SESSION_COOKIE, make_session_token(), max_age=SESSION_DAYS * 86400, httponly=True, samesite="lax",
-                            secure=request.headers.get("x-forwarded-proto", request.url.scheme) == "https")
-        return response
-    failures.append(now)
-    return HTMLResponse(_login_page("That password isn't right."), status_code=401)
+    if _login_by_client.blocked(client) or _login_by_email.blocked(email):
+        return HTMLResponse(auth_pages.login_page("Too many failed attempts. Please wait a few minutes and try again.", email, ALLOW_SIGNUP), status_code=429)
+    try:
+        user = await run_in_threadpool(auth.authenticate, email, password)
+    except auth.AccountsNotSetUp:
+        return HTMLResponse(auth_pages.notice_page("Accounts aren't set up yet", "The site owner needs to run: python manage_users.py migrate"), status_code=503)
+    if user:
+        _login_by_client.clear(client)
+        _login_by_email.clear(email)
+        if user["status"] == "pending":
+            return HTMLResponse(auth_pages.pending_page(user["email"]), status_code=403)
+        if user["status"] != "approved":
+            return HTMLResponse(auth_pages.blocked_page(), status_code=403)
+        return _start_session(request, user["id"])
+    _login_by_client.record(client)
+    _login_by_email.record(email)
+    return HTMLResponse(auth_pages.login_page("That email or password isn't right.", email, ALLOW_SIGNUP), status_code=401)
+
+
+@app.get("/register", response_class=HTMLResponse)
+def register_page(request: Request):
+    if not ALLOW_SIGNUP:
+        return HTMLResponse(auth_pages.register_page(closed=True), status_code=403)
+    return HTMLResponse(auth_pages.register_page(needs_code=bool(SIGNUP_CODE)))
+
+
+@app.post("/register")
+async def register(request: Request):
+    if not ALLOW_SIGNUP:
+        return HTMLResponse(auth_pages.register_page(closed=True), status_code=403)
+    form = await _read_form(request)
+    email, password = auth.normalize_email(form.get("email")), form.get("password", "")
+    client = _client_id(request)
+
+    def again(message, status):
+        return HTMLResponse(auth_pages.register_page(message, email, bool(SIGNUP_CODE)), status_code=status)
+
+    if _signups.blocked(client):
+        return again("Too many sign-up attempts from your network. Please try again later.", 429)
+    _signups.record(client)
+    if SIGNUP_CODE and not hmac.compare_digest(form.get("code", "").strip().encode(), SIGNUP_CODE.encode()):
+        return again("That invite code isn't right.", 403)
+    if password != form.get("confirm", ""):
+        return again("The two passwords don't match.", 400)
+    try:
+        user = await run_in_threadpool(auth.register, email, password, "pending" if REQUIRE_APPROVAL else "approved")
+    except auth.AuthError as e:
+        return again(e.message, e.status)
+    except auth.AccountsNotSetUp:
+        return HTMLResponse(auth_pages.notice_page("Accounts aren't set up yet", "The site owner needs to run: python manage_users.py migrate"), status_code=503)
+    if user["status"] == "pending":
+        return HTMLResponse(auth_pages.pending_page(user["email"]), status_code=200)      # no session until an administrator approves
+    return _start_session(request, user["id"])
 
 
 @app.get("/logout")
@@ -125,21 +221,59 @@ def logout():
 
 @app.get("/api/auth/status")
 def auth_status(request: Request):
-    return {"enabled": bool(APP_PASSWORD), "signed_in": (not APP_PASSWORD) or valid_session_token(request.cookies.get(SESSION_COOKIE, ""))}
+    user_id = auth.read_token(request.cookies.get(SESSION_COOKIE, ""))
+    if user_id is None:
+        return {"enabled": True, "signed_in": False, "user": None, "admin": False}
+    try:
+        user = auth.access_for(user_id)
+    except Exception:
+        return {"enabled": True, "signed_in": True, "user": None, "admin": False}   # a database hiccup shouldn't sign anyone out
+    if not user or user["status"] != "approved":
+        return {"enabled": True, "signed_in": False, "user": None, "admin": False}
+    return {"enabled": True, "signed_in": True, "user": {"id": user["id"], "email": user["email"]}, "admin": bool(user["is_admin"])}
 
 
-# -- Serve dashboard.html directly from port 8000 --
+# ── Serve dashboard.html directly from port 8000 ──
+def _dashboard_response(request: Request):
+    path = os.path.join(_BASE_DIR, "dashboard.html")
+    if not os.path.exists(path):
+        return {"status": "running", "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+    with open(path, encoding="utf-8") as f:
+        page = f.read()
+    user_id = getattr(request.state, "user_id", None)
+    meta = ""
+    if user_id is not None:
+        try:
+            user = auth.get_user(user_id)
+        except Exception:
+            user = None
+        meta = (f'<meta name="smp-user-id" content="{int(user_id)}">'
+                f'<meta name="smp-user-email" content="{_escape_html((user or {}).get("email", ""), quote=True)}">'
+                f'<meta name="smp-user-admin" content="{1 if getattr(request.state, "is_admin", False) else 0}">')
+    # The page is different for every person, so it must never be stored by a browser cache or a shared proxy.
+    return HTMLResponse(page.replace("<!--SMP_USER-->", meta, 1), headers={"Cache-Control": "private, no-store"})
+
+
 @app.get("/")
-def serve_root():
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard.html")
-    if os.path.exists(path):
-        return FileResponse(path)
-    return {"status": "running", "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+def serve_root(request: Request):
+    return _dashboard_response(request)
+
 
 @app.get("/dashboard.html")
-def serve_dashboard():
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard.html")
-    return FileResponse(path)
+def serve_dashboard(request: Request):
+    return _dashboard_response(request)
+
+
+def _app_asset_route(filename: str, media_type: str):
+    def serve():
+        path = os.path.join(_STATIC_DIR, filename)
+        if not os.path.exists(path):
+            return JSONResponse({"detail": "Not found"}, status_code=404)
+        return FileResponse(path, media_type=media_type, headers={"Cache-Control": "public, max-age=86400"})
+    return serve
+
+for _route, (_file, _type) in _APP_ASSETS.items():
+    app.add_api_route(_route, _app_asset_route(_file, _type), methods=["GET"], include_in_schema=False)
 
 @app.get("/health")
 def health():
@@ -156,6 +290,10 @@ def get_db():
     }
     if os.getenv("DB_SSL", "false").lower() == "true":
         config["ssl_disabled"] = False
+    # The web server opens many connections at once (one per request, on separate threads). The connector's C
+    # extension is not safe for that: concurrent first connections fail with "2059 Authentication plugin ... is
+    # already loaded" and can crash the whole process. The pure-Python connector has no such problem.
+    config["use_pure"] = True
     return mysql.connector.connect(**config)
 
 def query(sql, params=None):
@@ -399,11 +537,12 @@ def batch_commodity_companies(request: dict = Body(...)):
         placeholders = ','.join(['%s'] * len(tickers))
         results = query(f"""
             SELECT l.ticker, l.company_name, l.sector, l.current_price,
-                   l.price_change_pct, l.market_cap, l.market_cap_category,
+                   l.price_change_pct, l.market_cap, f.market_cap_category,
                    COALESCE(p.buy_signal, 'N/A') as buy_signal,
                    COALESCE(p.trend, 'NEUTRAL') as trend,
                    COALESCE(a.analyst_rating, 'N/A') as analyst_rating
             FROM stocks_live l
+            LEFT JOIN stocks_fundamentals f ON l.ticker = f.ticker
             LEFT JOIN stocks_predictions p ON l.ticker = p.ticker
             LEFT JOIN stocks_analyst a ON l.ticker = a.ticker
             WHERE l.ticker IN ({placeholders})
@@ -1407,38 +1546,108 @@ def get_world_news():
 def get_stock_news(ticker: str):
     return _fetch_news(ticker.upper(), 10)
 
-# ======================================================
-# SCREENER
-# ======================================================
+# ══════════════════════════════════════════════════════
+# PORTFOLIO
+# ══════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════
+# AI AGENT ENDPOINTS
+# ══════════════════════════════════════════════════════
 import logging
+import queue
 import re
 import threading
 import time
 from collections import defaultdict, deque
 from typing import List, Literal
+
+import groq
 from fastapi import Path, Query, Request
-from fastapi.responses import StreamingResponse
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse, StreamingResponse
 from datetime import date as Date
 from pydantic import BaseModel, Field, field_validator
+
+from agent import run_agent, explain_single_stock, LLMUnavailable, set_stream_sink, clear_stream_sink
+import ipo_data
+import news_feed
+import peers
+import portfolio
+import sentiment
+import stock_period
+import watchlist
 from screener import get_top_movers, get_sector_summary, screen_stocks
 
 log = logging.getLogger("uvicorn.error")
+
 TICKER_RE = re.compile(r"^[A-Za-z0-9.\-^=]{1,10}$")
+
 
 def _valid_tickers(values):
     return [t.strip() for t in values if isinstance(t, str) and TICKER_RE.match(t.strip())]
 
+
+# ── Rate limit for the endpoints that spend LLM quota (per signed-in user, sliding 60s window) ──
+AGENT_RATE_LIMIT = int(os.getenv("AGENT_RATE_LIMIT", "20"))
+_agent_hits = defaultdict(deque)
+_agent_hits_lock = threading.Lock()
+
+
 def _client_id(request: Request) -> str:
+    # Behind a proxy or tunnel every request comes from the proxy, so trust its forwarded header
     forwarded = request.headers.get("cf-connecting-ip") or request.headers.get("x-forwarded-for", "").split(",")[0].strip()
     return forwarded or (request.client.host if request.client else "unknown")
 
+
 def agent_error(status_code: int, message: str) -> JSONResponse:
     return JSONResponse({"status": "error", "message": message}, status_code=status_code)
+
+
+def check_rate_limit(request: Request):
+    """Returns an error response when the client is over the limit, else None."""
+    now = time.time()
+    user_id = getattr(request.state, "user_id", None)
+    key = f"user:{user_id}" if user_id is not None else _client_id(request)
+    with _agent_hits_lock:
+        hits = _agent_hits[key]
+        while hits and now - hits[0] > 60:
+            hits.popleft()
+        if len(hits) >= AGENT_RATE_LIMIT:
+            return agent_error(429, f"You're sending messages too quickly. Please wait a moment (limit {AGENT_RATE_LIMIT} per minute).")
+        hits.append(now)
+        if len(_agent_hits) > 5000:  # drop clients with no recent activity
+            for k in [k for k, v in _agent_hits.items() if not v or now - v[-1] > 60]:
+                del _agent_hits[k]
+    return None
+
+
+def describe_ai_error(e):
+    """(HTTP status, short safe message) for a failure inside an AI call. Details go to the server log, not the client."""
+    if isinstance(e, LLMUnavailable):
+        return 503, "The AI assistant isn't available right now."
+    if isinstance(e, groq.RateLimitError):
+        return 429, "The AI service is busy. Please try again in a minute."
+    if isinstance(e, groq.APIConnectionError):  # includes timeouts
+        return 504, "I couldn't reach the AI service in time. Please try again."
+    log.error("AI endpoint failed", exc_info=e)
+    return 500, "Something went wrong on our side. Please try again."
+
+
+def run_ai(call):
+    """Run an AI call and turn failures into short, safe messages."""
+    try:
+        return call()
+    except Exception as e:
+        status, message = describe_ai_error(e)
+        return agent_error(status, message)
+
 
 class ScreenerRequest(BaseModel):
     filters: dict = {}
     limit: int = Field(default=50, ge=1, le=200)
 
+
+# Plain `def` endpoints run in FastAPI's thread pool, so slow LLM / database calls
+# do not freeze every other request the way they did inside `async def`.
 @app.post("/api/screener")
 def run_screener(request: ScreenerRequest):
     try:
@@ -1447,6 +1656,436 @@ def run_screener(request: ScreenerRequest):
     except Exception:
         log.exception("Screener failed")
         return []
+
+
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(max_length=2000)
+
+
+class RecommendRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=500)
+    portfolio_tickers: List[str] = Field(default_factory=list, max_length=30)
+    chat_history: List[ChatMessage] = Field(default_factory=list, max_length=20)
+    reply_to: str = Field(default="", max_length=300)
+
+    @field_validator("portfolio_tickers")
+    @classmethod
+    def only_valid_tickers(cls, v):
+        return _valid_tickers(v)
+
+
+class PortfolioRequest(BaseModel):
+    tickers: List[str] = Field(default_factory=list, max_length=30)   # ticker symbols or company names
+    use_holdings: bool = False                                        # review the saved holdings instead
+
+    @field_validator("tickers")
+    @classmethod
+    def sane_entries(cls, v):
+        return [t.strip()[:60] for t in v if isinstance(t, str) and t.strip()]
+
+
+class ExplainRequest(BaseModel):
+    ticker: str = Field(pattern=r"^[A-Za-z0-9.\-^=]{1,10}$")
+    query: str = Field(default="", max_length=500)
+
+
+class HoldingIn(BaseModel):
+    ticker: str = Field(pattern=r"^[A-Za-z0-9.\-^=]{1,10}$")
+    quantity: float = Field(gt=0, le=1e9)
+    avg_buy_price: float = Field(gt=0, le=1e7)
+    buy_date: Date
+    notes: str = Field(default="", max_length=200)
+
+
+class HoldingEdit(BaseModel):
+    quantity: float = Field(gt=0, le=1e9)
+    avg_buy_price: float = Field(gt=0, le=1e7)
+    buy_date: Date
+    notes: str = Field(default="", max_length=200)
+
+
+def holding_call(fn, user_id, *args):
+    try:
+        return {"status": "success", **fn(user_id, *args)}
+    except portfolio.PortfolioError as e:
+        return agent_error(e.status, e.message)
+    except Exception:
+        log.exception("Portfolio change failed")
+        return agent_error(500, "Something went wrong saving that. Please try again.")
+
+
+@app.get("/api/portfolio")
+def get_portfolio(user_id: int = Depends(current_user_id)):
+    return portfolio.list_holdings(user_id)
+
+
+@app.get("/api/portfolio/summary")
+def get_portfolio_summary(user_id: int = Depends(current_user_id)):
+    return portfolio.summarize(portfolio.list_holdings(user_id))
+
+
+@app.post("/api/portfolio")
+def add_portfolio_holding(body: HoldingIn, user_id: int = Depends(current_user_id)):
+    """Add a purchase. Buying more of a stock you already hold merges into one position at the weighted-average cost."""
+    return holding_call(portfolio.add_holding, user_id, body.ticker, body.quantity, body.avg_buy_price, body.buy_date, body.notes)
+
+
+@app.put("/api/portfolio/{holding_id}")
+def edit_portfolio_holding(holding_id: int, body: HoldingEdit, user_id: int = Depends(current_user_id)):
+    return holding_call(portfolio.update_holding, user_id, holding_id, body.quantity, body.avg_buy_price, body.buy_date, body.notes)
+
+
+@app.delete("/api/portfolio/{holding_id}")
+def delete_portfolio_holding(holding_id: int, user_id: int = Depends(current_user_id)):
+    return holding_call(portfolio.delete_holding, user_id, holding_id)
+
+
+class TxIn(BaseModel):
+    ticker: str = Field(pattern=r"^[A-Za-z0-9.\-^=]{1,10}$")
+    transaction_type: Literal["BUY", "SELL", "DIVIDEND"]
+    quantity: float = Field(gt=0, le=1e9)
+    price: float = Field(gt=0, le=1e7)          # for a DIVIDEND, the amount per share
+    transaction_date: Date
+    notes: str = Field(default="", max_length=200)
+    apply_to_holdings: bool = False             # also add the shares to / remove them from Holdings
+
+
+class TxEdit(BaseModel):
+    quantity: float = Field(gt=0, le=1e9)
+    price: float = Field(gt=0, le=1e7)
+    transaction_date: Date
+    notes: str = Field(default="", max_length=200)
+
+
+@app.get("/api/transactions")
+def get_transactions(user_id: int = Depends(current_user_id)):
+    return portfolio.list_transactions(user_id)
+
+
+@app.get("/api/transactions/summary")
+def get_transactions_summary(user_id: int = Depends(current_user_id)):
+    return portfolio.transaction_summary(user_id)
+
+
+@app.post("/api/transactions")
+def add_transaction_entry(body: TxIn, user_id: int = Depends(current_user_id)):
+    return holding_call(portfolio.add_transaction, user_id, body.ticker, body.transaction_type, body.quantity, body.price,
+                        body.transaction_date, body.notes, body.apply_to_holdings)
+
+
+@app.put("/api/transactions/{tx_id}")
+def edit_transaction_entry(tx_id: int, body: TxEdit, user_id: int = Depends(current_user_id)):
+    return holding_call(portfolio.update_transaction, user_id, tx_id, body.quantity, body.price, body.transaction_date, body.notes)
+
+
+@app.delete("/api/transactions/{tx_id}")
+def delete_transaction_entry(tx_id: int, user_id: int = Depends(current_user_id)):
+    return holding_call(portfolio.delete_transaction, user_id, tx_id)
+
+
+@app.get("/api/portfolio/performance")
+def portfolio_performance(user_id: int = Depends(current_user_id)):
+    """Portfolio value against the same dollars invested in the S&P 500, plus risk measures."""
+    try:
+        return {"status": "success", **portfolio.performance(user_id)}
+    except portfolio.PortfolioError as e:
+        return agent_error(e.status, e.message)
+    except Exception:
+        log.exception("Portfolio performance failed")
+        return agent_error(500, "Something went wrong working out performance.")
+
+
+# ── Administration: who is allowed in ──
+@app.get("/admin")
+def admin_page(request: Request):
+    user = auth.get_user(request.state.user_id)
+    if not user or user["status"] != "approved" or not user["is_admin"]:
+        return HTMLResponse(auth_pages.notice_page("Administrators only", "You don't have access to this page.", "/", "Back to the dashboard"), status_code=403)
+    with open(os.path.join(_BASE_DIR, "admin.html"), encoding="utf-8") as f:
+        return HTMLResponse(f.read(), headers={"Cache-Control": "private, no-store"})
+
+
+class StatusBody(BaseModel):
+    status: Literal["approved", "blocked"]
+
+
+@app.get("/api/admin/users")
+def admin_list_users(admin_id: int = Depends(require_admin)):
+    try:
+        return {"status": "success", "you": admin_id, **auth.list_users()}
+    except Exception:
+        log.exception("Listing users failed")
+        return agent_error(500, "Something went wrong loading the accounts.")
+
+
+@app.get("/api/admin/summary")
+def admin_summary(admin_id: int = Depends(require_admin)):
+    try:
+        return {"status": "success", "pending": auth.pending_count()}
+    except Exception:
+        log.exception("Counting pending accounts failed")
+        return agent_error(500, "Something went wrong counting the pending accounts.")
+
+
+@app.post("/api/admin/users/{user_id}/status")
+def admin_set_status(user_id: int, body: StatusBody, admin_id: int = Depends(require_admin_action)):
+    """Approve or block an account. The change applies to that person's very next request on this server."""
+    try:
+        return {"status": "success", "user": auth.set_user_status(admin_id, user_id, body.status)}
+    except auth.AuthError as e:
+        return agent_error(e.status, e.message)
+    except Exception:
+        log.exception("Changing an account's status failed")
+        return agent_error(500, "Something went wrong saving that change.")
+
+
+class WatchlistBody(BaseModel):
+    tickers: List[str] = Field(default_factory=list, max_length=200)
+
+
+@app.get("/api/watchlist")
+def get_watchlist(user_id: int = Depends(current_user_id)):
+    try:
+        return {"status": "success", "tickers": watchlist.get_watchlist(user_id)}
+    except Exception:
+        log.exception("Watchlist load failed")
+        return agent_error(500, "Something went wrong loading your watchlist.")
+
+
+@app.put("/api/watchlist")
+def put_watchlist(body: WatchlistBody, user_id: int = Depends(current_user_id)):
+    """Replace the whole watchlist (the dashboard sends the full list after each change)."""
+    try:
+        return {"status": "success", "tickers": watchlist.save_watchlist(user_id, body.tickers)}
+    except watchlist.WatchlistError as e:
+        return agent_error(e.status, e.message)
+    except Exception:
+        log.exception("Watchlist save failed")
+        return agent_error(500, "Something went wrong saving your watchlist.")
+
+
+def _tracked_stock(ticker: str) -> bool:
+    return bool(query("SELECT 1 FROM stocks_live WHERE ticker=%s LIMIT 1", [ticker.upper()]))
+
+
+@app.get("/api/stocks/{ticker}/price-range")
+def stock_price_range(ticker: str = Path(pattern=r"^[A-Za-z0-9.\-^=]{1,10}$")):
+    """First and last trading day we have prices for, so the period picker only offers years that exist."""
+    if not _tracked_stock(ticker):
+        return agent_error(404, f"{ticker.upper()} isn't in our database.")
+    try:
+        return {"status": "success", **stock_period.price_range(ticker)}
+    except stock_period.PeriodError as e:
+        return agent_error(e.status, e.message)
+    except Exception:
+        log.exception("Price range failed")
+        return agent_error(500, "Something went wrong loading the price history.")
+
+
+@app.get("/api/stocks/{ticker}/period")
+def stock_period_performance(ticker: str = Path(pattern=r"^[A-Za-z0-9.\-^=]{1,10}$"), start: Date = Query(...), end: Date = Query(...)):
+    """How the stock performed between two dates (a year, a quarter or anything else), against the S&P 500."""
+    if not _tracked_stock(ticker):
+        return agent_error(404, f"{ticker.upper()} isn't in our database.")
+    try:
+        return {"status": "success", **stock_period.period_performance(ticker, start, end)}
+    except stock_period.PeriodError as e:
+        return agent_error(e.status, e.message)
+    except Exception:
+        log.exception("Period performance failed")
+        return agent_error(500, "Something went wrong loading the price history.")
+
+
+def _parse_compare_tickers(tickers: str):
+    parts = [t.strip() for t in tickers.split(",") if t.strip()]
+    valid = _valid_tickers(parts)
+    if len(valid) != len(parts):
+        return None, agent_error(400, "One of the tickers is not valid.")
+    if not 2 <= len({t.upper() for t in valid}) <= peers.MAX_STOCKS:
+        return None, agent_error(400, f"Compare between 2 and {peers.MAX_STOCKS} different stocks.")
+    return valid, None
+
+
+@app.get("/api/compare/prices")
+def compare_prices(tickers: str = Query(..., min_length=1, max_length=120)):
+    """One-year closing prices rebased to 100, so the stocks' relative performance can be charted."""
+    valid, error = _parse_compare_tickers(tickers)
+    if error:
+        return error
+    try:
+        return {"status": "success", **peers.rebased_prices(valid)}
+    except Exception:
+        log.exception("Price comparison failed")
+        return agent_error(500, "Something went wrong loading prices.")
+
+
+@app.get("/api/compare/verdict")
+def compare_verdict(request: Request, tickers: str = Query(..., min_length=1, max_length=120)):
+    """A short AI-written comparison of the stocks, based only on the stored data (cached for an hour)."""
+    limited = check_rate_limit(request)
+    if limited:
+        return limited
+    valid, error = _parse_compare_tickers(tickers)
+    if error:
+        return error
+
+    def call():
+        result = peers.verdict(valid)
+        if result is None:
+            return agent_error(404, "We need at least two stocks we track to compare.")
+        return {"status": "success", **result}
+    return run_ai(call)
+
+
+def recommend_payload(body: RecommendRequest) -> dict:
+    result = run_agent(
+        user_query=body.query.strip(),
+        portfolio_tickers=body.portfolio_tickers,
+        chat_history=[m.model_dump() for m in body.chat_history],
+        reply_to=body.reply_to.strip(),
+    )
+    return {
+        "status": "success",
+        "query": body.query,
+        "intent": result.get("intent"),
+        "stocks_found": result["stocks_found"],
+        "recommendation": result["recommendation"],
+        "top_stocks": result["top_stocks"],
+        "all_stocks": result["all_stocks"]
+    }
+
+
+@app.post("/agent/recommend")
+def agent_recommend(request: Request, body: RecommendRequest):
+    limited = check_rate_limit(request)
+    if limited:
+        return limited
+    return run_ai(lambda: recommend_payload(body))
+
+
+@app.post("/agent/recommend/stream")
+def agent_recommend_stream(request: Request, body: RecommendRequest):
+    """
+    The same answer as /agent/recommend, sent as server-sent events so the text appears as it is written:
+      data: {"delta": "..."}   a piece of the answer
+      data: {"final": {...}}   the complete result (same shape as /agent/recommend), including stock cards
+      data: {"error": {"status": 429, "message": "..."}}
+    """
+    limited = check_rate_limit(request)
+    if limited:
+        return limited
+    events = queue.Queue()
+
+    def worker():
+        token = set_stream_sink(lambda text: events.put(("delta", text)))
+        try:
+            events.put(("final", jsonable_encoder(recommend_payload(body))))
+        except Exception as e:
+            status, message = describe_ai_error(e)
+            events.put(("error", {"status": status, "message": message}))
+        finally:
+            clear_stream_sink(token)
+            events.put(("done", None))
+
+    threading.Thread(target=worker, daemon=True).start()
+
+    def stream():
+        while True:
+            kind, value = events.get()
+            if kind == "done":
+                return
+            yield f"data: {json.dumps({kind: value})}\n\n"
+    return StreamingResponse(stream(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.post("/agent/explain-stock")
+def agent_explain_stock(request: Request, body: ExplainRequest):
+    limited = check_rate_limit(request)
+    if limited:
+        return limited
+    return run_ai(lambda: {"status": "success", "ticker": body.ticker,
+                           "explanation": explain_single_stock(body.ticker, body.query)})
+
+
+@app.post("/agent/portfolio-review")
+def agent_portfolio_review(request: Request, body: PortfolioRequest, user_id: int = Depends(current_user_id)):
+    limited = check_rate_limit(request)
+    if limited:
+        return limited
+    if not body.use_holdings and not body.tickers:
+        return agent_error(400, "Type at least one ticker or company name, or review your saved holdings.")
+
+    def call():
+        try:
+            result = portfolio.review(user_id, body.tickers, body.use_holdings)
+        except portfolio.PortfolioError as e:
+            return agent_error(e.status, e.message)
+        return {"status": "success", **result}
+    return run_ai(call)
+
+@app.get("/api/ipos")
+def get_ipo_calendar(days_back: int = Query(14, ge=0, le=30), days_ahead: int = Query(60, ge=0, le=90)):
+    """Upcoming and recently priced US IPOs (cached for 30 minutes)."""
+    try:
+        return ipo_data.get_ipos(days_back, days_ahead)
+    except ipo_data.IPOUnavailable:
+        return agent_error(503, "The IPO calendar is unavailable right now. Please try again shortly.")
+    except Exception:
+        log.exception("IPO calendar failed")
+        return agent_error(500, "Something went wrong loading the IPO calendar.")
+
+
+@app.get("/api/peers/{ticker}")
+def get_stock_peers(request: Request, ticker: str = Path(pattern=r"^[A-Za-z0-9.\-^=]{1,10}$"), n: int = Query(4, ge=1, le=5)):
+    """Suggested competitors for a stock (database pool, closest picked by AI, cached for a week)."""
+    limited = check_rate_limit(request)  # an uncached lookup makes an LLM call
+    if limited:
+        return limited
+    try:
+        result = peers.suggest_peers(ticker, n)
+    except Exception:
+        log.exception("Peer lookup failed")
+        return agent_error(500, "Something went wrong finding peers.")
+    if result is None:
+        return agent_error(404, f"{ticker.upper()} isn't in our database.")
+    return {"status": "success", **result}
+
+
+@app.get("/api/sentiment/{ticker}")
+def get_stock_sentiment(request: Request, ticker: str = Path(pattern=r"^[A-Za-z0-9.\-^=]{1,10}$")):
+    """AI-scored sentiment of a stock's recent headlines (cached for a few hours)."""
+    limited = check_rate_limit(request)  # a refresh makes an LLM call
+    if limited:
+        return limited
+
+    def call():
+        result = sentiment.get_sentiment(ticker)
+        if result is None:
+            return agent_error(404, f"{ticker.upper()} isn't in our database.")
+        return {"status": "success", **result}
+    return run_ai(call)
+
+
+@app.get("/api/compare")
+def compare_stocks(tickers: str = Query(..., min_length=1, max_length=120)):
+    """Side-by-side metrics. The first ticker is the stock the others are compared against."""
+    parts = [t.strip() for t in tickers.split(",") if t.strip()]
+    valid = _valid_tickers(parts)
+    if len(valid) != len(parts):
+        return agent_error(400, "One of the tickers is not valid.")
+    if not 2 <= len({t.upper() for t in valid}) <= peers.MAX_STOCKS:
+        return agent_error(400, f"Compare between 2 and {peers.MAX_STOCKS} different stocks.")
+    try:
+        result = peers.build_comparison(valid)
+    except Exception:
+        log.exception("Comparison failed")
+        return agent_error(500, "Something went wrong building the comparison.")
+    if valid[0].upper() not in result["tickers"] or len(result["tickers"]) < 2:
+        return agent_error(404, "We need at least two stocks we track, including the first one.")
+    return {"status": "success", **result}
+
 
 @app.get("/api/market/signals")
 async def market_signals():
@@ -1473,7 +2112,7 @@ async def market_signals():
 
 @app.get("/api/predictions/accuracy")
 def prediction_accuracy():
-    """Hit rate of the 1-week (7 trading day) direction call."""
+    """Hit rate of the 1-week (7 trading day) direction call, next to what always guessing 'up' would have scored."""
     try:
         r = query("""SELECT COUNT(*) AS total, COALESCE(SUM(direction_correct),0) AS correct,
                             AVG(actual_price > price_at_run)*100 AS always_up_pct,
@@ -2240,16 +2879,7 @@ def get_stock_dividends(ticker: str):
 # Reads the portfolio / transactions tables (quantity, avg_buy_price, buy_date ...)
 # and returns the fields the Portfolio and Transactions tabs use.
 def _pf_db():
-    cfg = {
-        "host": os.getenv("DB_HOST", "localhost"),
-        "port": int(os.getenv("DB_PORT", 3306)),
-        "user": os.getenv("DB_USER", "root"),
-        "password": os.getenv("DB_PASSWORD", os.getenv("DB_PASS", "")),
-        "database": os.getenv("DB_NAME", "stock_market_pro_db"),
-    }
-    if os.getenv("DB_SSL", "false").lower() == "true":
-        cfg["ssl_disabled"] = False
-    return mysql.connector.connect(**cfg)
+    return get_db()      # the one connection path (see get_db): same settings, and safe when many requests connect at once
 
 
 def _pf_rows(sql, params=None):
@@ -2275,189 +2905,51 @@ def _pf_rows(sql, params=None):
     return out
 
 
-def _pf_holdings():
-    rows = _pf_rows("""
-        SELECT p.id, p.ticker, p.company_name, p.quantity, p.avg_buy_price, p.buy_date, p.sector, p.notes,
-               l.company_name AS live_name, l.sector AS live_sector,
-               l.current_price, l.price_change_pct,
-               a.analyst_rating, a.target_price
-        FROM portfolio p
-        LEFT JOIN stocks_live l ON p.ticker = l.ticker
-        LEFT JOIN stocks_analyst a ON p.ticker = a.ticker
-        ORDER BY p.id
-    """)
-    holdings = []
-    for r in rows:
-        qty = float(r["quantity"] or 0)
-        avg = float(r["avg_buy_price"] or 0)
-        price = r["current_price"]
-        if price is None:
-            try:
-                hist = yf.Ticker(r["ticker"]).history(period="5d")
-                price = float(hist["Close"].iloc[-1]) if not hist.empty else None
-            except Exception:
-                price = None
-        invested = qty * avg
-        current = qty * price if price is not None else None
-        pnl = current - invested if current is not None else None
-        holdings.append({
-            "id": r["id"],
-            "ticker": r["ticker"],
-            "company_name": r["company_name"] or r["live_name"],
-            "sector": r["sector"] or r["live_sector"],
-            "quantity": qty,
-            "avg_buy_price": round(avg, 2),
-            "buy_date": r["buy_date"],
-            "notes": r["notes"],
-            "current_price": round(price, 2) if price is not None else None,
-            "invested_value": round(invested, 2),
-            "current_value": round(current, 2) if current is not None else None,
-            "unrealized_pnl": round(pnl, 2) if pnl is not None else None,
-            "pnl_pct": round(pnl / invested * 100, 2) if pnl is not None and invested else None,
-            "day_change_pct": round(float(r["price_change_pct"]), 2) if r["price_change_pct"] is not None else None,
-            "analyst_rating": r["analyst_rating"],
-            "target_price": r["target_price"],
-        })
-    return holdings
-
-
-@app.get("/api/portfolio")
-def get_portfolio():
-    try:
-        return _pf_holdings()
-    except Exception as e:
-        print(f"Portfolio error: {e}")
-        return []
-
-
-@app.get("/api/portfolio/summary")
-def get_portfolio_summary():
-    try:
-        h = _pf_holdings()
-        invested = sum(x["invested_value"] for x in h)
-        value = sum(x["current_value"] or 0 for x in h)
-        day = 0.0
-        for x in h:
-            pct = x["day_change_pct"]
-            if x["current_value"] and pct is not None and pct > -100:
-                day += x["current_value"] * pct / (100 + pct)
-        return {
-            "holdings": len(h),
-            "total_invested": round(invested, 2),
-            "total_value": round(value, 2),
-            "total_pnl": round(value - invested, 2),
-            "day_change": round(day, 2),
-        }
-    except Exception as e:
-        print(f"Portfolio summary error: {e}")
-        return {"holdings": 0, "total_invested": 0, "total_value": 0, "total_pnl": 0, "day_change": 0, "error": str(e)}
-
-
+# GET /api/portfolio, /api/portfolio/summary, /api/transactions and /api/transactions/summary are answered by the
+# account-aware versions earlier in this file. They return every field this tab reads (and more), for the signed-in
+# person only. The two forms below keep their original URLs and replies, but save through the same validated,
+# per-account code as POST /api/portfolio and POST /api/transactions.
 @app.post("/api/portfolio/add")
-def add_portfolio(ticker: str, quantity: float, avg_buy_price: float, buy_date: str):
+def add_portfolio(ticker: str, quantity: float, avg_buy_price: float, buy_date: str, user_id: int = Depends(current_user_id)):
     try:
-        t = ticker.strip().upper()
-        info = _pf_rows("SELECT company_name, sector FROM stocks_live WHERE ticker=%s", [t])
-        name = info[0]["company_name"] if info else t
-        sector = info[0]["sector"] if info else None
-        conn = _pf_db()
-        cur = conn.cursor()
-        cur.execute(
-            """INSERT INTO portfolio (ticker, company_name, quantity, avg_buy_price, buy_date, sector, notes)
-               VALUES (%s,%s,%s,%s,%s,%s,%s)""",
-            (t, name, quantity, avg_buy_price, buy_date, sector, ""),
-        )
-        conn.commit()
-        cur.close()
-        conn.close()
-        return {"success": True, "message": f"Added {t} to your portfolio"}
-    except Exception as e:
-        return {"success": False, "message": f"Could not add: {e}"}
-
-
-@app.get("/api/transactions")
-def get_transactions():
-    try:
-        return _pf_rows("""
-            SELECT id, ticker, company_name, transaction_type, quantity, price, total_value,
-                   transaction_date, notes
-            FROM transactions
-            ORDER BY transaction_date DESC, id DESC
-        """)
-    except Exception as e:
-        print(f"Transactions error: {e}")
-        return []
-
-
-@app.get("/api/transactions/summary")
-def get_transactions_summary():
-    try:
-        r = _pf_rows("""
-            SELECT COUNT(*) AS total_trades,
-                   COALESCE(SUM(CASE WHEN transaction_type='BUY'  THEN total_value ELSE 0 END),0) AS total_invested,
-                   COALESCE(SUM(CASE WHEN transaction_type='SELL' THEN total_value ELSE 0 END),0) AS total_sold,
-                   COALESCE(MAX(total_value),0) AS largest_trade
-            FROM transactions
-        """)[0]
-        return {
-            "total_trades": int(r["total_trades"] or 0),
-            "total_invested": round(float(r["total_invested"] or 0), 2),
-            "total_sold": round(float(r["total_sold"] or 0), 2),
-            "largest_trade": round(float(r["largest_trade"] or 0), 2),
-        }
-    except Exception as e:
-        print(f"Transactions summary error: {e}")
-        return {"total_trades": 0, "total_invested": 0, "total_sold": 0, "largest_trade": 0, "error": str(e)}
+        result = portfolio.add_holding(user_id, ticker, quantity, avg_buy_price, buy_date)
+        return {"success": True, "message": result["message"]}
+    except portfolio.PortfolioError as e:
+        return {"success": False, "message": e.message}
+    except Exception:
+        log.exception("Add holding failed")
+        return {"success": False, "message": "Could not add: something went wrong saving that."}
 
 
 @app.post("/api/transactions/add")
-def add_transaction(ticker: str, transaction_type: str, quantity: float, price: float, transaction_date: str, notes: str = ""):
+def add_transaction(ticker: str, transaction_type: str, quantity: float, price: float, transaction_date: str, notes: str = "",
+                    user_id: int = Depends(current_user_id)):
+    ttype = transaction_type.strip().upper()
+    if ttype not in ("BUY", "SELL"):
+        return {"success": False, "message": "Type must be BUY or SELL"}
     try:
-        t = ticker.strip().upper()
-        ttype = transaction_type.strip().upper()
-        if ttype not in ("BUY", "SELL"):
-            return {"success": False, "message": "Type must be BUY or SELL"}
-        info = _pf_rows("SELECT company_name FROM stocks_live WHERE ticker=%s", [t])
-        name = info[0]["company_name"] if info else t
-        conn = _pf_db()
-        cur = conn.cursor()
-        cur.execute(
-            """INSERT INTO transactions
-               (ticker, company_name, transaction_type, quantity, price, total_value, transaction_date, notes)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
-            (t, name, ttype, quantity, price, round(quantity * price, 2), transaction_date, notes),
-        )
-        conn.commit()
-        cur.close()
-        conn.close()
-        return {"success": True, "message": f"Recorded {ttype} of {t}"}
-    except Exception as e:
-        return {"success": False, "message": f"Could not add: {e}"}
+        result = portfolio.add_transaction(user_id, ticker, ttype, quantity, price, transaction_date, notes)
+        return {"success": True, "message": result["message"]}
+    except portfolio.PortfolioError as e:
+        return {"success": False, "message": e.message}
+    except Exception:
+        log.exception("Add transaction failed")
+        return {"success": False, "message": "Could not add: something went wrong saving that."}
 # === PORTFOLIO & TRANSACTIONS (end) ===
 
 
 # === PORTFOLIO vs S&P 500 BENCHMARK (start) ===
 @app.get("/api/portfolio/benchmark")
-def portfolio_benchmark():
+def portfolio_benchmark(user_id: int = Depends(current_user_id)):
     """Compare portfolio performance vs S&P 500 (SPY)."""
     try:
         import yfinance as yf
         import pandas as pd
         from datetime import date, timedelta
 
-        # Same DB settings as get_db() at the top of this file
-        cfg = {
-            "host": os.getenv("DB_HOST", "localhost"),
-            "port": int(os.getenv("DB_PORT", 3306)),
-            "user": os.getenv("DB_USER", "root"),
-            "password": os.getenv("DB_PASSWORD", os.getenv("DB_PASS", "")),
-            "database": os.getenv("DB_NAME", "stock_market_pro_db"),
-        }
-        if os.getenv("DB_SSL", "false").lower() == "true":
-            cfg["ssl_disabled"] = False
-        conn = mysql.connector.connect(**cfg)
+        conn = get_db()
         cur = conn.cursor(dictionary=True)
-        cur.execute("SELECT * FROM portfolio")
+        cur.execute("SELECT * FROM portfolio WHERE user_id = %s", (user_id,))
         rows = cur.fetchall()
         tickers = sorted({str(r.get("ticker") or "").upper() for r in rows if r.get("ticker")})
         live = {}
@@ -2627,21 +3119,13 @@ _AL_COLS = {
     "triggered_price": "FLOAT",
     "triggered_at": "DATETIME",
     "created_at": "DATETIME",
+    "user_id": "INT NULL",          # whose alert it is; alerts made before accounts have none until claimed
 }
 _AL_STATE = {"ready": False, "cols": set()}
 
 
 def _al_db():
-    cfg = {
-        "host": os.getenv("DB_HOST", "localhost"),
-        "port": int(os.getenv("DB_PORT", 3306)),
-        "user": os.getenv("DB_USER", "root"),
-        "password": os.getenv("DB_PASSWORD") or os.getenv("DB_PASS", ""),
-        "database": os.getenv("DB_NAME", "stock_market_pro_db"),
-    }
-    if os.getenv("DB_SSL", "false").lower() == "true":
-        cfg["ssl_disabled"] = False
-    return mysql.connector.connect(**cfg)
+    return get_db()
 
 
 def _al_setup():
@@ -2739,13 +3223,13 @@ def _al_row(r, live=None):
 
 
 @app.get("/api/alerts")
-def get_alerts():
+def get_alerts(user_id: int = Depends(current_user_id)):
     """All price alerts, newest first, with today's price and distance to target."""
     try:
         _al_setup()
         db = _al_db()
         cur = db.cursor(dictionary=True)
-        cur.execute("SELECT * FROM price_alerts ORDER BY triggered ASC, id DESC")
+        cur.execute("SELECT * FROM price_alerts WHERE user_id = %s ORDER BY triggered ASC, id DESC", (user_id,))
         rows = cur.fetchall()
         cur.close()
         db.close()
@@ -2757,7 +3241,7 @@ def get_alerts():
 
 
 @app.post("/api/alerts/create")
-def create_alert(payload: dict = Body(...)):
+def create_alert(payload: dict = Body(...), user_id: int = Depends(current_user_id)):
     """Body: {ticker, target_price, condition_type: 'above'|'below'}."""
     try:
         _al_setup()
@@ -2787,8 +3271,8 @@ def create_alert(payload: dict = Body(...)):
                 return {"status": "error", "success": False,
                         "message": f"{ticker} is already at ${price:,.2f}. For a 'below' alert, pick a price lower than that."}
 
-        cols = ["ticker", "company_name", "condition_type", "target_price", "price_at_creation", "triggered", "created_at"]
-        vals = [ticker, company, cond, target, price, 0, datetime.now()]
+        cols = ["ticker", "company_name", "condition_type", "target_price", "price_at_creation", "triggered", "created_at", "user_id"]
+        vals = [ticker, company, cond, target, price, 0, datetime.now(), user_id]
         if "alert_type" in _AL_STATE["cols"]:
             cols.append("alert_type"); vals.append(cond)
         if "current_price" in _AL_STATE["cols"]:
@@ -2812,12 +3296,12 @@ def create_alert(payload: dict = Body(...)):
 
 
 @app.delete("/api/alerts/{alert_id}")
-def delete_alert(alert_id: int):
+def delete_alert(alert_id: int, user_id: int = Depends(current_user_id)):
     try:
         _al_setup()
         db = _al_db()
         cur = db.cursor()
-        cur.execute("DELETE FROM price_alerts WHERE id=%s", (alert_id,))
+        cur.execute("DELETE FROM price_alerts WHERE id=%s AND user_id=%s", (alert_id, user_id))
         db.commit()
         n = cur.rowcount
         cur.close()
@@ -2828,13 +3312,13 @@ def delete_alert(alert_id: int):
 
 
 @app.get("/api/alerts/check")
-def check_alerts():
+def check_alerts(user_id: int = Depends(current_user_id)):
     """Checks every active alert against the latest price. Each alert fires exactly once."""
     try:
         _al_setup()
         db = _al_db()
         cur = db.cursor(dictionary=True)
-        cur.execute("SELECT * FROM price_alerts WHERE triggered = 0")
+        cur.execute("SELECT * FROM price_alerts WHERE triggered = 0 AND user_id = %s", (user_id,))
         rows = cur.fetchall()
         cur.close()
         db.close()
@@ -2853,7 +3337,7 @@ def check_alerts():
             if (cond == "above" and price >= tgt) or (cond == "below" and price <= tgt):
                 # only the first caller flips triggered 0 -> 1, so two open tabs can't both notify
                 cur.execute("UPDATE price_alerts SET triggered=1, triggered_price=%s, triggered_at=%s "
-                            "WHERE id=%s AND triggered=0", (price, datetime.now(), r["id"]))
+                            "WHERE id=%s AND triggered=0 AND user_id=%s", (price, datetime.now(), r["id"], user_id))
                 if cur.rowcount == 1:
                     item = _al_row(r, live)
                     item.update({"current_price": round(price, 4), "triggered": True, "distance_pct": None,

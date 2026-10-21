@@ -1,5 +1,5 @@
 # fix_predict_tables.py
-# Run this ONCE to add missing columns, then run predict.py normally
+# Run this ONCE to add missing columns, then run predict_aarya.py normally
 import os
 from dotenv import load_dotenv
 load_dotenv()
@@ -58,7 +58,7 @@ def main():
     conn.commit()
     cursor.close()
     conn.close()
-    print("\nDone. Now run: python predict.py")
+    print("\nDone. Now run: python predict_aarya.py")
 
 if __name__ == "__main__":
     main()
