@@ -120,6 +120,23 @@ body{background:var(--bg0);color:var(--t1);font-family:var(--sans);min-height:10
 .card{background:var(--bg2);border:1px solid var(--b1);border-radius:11px;padding:16px;overflow:hidden;}
 .chdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;}
 .ctitle{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--t2);display:flex;align-items:center;gap:7px;}
+/* Headings: tables & sections white; chart cards keep the grey heading */
+.ctitle{color:var(--t1)!important;}
+.card:has(canvas) .ctitle,.chartcard .ctitle{color:var(--t2)!important;}
+.inttitle{color:var(--t1)!important;}
+/* Main tabs: white text; the selected tab keeps its highlight */
+.ntab{color:var(--t1);}
+/* Line icons + impact dots */
+.lic{display:block;flex-shrink:0;}
+.idot{display:inline-block;width:7px;height:7px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;position:relative;top:-1px;}
+.brand-icon{color:#fff;}
+.nt-bell{color:var(--t1);}
+#bounty-btn,.b-avatar,.bm-av{color:#fff;}
+.bm-av .lic{width:15px;height:15px;}
+.alert-item-del{display:inline-flex;align-items:center;justify-content:center;}
+.b-hdr-btn{display:inline-flex;align-items:center;}
+.news-card-img-placeholder{color:var(--t3);}
+.news-card-img-placeholder .lic{width:26px;height:26px;}
 .ctitle::before{content:'';width:3px;height:12px;background:var(--cyan);border-radius:2px;display:block;}
 .stitle{font-size:14px;font-weight:800;color:var(--t1);margin-bottom:14px;display:flex;align-items:center;gap:8px;}
 .stitle::before{content:'';width:3px;height:15px;background:var(--cyan);border-radius:2px;}
@@ -359,22 +376,22 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 
 <nav class="nav">
   <div class="brand">
-    <div class="brand-icon">📈</div>
+    <div class="brand-icon"><svg class="lic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></svg></div>
     <div>
       <div class="brand-title">Stock Market <span>Pro</span></div>
       <div class="brand-sub">AYEIM Ventures</div>
     </div>
   </div>
   <div class="ntabs">
-    <button class="ntab on" onclick="showPage('market',this)"><span class="ico">📊</span><span class="lbl">Market</span></button>
-    <button class="ntab" id="ntab-ipos" onclick="showPage('ipos',this)"><span class="ico">🚀</span><span class="lbl">IPOs</span></button>
-    <button class="ntab" onclick="showPage('watchlist',this)"><span class="ico">⭐</span><span class="lbl">Watchlist</span></button>
-    <button class="ntab" onclick="showPage('commodities',this)"><span class="ico">🏗️</span><span class="lbl" data-short="Commod.">Commodities</span></button>
-    <button class="ntab" onclick="showPage('portfolio',this)"><span class="ico">💼</span><span class="lbl">Portfolio</span></button>
-    <button class="ntab" onclick="showPage('transactions',this)"><span class="ico">🔄</span><span class="lbl" data-short="Trades">Transactions</span></button>
+    <button class="ntab on" onclick="showPage('market',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></svg></span><span class="lbl">Market</span></button>
+    <button class="ntab" id="ntab-ipos" onclick="showPage('ipos',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span><span class="lbl">IPOs</span></button>
+    <button class="ntab" onclick="showPage('watchlist',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.1 8.3 22 9.3 17 14.1 18.2 21 12 17.8 5.8 21 7 14.1 2 9.3 8.9 8.3 12 2"/></svg></span><span class="lbl">Watchlist</span></button>
+    <button class="ntab" onclick="showPage('commodities',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg></span><span class="lbl" data-short="Commod.">Commodities</span></button>
+    <button class="ntab" onclick="showPage('portfolio',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg></span><span class="lbl">Portfolio</span></button>
+    <button class="ntab" onclick="showPage('transactions',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span><span class="lbl" data-short="Trades">Transactions</span></button>
   </div>
   <div class="nav-r">
-    <button id="nt-bell" class="nt-bell" onclick="ntToggleBell(event)" title="Notifications">🔔<span id="nt-badge" class="nt-badge" style="display:none">0</span></button>
+    <button id="nt-bell" class="nt-bell" onclick="ntToggleBell(event)" title="Notifications"><svg class="lic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span id="nt-badge" class="nt-badge" style="display:none">0</span></button>
     <div class="lpill"><span class="ldot"></span>Live</div>
     <span class="ntime" id="ntime">--:--:--</span>
     <span id="nconn" style="font-size:12px;font-weight:700;color:var(--green)">● Connected</span>
@@ -403,7 +420,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   <!-- Currency Exchange Rates -->
   <div class="card" style="margin-bottom:16px;">
     <div class="chdr">
-      <div class="ctitle">💱 Live Currency Exchange Rates</div>
+      <div class="ctitle">Live Currency Exchange Rates</div>
       <div style="font-size:10px;font-weight:600;color:var(--t3);">Updates every 60 seconds</div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;" id="currency-grid">
@@ -419,7 +436,6 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   <!-- AI Stock Finder + Manual Screener Combined -->
   <div class="ai-wrap">
     <div class="ai-header">
-      <div class="ai-icon">🤖</div>
       <div>
         <div class="ai-title">AI Stock Finder</div>
         <div class="ai-sub">Type anything in plain English — or use manual filters below</div>
@@ -427,7 +443,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     </div>
     <div class="ai-input-row">
       <input class="ai-input" id="ai-query" placeholder="e.g. find me small cap stocks with strong growth and low debt..." onkeydown="if(event.key==='Enter')runAI()"/>
-      <button class="ai-btn" id="ai-btn" onclick="runAI()">🔍 Ask AI</button>
+      <button class="ai-btn" id="ai-btn" onclick="runAI()">Ask AI</button>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
       <span style="font-size:11px;font-weight:700;color:var(--t3);">Try:</span>
@@ -438,19 +454,19 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     </div>
     <div class="ai-loading" id="ai-loading"><div class="spin"></div>AI is analysing stocks — this takes about 10 seconds...</div>
     <div class="ai-result" id="ai-result">
-      <div class="ai-result-title">🤖 AI Recommendation</div>
+      <div class="ai-result-title">AI Recommendation</div>
       <div class="ai-result-text" id="ai-result-text"></div>
       <div class="ai-meta" id="ai-meta"></div>
       <div id="ai-stocks-grid" class="ai-stocks-grid"></div>
       <div id="ai-explorer" style="display:none;margin-top:18px;border-top:1px solid var(--b2);padding-top:16px;">
-        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--t3);margin-bottom:10px;">📋 Explore All Matched Stocks — Select Any for Full AI Explanation</div>
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--t3);margin-bottom:10px;">Explore All Matched Stocks — Select Any for Full AI Explanation</div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <select id="ai-stock-select" style="flex:1;min-width:220px;background:var(--bg3);border:1px solid var(--b2);border-radius:9px;padding:10px 14px;color:var(--t1);font-size:13px;font-weight:600;outline:none;cursor:pointer;font-family:var(--sans);"><option value="">Select a company...</option></select>
-          <button class="ai-btn" onclick="explainSelectedStock()" style="padding:10px 20px;">🤖 Get AI Explanation</button>
+          <button class="ai-btn" onclick="explainSelectedStock()" style="padding:10px 20px;">Get AI Explanation</button>
         </div>
         <div class="ai-loading" id="explain-loading" style="margin-top:10px;"><div class="spin"></div>AI is analysing this stock...</div>
         <div id="explain-result" style="display:none;margin-top:12px;background:var(--bg2);border:1px solid var(--b2);border-radius:10px;padding:16px 18px;">
-          <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--cyan);margin-bottom:10px;">🤖 Stock Explanation</div>
+          <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--cyan);margin-bottom:10px;">Stock Explanation</div>
           <div id="explain-result-text" style="font-size:13px;font-weight:500;color:var(--t2);line-height:1.7;"></div>
         </div>
       </div>
@@ -459,7 +475,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 
   <!-- Charts: 3 per row (2 on smaller screens, 1 on a phone) -->
   <div class="g3">
-    <div class="card">
+    <div class="card chartcard">
       <div class="chdr"><div class="ctitle">Market Sentiment</div></div>
       <div class="gauge">
         <div class="gscore" id="g-score" style="color:var(--t1)">--</div>
@@ -490,9 +506,9 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   <div class="g3">
     <div class="card">
       <div class="stabs">
-        <button class="stab on" onclick="showSub('gl','gainers',this)">🟢 Gainers</button>
-        <button class="stab" onclick="showSub('gl','losers',this)">🔴 Losers</button>
-        <button class="stab" onclick="showSub('gl','active',this)">⚡ Active</button>
+        <button class="stab on" onclick="showSub('gl','gainers',this)">Gainers</button>
+        <button class="stab" onclick="showSub('gl','losers',this)">Losers</button>
+        <button class="stab" onclick="showSub('gl','active',this)">Active</button>
       </div>
       <div id="gl-gainers"><div class="tw"><table class="gltable"><thead><tr><th>Ticker</th><th>Company</th><th>Price</th><th>Change</th><th>Volume</th></tr></thead><tbody id="tb-g"></tbody></table></div></div>
       <div id="gl-losers" style="display:none"><div class="tw"><table class="gltable"><thead><tr><th>Ticker</th><th>Company</th><th>Price</th><th>Change</th><th>Volume</th></tr></thead><tbody id="tb-l"></tbody></table></div></div>
@@ -509,12 +525,12 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   </div>
 
   <div class="g3">
-    <div class="card span2">
-      <div class="chdr"><div class="ctitle">🌡️ Sector Performance Heatmap — Today's Change %</div></div>
+    <div class="card span2 chartcard">
+      <div class="chdr"><div class="ctitle">Sector Performance Heatmap — Today's Change %</div></div>
       <div id="heatmap-wrap" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:5px;align-content:start"></div>
     </div>
     <div class="card">
-      <div class="chdr"><div class="ctitle">📍 52-Week High/Low Proximity — Where Are Stocks Now?</div></div>
+      <div class="chdr"><div class="ctitle">52-Week High/Low Proximity — Where Are Stocks Now?</div></div>
       <div class="chbox" style="--chmin:200px"><canvas id="w52-c"></canvas></div>
     </div>
   </div>
@@ -529,14 +545,14 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <div class="chbox" style="--chmin:200px"><canvas id="div-c"></canvas></div>
     </div>
     <div class="card">
-      <div class="chdr"><div class="ctitle">⚡ Volume Spikes — Unusual Activity Today</div></div>
+      <div class="chdr"><div class="ctitle">Volume Spikes — Unusual Activity Today</div></div>
       <div class="chbox" style="--chmin:200px"><canvas id="vspike-c"></canvas></div>
     </div>
   </div>
 
   <div class="g3">
     <div class="card span3">
-      <div class="chdr"><div class="ctitle">🏆 Top Stocks by Analyst Upside Potential</div></div>
+      <div class="chdr"><div class="ctitle">Top Stocks by Analyst Upside Potential</div></div>
       <div class="chbox" style="--chmin:190px"><canvas id="upside-c"></canvas></div>
     </div>
   </div>
@@ -544,12 +560,12 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   <!-- Earnings + Economic Calendar Card -->
   <div class="card" style="margin-bottom:16px">
     <div class="chdr">
-      <div class="ctitle" id="earn-cal-title">📅 Earnings Calendar — All Sectors</div>
+      <div class="ctitle" id="earn-cal-title">Earnings Calendar — All Sectors</div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
         <!-- Main tab toggle -->
         <div style="display:flex;background:var(--bg3);border:1px solid var(--b2);border-radius:8px;overflow:hidden;">
-          <button id="btn-earn-cal" onclick="switchCalTab('earnings')" style="padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:var(--cyan);color:#000;transition:all .2s;">📅 Earnings</button>
-          <button id="btn-eco-cal" onclick="switchCalTab('economic')" style="padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:transparent;color:var(--t2);transition:all .2s;">🌐 Economic Events</button>
+          <button id="btn-earn-cal" onclick="switchCalTab('earnings')" style="padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:var(--cyan);color:#000;transition:all .2s;">Earnings</button>
+          <button id="btn-eco-cal" onclick="switchCalTab('economic')" style="padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:transparent;color:var(--t2);transition:all .2s;">Economic Events</button>
         </div>
         <!-- Earnings controls -->
         <div id="earn-controls" style="display:flex;gap:8px;flex-wrap:wrap">
@@ -569,8 +585,8 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
         <div id="eco-controls" style="display:none;gap:8px;flex-wrap:wrap;align-items:center">
           <select class="sel" id="eco-impact-filter" onchange="applyEcoFilter()">
             <option value="all">All Impact</option>
-            <option value="high">🔴 High Only</option>
-            <option value="medium">⚪ Medium+</option>
+            <option value="high">High Only</option>
+            <option value="medium">Medium+</option>
           </select>
           <button onclick="refreshEcoCalendar()" style="background:var(--bg3);border:1px solid var(--b2);border-radius:6px;padding:4px 10px;color:var(--cyan);font-size:11px;font-weight:700;cursor:pointer;">↻ Refresh</button>
         </div>
@@ -592,9 +608,9 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <!-- Impact legend -->
       <div style="display:flex;gap:16px;padding:8px 0 8px;flex-wrap:wrap;border-bottom:1px solid var(--b2);margin-bottom:10px">
         <span style="font-size:10px;color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:.5px;align-self:center">Impact:</span>
-        <span style="font-size:11px;font-weight:700;color:#ff4d4d;">🔴 High — Major mover</span>
-        <span style="font-size:11px;font-weight:700;color:#c9cdd8;">⚪ Medium</span>
-        <span style="font-size:11px;font-weight:700;color:#00c87a;">🟢 Low</span>
+        <span style="font-size:11px;font-weight:700;color:#ff4d4d;"><span class="idot"></span>High — Major mover</span>
+        <span style="font-size:11px;font-weight:700;color:#c9cdd8;"><span class="idot"></span>Medium</span>
+        <span style="font-size:11px;font-weight:700;color:#00c87a;"><span class="idot"></span>Low</span>
         <span style="font-size:10px;color:var(--t3);margin-left:auto;align-self:center">Click any event for details</span>
       </div>
       <!-- Month tabs -->
@@ -607,7 +623,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   <!-- Upcoming IPOs (summary; full calendar is on the IPOs tab) -->
   <div class="card" style="margin-bottom:16px">
     <div class="chdr">
-      <div class="ctitle">🚀 Upcoming IPOs</div>
+      <div class="ctitle">Upcoming IPOs</div>
       <button class="linkbtn" onclick="showPage('ipos',document.getElementById('ntab-ipos'))">See full calendar →</button>
     </div>
     <div id="ipo-mini"><div class="load"><div class="spin"></div>Loading...</div></div>
@@ -617,7 +633,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   <!-- World Finance News -->
   <div class="card" style="margin-bottom:16px">
     <div class="chdr">
-      <div class="ctitle">🌍 World Finance & Market News</div>
+      <div class="ctitle">World Finance & Market News</div>
       <div style="display:flex;gap:6px;align-items:center;">
         <div id="news-live-dot" style="width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;"></div>
         <span style="font-size:11px;color:var(--green);font-weight:700;">Live</span>
@@ -639,7 +655,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 
   <!-- All Stocks Table -->
   <div class="card">
-    <div class="stitle" id="stocks-title">📋 All Stocks — Live Data</div>
+    <div class="stitle" id="stocks-title">All Stocks — Live Data</div>
     <div class="toolbar">
       <input class="srch" style="width:220px" placeholder="Ticker or company..." id="s-srch" oninput="filterStocks()"/>
       <select class="sel" id="s-sec" onchange="filterStocks()">
@@ -686,14 +702,14 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 <div class="page" id="page-ipos">
   <div class="card" style="margin-bottom:16px">
     <div class="chdr">
-      <div class="ctitle">🚀 Next 7 Days</div>
+      <div class="ctitle">Next 7 Days</div>
       <span id="ipo-asof" style="font-size:11px;font-weight:600;color:var(--t3)"></span>
     </div>
     <div class="ipo-strip" id="ipo-week"><div class="load"><div class="spin"></div>Loading IPOs...</div></div>
   </div>
   <div class="card">
     <div class="chdr">
-      <div class="ctitle">📅 US IPO Calendar</div>
+      <div class="ctitle">US IPO Calendar</div>
       <div class="ipo-filters">
         <select class="sel" id="ipo-window" onchange="renderIPOs()">
           <option value="upcoming">Upcoming</option><option value="7">Next 7 days</option>
@@ -709,7 +725,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
         <input class="srch" style="width:150px" placeholder="Search company..." id="ipo-srch" oninput="renderIPOs()"/>
       </div>
     </div>
-    <div class="info-note" id="ipo-note">🚀 IPO dates from Yahoo Finance; price range and share count from Nasdaq when announced. Terms are usually set only days before pricing, and dates change often. Not investment advice.</div>
+    <div class="info-note" id="ipo-note">IPO dates from Yahoo Finance; price range and share count from Nasdaq when announced. Terms are usually set only days before pricing, and dates change often. Not investment advice.</div>
     <div class="tw"><table>
       <thead><tr><th>Date</th><th>Company</th><th>Ticker</th><th>Exchange</th><th>Price range</th><th>Shares</th><th>Deal size</th><th>Status</th></tr></thead>
       <tbody id="tb-ipo"><tr><td colspan="8"><div class="load"><div class="spin"></div>Loading...</div></td></tr></tbody>
@@ -730,7 +746,6 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   <!-- AI Portfolio Review — top after KPI -->
   <div class="ai-wrap" style="margin-bottom:16px;">
     <div class="ai-header">
-      <div class="ai-icon">🧠</div>
       <div>
         <div class="ai-title">AI Portfolio Review</div>
         <div class="ai-sub">Review your saved holdings using your real quantities, cost and position sizes, or type any stocks (tickers or company names) to review</div>
@@ -738,21 +753,21 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     </div>
     <div class="ai-input-row">
       <input class="ai-input" id="pf-tickers" placeholder="e.g. Apple, Tesla, Nvidia  or  AAPL, TSLA, NVDA" onkeydown="if(event.key==='Enter')runPfReview('list')"/>
-      <button class="ai-btn" id="pf-ai-btn" onclick="runPfReview('list')">🔍 Review these stocks</button>
+      <button class="ai-btn" id="pf-ai-btn" onclick="runPfReview('list')">Review these stocks</button>
     </div>
     <div style="margin-bottom:8px;display:flex;gap:18px;flex-wrap:wrap">
-      <button class="linkbtn" id="pf-hold-btn" onclick="runPfReview('holdings')">🧠 Review my saved holdings</button>
-      <button class="linkbtn" onclick="loadPortfolioTickers()">📋 Fill the box with my holdings' tickers</button>
+      <button class="linkbtn" id="pf-hold-btn" onclick="runPfReview('holdings')">Review my saved holdings</button>
+      <button class="linkbtn" onclick="loadPortfolioTickers()">Fill the box with my holdings' tickers</button>
     </div>
     <div class="ai-loading" id="pf-ai-loading"><div class="spin"></div>AI is reviewing — this takes about 10 seconds...</div>
     <div class="ai-result" id="pf-ai-result">
-      <div class="ai-result-title">🧠 Portfolio Review</div>
+      <div class="ai-result-title">Portfolio Review</div>
       <div class="ai-result-text" id="pf-ai-result-text"></div>
     </div>
   </div>
 
   <div class="card" style="margin-bottom:16px" id="pf-perf-card">
-    <div class="chdr"><div class="ctitle">📈 Performance vs the S&P 500</div><span id="pf-perf-sub" style="font-size:11px;font-weight:600;color:var(--t3)"></span></div>
+    <div class="chdr"><div class="ctitle">Performance vs the S&P 500</div><span id="pf-perf-sub" style="font-size:11px;font-weight:600;color:var(--t3)"></span></div>
     <div id="pf-perf-msg"><div class="load"><div class="spin"></div>Loading price history...</div></div>
     <div id="pf-perf-body" style="display:none">
       <div class="g4" id="pf-perf-stats" style="margin-bottom:12px"></div>
@@ -765,15 +780,15 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   <!-- Portfolio vs S&P 500 Benchmark -->
   <div class="card" style="margin-bottom:16px;" id="benchmark-card">
     <div class="chdr">
-      <div class="ctitle">📊 Portfolio vs S&P 500 Benchmark</div>
-      <button onclick="loadBenchmark()" style="background:var(--bg3);border:1px solid var(--b2);border-radius:7px;padding:5px 12px;color:var(--cyan);font-size:11px;font-weight:700;cursor:pointer;">🔄 Refresh</button>
+      <div class="ctitle">Portfolio vs S&P 500 Benchmark</div>
+      <button onclick="loadBenchmark()" style="background:var(--bg3);border:1px solid var(--b2);border-radius:7px;padding:5px 12px;color:var(--cyan);font-size:11px;font-weight:700;cursor:pointer;">Refresh</button>
     </div>
     <div id="benchmark-content"><div class="load"><div class="spin"></div>Loading benchmark data...</div></div>
   </div>
 
   <div class="g2">
     <div class="card"><div class="chdr"><div class="ctitle">Allocation</div></div><div style="height:220px"><canvas id="alloc-c"></canvas></div></div>
-    <div class="card"><div class="chdr"><div class="ctitle">Sector Breakdown</div></div><div id="sec-alloc"><div class="load"><div class="spin"></div></div></div></div>
+    <div class="card chartcard"><div class="chdr"><div class="ctitle">Sector Breakdown</div></div><div id="sec-alloc"><div class="load"><div class="spin"></div></div></div></div>
   </div>
   <div class="card" style="margin-bottom:16px">
     <div class="chdr"><div class="ctitle">P&L Per Holding</div></div>
@@ -787,7 +802,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     </table></div>
   </div>
   <div class="card" id="pf-form-card">
-    <div class="stitle" id="pf-form-title">➕ Add Holding</div>
+    <div class="stitle" id="pf-form-title">Add Holding</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;align-items:end">
       <div><label class="flbl">Ticker</label><input class="finp" id="a-tick" placeholder="AAPL"/></div>
       <div><label class="flbl">Quantity</label><input class="finp" type="number" id="a-qty" min="0" step="any" placeholder="100"/></div>
@@ -826,7 +841,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   <div class="card" style="margin-bottom:16px">
     <div class="stitle">Transactions</div>
     <div class="toolbar">
-      <input class="srch" style="width:200px" placeholder="🔍 Search..." id="tx-srch" oninput="renderTx()"/>
+      <input class="srch" style="width:200px" placeholder="Search..." id="tx-srch" oninput="renderTx()"/>
       <button class="fbtn on" onclick="setTxF('all',this)">All</button>
       <button class="fbtn" onclick="setTxF('BUY',this)">Buy</button>
       <button class="fbtn" onclick="setTxF('SELL',this)">Sell</button>
@@ -838,7 +853,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     </table></div>
   </div>
   <div class="card" id="tx-form-card">
-    <div class="stitle" id="tx-form-title">➕ Add Transaction</div>
+    <div class="stitle" id="tx-form-title">Add Transaction</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;align-items:end">
       <div><label class="flbl">Ticker</label><input class="finp" id="tx-tick" placeholder="AAPL"/></div>
       <div><label class="flbl">Type</label><select class="finp" id="tx-type"><option>BUY</option><option>SELL</option><option>DIVIDEND</option></select></div>
@@ -868,7 +883,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 
   <!-- Macro Economic Indicators -->
   <div class="card" style="margin-bottom:16px;">
-    <div class="chdr"><div class="ctitle">🌍 Macro Economic Indicators</div></div>
+    <div class="chdr"><div class="ctitle">Macro Economic Indicators</div></div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;" id="macro-grid">
       <div class="sc" style="--sc-t:var(--red)"><div class="sc-l">VIX — Fear Index</div><div class="sc-v" id="mac-vix">--</div><div class="sc-s" id="mac-vix-c">--</div></div>
       <div class="sc" style="--sc-t:var(--blue)"><div class="sc-l">Dollar Index (DXY)</div><div class="sc-v" id="mac-dxy">--</div><div class="sc-s" id="mac-dxy-c">--</div></div>
@@ -880,7 +895,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   <!-- Commodity Prices — KPI Cards with Dropdown Filter -->
   <div class="card" style="margin-bottom:16px;">
     <div class="chdr">
-      <div class="ctitle">🏗️ Live Commodity Prices</div>
+      <div class="ctitle">Live Commodity Prices</div>
       <div style="display:flex;gap:8px;align-items:center;">
         <select id="com-filter-select" onchange="filterComFromSelect(this.value)" style="background:var(--bg3);border:1px solid var(--b2);border-radius:8px;padding:6px 12px;color:var(--t1);font-size:12px;font-weight:700;outline:none;cursor:pointer;">
           <option value="all">All Commodities</option>
@@ -913,7 +928,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   <!-- Commodity-Linked Companies — KPI Cards -->
   <div class="card">
     <div class="chdr">
-      <div class="ctitle">🏢 Commodity-Linked Companies</div>
+      <div class="ctitle">Commodity-Linked Companies</div>
       <select id="comco-filter-select" onchange="filterComCoFromSelect(this.value)" style="background:var(--bg3);border:1px solid var(--b2);border-radius:8px;padding:6px 12px;color:var(--t1);font-size:12px;font-weight:700;outline:none;cursor:pointer;">
         <option value="all">All Companies</option>
         <option value="gold">Gold</option>
@@ -954,17 +969,17 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 
   <div class="card" style="margin-bottom:16px;">
     <div class="chdr">
-      <div class="ctitle">⭐ My Watchlist</div>
+      <div class="ctitle">My Watchlist</div>
       <div style="position:relative;display:flex;gap:8px;align-items:center;">
         <div style="position:relative;">
-          <input class="srch" placeholder="🔍 Search by name or ticker..." id="wl-add-input" style="width:260px;" oninput="searchWatchlistStocks(this.value)" onkeydown="if(event.key==='Escape')closeWlSuggestions()"/>
+          <input class="srch" placeholder="Search by name or ticker..." id="wl-add-input" style="width:260px;" oninput="searchWatchlistStocks(this.value)" onkeydown="if(event.key==='Escape')closeWlSuggestions()"/>
           <div id="wl-suggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--b2);border-radius:8px;z-index:100;max-height:220px;overflow-y:auto;margin-top:4px;box-shadow:0 8px 24px rgba(0,0,0,0.4);"></div>
         </div>
         <button class="btn btns" onclick="addToWatchlistManual()" style="padding:8px 16px;font-size:12px;">+ Add</button>
       </div>
     </div>
     <div id="wl-empty" style="text-align:center;padding:40px;color:var(--t3);font-size:13px;display:none;">
-      ⭐ Your watchlist is empty. Search for a stock and click the ⭐ button to add it here.
+      Your watchlist is empty. Search for a stock above and add it here.
     </div>
     <div class="tw"><table id="wl-table">
       <thead><tr><th>Ticker</th><th>Company</th><th>Sector</th><th>Price</th><th>Change</th><th>Action</th></tr></thead>
@@ -1018,8 +1033,8 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
           <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">
             <!-- Chart type toggle -->
             <div style="display:flex;gap:3px;background:var(--bg3);border-radius:7px;padding:2px;margin-right:6px;">
-              <button id="chart-line-btn" onclick="setChartType('line',this)" style="padding:4px 10px;border-radius:5px;border:none;background:var(--blue);color:#fff;font-size:11px;font-weight:700;cursor:pointer;">📈 Line</button>
-              <button id="chart-candle-btn" onclick="setChartType('candle',this)" style="padding:4px 10px;border-radius:5px;border:none;background:none;color:var(--t3);font-size:11px;font-weight:700;cursor:pointer;">🕯 Candle</button>
+              <button id="chart-line-btn" onclick="setChartType('line',this)" style="padding:4px 10px;border-radius:5px;border:none;background:var(--blue);color:#fff;font-size:11px;font-weight:700;cursor:pointer;">Line</button>
+              <button id="chart-candle-btn" onclick="setChartType('candle',this)" style="padding:4px 10px;border-radius:5px;border:none;background:none;color:var(--t3);font-size:11px;font-weight:700;cursor:pointer;">Candle</button>
             </div>
             <!-- Period buttons -->
             <button class="fbtn on" onclick="setPer('3mo',this)">3M</button>
@@ -1037,7 +1052,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <!-- Price Alert Quick Bar -->
       <div class="card" style="margin-bottom:14px;">
         <div class="chdr">
-          <div class="ctitle">🔔 Set Price Alert</div>
+          <div class="ctitle">Set Price Alert</div>
           <div id="chart-alert-preview" style="font-size:12px;color:var(--cyan);font-weight:700;"></div>
         </div>
         <div style="padding:14px 16px;">
@@ -1060,7 +1075,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
             <input type="number" id="chart-alert-price" placeholder="Enter target price $" step="0.01" min="0"
               style="background:var(--bg3);border:1px solid var(--b2);border-radius:8px;padding:10px 12px;color:var(--t1);font-size:13px;font-weight:700;outline:none;width:100%;box-sizing:border-box;"
               oninput="updateAlertPreview()"/>
-            <button onclick="saveChartAlert()" style="background:linear-gradient(135deg,var(--cyan),var(--blue));border:none;border-radius:8px;padding:10px 20px;color:#fff;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;">Set Alert 🔔</button>
+            <button onclick="saveChartAlert()" style="background:linear-gradient(135deg,var(--cyan),var(--blue));border:none;border-radius:8px;padding:10px 20px;color:#fff;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;">Set Alert </button>
           </div>
         </div>
       </div>
@@ -1082,13 +1097,13 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <!-- Balance Sheet + P&L Tables -->
       <div class="fs2" style="margin-top:8px;">
         <div class="card">
-          <div class="chdr"><div class="ctitle">📊 Balance Sheet — Latest Annual</div></div>
+          <div class="chdr"><div class="ctitle">Balance Sheet — Latest Annual</div></div>
           <div id="fs-balance-sheet">
             <div class="load"><div class="spin"></div>Loading...</div>
           </div>
         </div>
         <div class="card">
-          <div class="chdr"><div class="ctitle">📈 Profit & Loss — Latest Annual</div></div>
+          <div class="chdr"><div class="ctitle">Profit & Loss — Latest Annual</div></div>
           <div id="fs-pnl">
             <div class="load"><div class="spin"></div>Loading...</div>
           </div>
@@ -1118,7 +1133,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
         <div id="pred-sent-strip"></div>
         <div id="period-bar" class="period-bar" style="display:none">
           <div class="period-row">
-            <span class="period-lbl">📅 Performance period</span>
+            <span class="period-lbl">Performance period</span>
             <select class="sel" id="period-year" onchange="periodYearChanged()"><option value="">Year…</option></select>
             <select class="sel" id="period-quarter" onchange="periodQuarterChanged()" disabled><option value="">Full year</option></select>
             <span class="period-or">or</span>
@@ -1141,7 +1156,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
         </div>
         <div id="pred-period-view" style="display:none"></div>
         <div id="pred-targets" class="intgrid" style="margin-top:16px"></div>
-        <div class="info-note" style="margin-top:12px">⚠️ Treat these as rough guides. In backtests on 59 large stocks the model's up/down calls were about as accurate as a coin flip, so its targets are pulled toward "no change". <b>Hit rate</b> is how often the model called direction correctly on held-out history, not a probability. Horizons are trading days (7 ≈ 1.5 weeks, 30 ≈ 6 weeks, 90 ≈ 4 months).</div>
+        <div class="info-note" style="margin-top:12px">Treat these as rough guides. In backtests on 59 large stocks the model's up/down calls were about as accurate as a coin flip, so its targets are pulled toward "no change". <b>Hit rate</b> is how often the model called direction correctly on held-out history, not a probability. Horizons are trading days (7 ≈ 1.5 weeks, 30 ≈ 6 weeks, 90 ≈ 4 months).</div>
       </div>
       <div class="fcpair">
         <div class="intbox" id="fs-int"></div>
@@ -1153,7 +1168,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     <div class="fssec" id="fss-earnings">
       <div id="fs-earn"><div class="load"><div class="spin"></div>Loading earnings...</div></div>
       <div class="card" style="margin-top:12px">
-        <div class="chdr"><div class="ctitle">📆 Quarterly Results — Last 8 Quarters</div></div>
+        <div class="chdr"><div class="ctitle">Quarterly Results — Last 8 Quarters</div></div>
         <div id="fs-quarterly"><div class="load"><div class="spin"></div>Loading quarterly data...</div></div>
       </div>
     </div>
@@ -1170,7 +1185,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 
     <!-- Company Tab -->
     <div class="fssec" id="fss-peers">
-      <div class="info-note" id="peer-note">👥 Compare this stock with its closest competitors.</div>
+      <div class="info-note" id="peer-note">Compare this stock with its closest competitors.</div>
       <div class="peer-bar">
         <div class="peer-chips" id="peer-chips"></div>
         <div class="peer-add">
@@ -1191,6 +1206,8 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 </div>
 
 <script>
+// ─── LINE ICONS (simple outline icons, used only where an icon is needed) ───
+const LI={chart:'<svg class="lic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></svg>',bell:'<svg class="lic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>',chat:'<svg class="lic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',trash:'<svg class="lic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>',news:'<svg class="lic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h13a1 1 0 0 1 1 1v14a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2z"/><path d="M18 9h2a1 1 0 0 1 1 1v9a2 2 0 0 1-2 2"/><path d="M8 8h6"/><path d="M8 12h6"/><path d="M8 16h4"/></svg>',user:'<svg class="lic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>'};
 // ─── COMPANY LOGO HELPER — defined first so available everywhere ───
 const DOMAIN_MAP={'AAPL':'apple.com','MSFT':'microsoft.com','GOOGL':'google.com','GOOG':'google.com','AMZN':'amazon.com','META':'meta.com','NFLX':'netflix.com','TSLA':'tesla.com','NVDA':'nvidia.com','AMD':'amd.com','INTC':'intel.com','CSCO':'cisco.com','ORCL':'oracle.com','IBM':'ibm.com','ADBE':'adobe.com','CRM':'salesforce.com','PYPL':'paypal.com','SQ':'block.xyz','SHOP':'shopify.com','UBER':'uber.com','LYFT':'lyft.com','ABNB':'airbnb.com','COIN':'coinbase.com','SPOT':'spotify.com','DIS':'disney.com','SBUX':'starbucks.com','MCD':'mcdonalds.com','NKE':'nike.com','KO':'coca-cola.com','PEP':'pepsico.com','WMT':'walmart.com','TGT':'target.com','COST':'costco.com','HD':'homedepot.com','LOW':'lowes.com','AMGN':'amgen.com','JPM':'jpmorganchase.com','BAC':'bankofamerica.com','WFC':'wellsfargo.com','GS':'goldmansachs.com','MS':'morganstanley.com','V':'visa.com','MA':'mastercard.com','AXP':'americanexpress.com','BLK':'blackrock.com','SCHW':'schwab.com','XOM':'exxonmobil.com','CVX':'chevron.com','COP':'conocophillips.com','SLB':'slb.com','HAL':'halliburton.com','OXY':'oxy.com','EOG':'eogresources.com','NEM':'newmont.com','GOLD':'barrick.com','AEM':'agnicoeagle.com','FNV':'franco-nevada.com','WPM':'wheatonpreciousmetals.com','AG':'firstmajestic.com','PAAS':'panamericansilver.com','FCX':'fcx.com','SCCO':'southerncopper.com','BHP':'bhp.com','RIO':'riotinto.com','VALE':'vale.com','TECK':'teck.com','NUE':'nucor.com','STLD':'steeldynamics.com','AA':'alcoa.com','ALB':'albemarle.com','MP':'mpmaterials.com','CCJ':'cameco.com','ADM':'adm.com','BG':'bunge.com','MOS':'mosaicco.com','DE':'deere.com','NTR':'nutrien.com','CF':'cfindustries.com','MSTR':'microstrategy.com','MARA':'marathondh.com','RIOT':'riotplatforms.com','NEE':'nexteraenergy.com','FSLR':'firstsolar.com','ENPH':'enphase.com','PLUG':'plugpower.com','BE':'bloomenergy.com','RUN':'sunrun.com','CHPT':'chargepoint.com','SEDG':'solaredge.com','AWK':'amwater.com','XYL':'xylem.com','WM':'wm.com','RSG':'rsg.com','ZIM':'zim.com','SBLK':'starbulk.com','GOGL':'goldenocean.com','ISRG':'intuitive.com','ABB':'abb.com','TER':'teradyne.com','CGNX':'cognex.com','ROK':'rockwellautomation.com','SYM':'symbotic.com','PATH':'uipath.com','PLTR':'palantir.com','SNOW':'snowflake.com','DDOG':'datadoghq.com','ZM':'zoom.us','DOCU':'docusign.com','TWLO':'twilio.com','NET':'cloudflare.com','NOW':'servicenow.com','WDAY':'workday.com','OKTA':'okta.com','CRWD':'crowdstrike.com','ZS':'zscaler.com'};
 function getLogoUrl(ticker){return DOMAIN_MAP[ticker]?`https://www.google.com/s2/favicons?domain=${DOMAIN_MAP[ticker]}&sz=32`:null;}
@@ -1292,7 +1309,7 @@ async function api(url){try{const r=await fetch(API+url);if(signedOut(r))return 
 // Administrators get a link to the user-access page, with the number of people waiting for approval
 function addAdminLink(nav){
   const a=document.createElement('a');a.href='/admin';a.className='nadmin';a.title='User access';
-  a.innerHTML='<span class="na-icon">⚙</span><span class="na-text">Admin</span>';nav.appendChild(a);
+  a.innerHTML='<span class="na-icon"><svg class="lic" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></span><span class="na-text">Admin</span>';nav.appendChild(a);
   nav.closest('.nav')?.classList.add('has-admin');
   const refresh=async()=>{try{
     const r=await fetch(API+'/api/admin/summary');if(!r.ok)return;const d=await r.json();
@@ -1359,7 +1376,6 @@ async function loadDividends(){
       wrap.innerHTML = `
         <div class="card" style="border-left:4px solid #58697a;margin-bottom:14px;">
           <div style="display:flex;align-items:center;gap:10px;">
-            <span style="font-size:28px;">📭</span>
             <div>
               <div style="font-size:15px;font-weight:700;color:#8a9bb0;line-height:1.5;">
                 ${curTick} does not currently pay a dividend.
@@ -1392,7 +1408,7 @@ async function loadDividends(){
 
     const streakYrs  = d.streak_years || 0;
     const streakBadge = streakYrs >= 1
-      ? `<span style="margin-left:10px;background:rgba(255,200,0,.15);border:1px solid #ffc800;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:700;color:#ffc800;">🔥 ${streakYrs} yr streak</span>`
+      ? `<span style="margin-left:10px;background:rgba(255,200,0,.15);border:1px solid #ffc800;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:700;color:#ffc800;">${streakYrs} yr streak</span>`
       : '';
 
     // ── KPI values ───────────────────────────────────────────────────────────
@@ -1445,7 +1461,7 @@ async function loadDividends(){
           <text x="${x+bW/2}" y="${y-4}" text-anchor="middle" fill="${color}" font-size="11" font-family="monospace" font-weight="700">$${h.total.toFixed(2)}</text>`;
       }).join('');
       barChartSvg = `
-        <div class="card" style="margin-bottom:14px;overflow:hidden;">
+        <div class="card chartcard" style="margin-bottom:14px;overflow:hidden;">
           <div class="chdr"><div class="ctitle">Annual Dividend Per Share</div>
             <div style="font-size:11px;color:var(--t3);display:flex;gap:10px;align-items:center;">
               <span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;background:#00e676;border-radius:2px;display:inline-block;"></span>Growth</span>
@@ -1488,7 +1504,7 @@ async function loadDividends(){
     // ── Plain English guide ──────────────────────────────────────────────────
     const guideHtml = `
       <div class="card" style="margin-bottom:14px;background:rgba(79,142,247,.06);border:1px solid rgba(79,142,247,.2);">
-        <div class="chdr"><div class="ctitle" style="color:#4f8ef7;">📘 Dividend Glossary</div></div>
+        <div class="chdr"><div class="ctitle">Dividend Glossary</div></div>
         <div style="display:grid;gap:10px;padding-top:4px;">
           <div><span style="font-size:12px;font-weight:700;color:var(--t1);">Dividend Yield</span>
             <div style="font-size:12px;color:var(--t3);margin-top:2px;">How much you earn per year as a % of the current share price. A 3% yield on a $100 stock = $3/year per share.</div>
@@ -1553,7 +1569,7 @@ async function loadCompanyTab(){
     wrap.innerHTML = `
       <!-- Company Overview -->
       <div style="margin-bottom:24px;">
-        <div class="inttitle">🏢 COMPANY OVERVIEW</div>
+        <div class="inttitle">COMPANY OVERVIEW</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
           <div>
             ${d.description ? `<p style="font-size:13px;color:var(--t2);line-height:1.7;margin-bottom:16px;">${d.description.substring(0,400)}${d.description.length>400?'...':''}</p>` : ''}
@@ -1586,7 +1602,7 @@ async function loadCompanyTab(){
 
       <!-- Shareholder Structure -->
       <div style="margin-bottom:24px;">
-        <div class="inttitle">👥 SHAREHOLDER STRUCTURE</div>
+        <div class="inttitle">SHAREHOLDER STRUCTURE</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
           <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:10px;padding:16px;">
             <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--cyan);margin-bottom:12px;">Ownership Breakdown</div>
@@ -1594,7 +1610,7 @@ async function loadCompanyTab(){
 
               <!-- Within Company — Insiders -->
               <div style="border-bottom:1px solid var(--b1);padding-bottom:10px;">
-                <div style="font-size:10px;font-weight:800;color:var(--yellow);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">🏢 Within Company (Insiders)</div>
+                <div style="font-size:10px;font-weight:800;color:var(--yellow);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Within Company (Insiders)</div>
                 ${d.insider_pct!=null?`
                 <div style="margin-bottom:6px;">
                   <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
@@ -1608,7 +1624,7 @@ async function loadCompanyTab(){
 
               <!-- Outside Company — Institutional -->
               <div style="border-bottom:1px solid var(--b1);padding-bottom:10px;">
-                <div style="font-size:10px;font-weight:800;color:var(--blue);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">🏦 Outside Company (Institutional)</div>
+                <div style="font-size:10px;font-weight:800;color:var(--blue);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Outside Company (Institutional)</div>
                 ${d.institution_pct!=null?`
                 <div style="margin-bottom:6px;">
                   <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
@@ -1622,7 +1638,7 @@ async function loadCompanyTab(){
 
               <!-- Public — Retail Investors -->
               <div>
-                <div style="font-size:10px;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">🌍 Public (Retail Investors)</div>
+                <div style="font-size:10px;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Public (Retail Investors)</div>
                 ${d.public_float_pct!=null?`
                 <div style="margin-bottom:6px;">
                   <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
@@ -1645,7 +1661,7 @@ async function loadCompanyTab(){
 
           <!-- Top Institutional Holders -->
           <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:10px;padding:16px;">
-            <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--cyan);margin-bottom:12px;">🏆 Top Institutional Holders</div>
+            <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--t1);margin-bottom:12px;">Top Institutional Holders</div>
             ${d.top_holders && d.top_holders.length ? `
               <div style="display:grid;gap:10px;">
                 ${d.top_holders.slice(0,8).map((h,i)=>`
@@ -1745,7 +1761,7 @@ async function loadSectors(){
 function filterBySector(sector){
   document.getElementById('s-sec').value=sector;
   filterStocks();
-  document.getElementById('stocks-title').textContent='📋 '+sector+' Stocks';
+  document.getElementById('stocks-title').textContent=''+sector+' Stocks';
   setTimeout(()=>document.querySelector('#page-market .card:last-of-type').scrollIntoView({behavior:'smooth'}),100);
 }
 
@@ -2197,7 +2213,7 @@ function renderPeriodView(d,range){
       <span class="period-change ${gc(st.change_pct)}">${pct(st.change_pct)}</span>
       <span class="period-sub">${st.benchmark_change_pct==null?'':`S&amp;P 500 ${pct(st.benchmark_change_pct)}`}</span></div>
     <div style="height:300px"><canvas id="period-c"></canvas></div>
-    ${notes.map(n=>`<div class="period-note">ℹ️ ${escapeHtml(n)}</div>`).join('')}
+    ${notes.map(n=>`<div class="period-note">${escapeHtml(n)}</div>`).join('')}
     <div class="g4" style="margin-top:12px">${cards}</div>
     <div class="period-note">${st.up_days_pct==null?'':`Up days ${f2(st.up_days_pct,0)}% · `}Best day ${pct(st.best_day_pct)} (${escapeHtml(shortDate(st.best_day))}) · Worst day ${pct(st.worst_day_pct)} (${escapeHtml(shortDate(st.worst_day))}) · ${st.trading_days} trading days. ${escapeHtml(d.adjusted||'')} Past performance does not predict the future.</div>`;
   const up=st.change_pct>=0,line=up?'#00e676':'#ff4444';
@@ -2251,12 +2267,12 @@ function renderSentiment(d){
   const upd=d.updated_at?new Date(d.updated_at).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'';
   const c=d.counts||{};
   return`<div class="sent-card">
-    <div class="chdr" style="margin-bottom:10px"><div class="ctitle">📰 News sentiment</div><span class="badge ${badge}">${escapeHtml(label)}</span></div>
+    <div class="chdr" style="margin-bottom:10px"><div class="ctitle">News sentiment</div><span class="badge ${badge}">${escapeHtml(label)}</span></div>
     ${score==null?`<div class="empty" style="padding:8px 0">${d.n_articles?'None of the recent headlines are about this company.':'No recent headlines found for this stock.'}</div>`:
     `<div class="sent-top"><div class="sent-score ${score>=0.15?'g':score<=-0.15?'r':''}">${score>0?'+':''}${score.toFixed(2)}</div>
       <div class="sent-gauge" title="-1 very negative, +1 very positive"><i style="left:${pos}%"></i></div></div>
     <div class="sent-meta">${d.n_relevant} of ${d.n_articles} headlines are about ${escapeHtml(d.ticker)}${d.n_stories&&d.n_stories<d.n_relevant?` (${d.n_stories} distinct stories)`:''} · ${c.positive||0} positive · ${c.neutral||0} neutral · ${c.negative||0} negative</div>`}
-    ${d.stale?'<div class="sent-meta r">⚠️ The AI service is unavailable, so this is an older result.</div>':''}
+    ${d.stale?'<div class="sent-meta r">The AI service is unavailable, so this is an older result.</div>':''}
     <div style="margin-top:10px">${about.map(sentHeadline).join('')}</div>
     ${other.length?`<details><summary>${other.length} headline${other.length>1?'s':''} not about ${escapeHtml(d.ticker)} (ignored)</summary>${other.map(sentHeadline).join('')}</details>`:''}
     <div class="sent-meta" style="margin-top:10px">Headlines are scored by AI from -1 (very negative) to +1 (very positive) for their likely effect on this stock, newer ones counting more. It is context, not a forecast. Headlines about the same story are grouped, and a heavily covered story counts more (by the square root of its coverage).${upd?' Updated '+escapeHtml(upd)+'.':''}</div>
@@ -2313,15 +2329,15 @@ function renderPeerChips(){
   const changed=peerState.list.join()!==peerState.suggested.join();
   document.getElementById('peer-reset').style.display=changed?'inline':'none';
   document.getElementById('peer-note').textContent=peerState.source==='ai'
-    ?'👥 Peers were chosen by AI from companies in the same industry or sector. Remove any, or add your own (up to '+PEER_MAX+').'
-    :'👥 Peers were picked by industry and market-cap closeness (AI selection was unavailable). Remove any, or add your own (up to '+PEER_MAX+').';
+    ?'Peers were chosen by AI from companies in the same industry or sector. Remove any, or add your own (up to '+PEER_MAX+').'
+    :'Peers were picked by industry and market-cap closeness (AI selection was unavailable). Remove any, or add your own (up to '+PEER_MAX+').';
 }
 function peerRemove(t){peerState.list=peerState.list.filter(x=>x!==t);renderPeerChips();renderPeerTable();}
 function peerReset(){peerState.list=[...peerState.suggested];renderPeerChips();renderPeerTable();}
 function peerAdd(t,name){
   peerCloseSuggest();
   if(!t||t===peerState.target||peerState.list.includes(t))return;
-  if(peerState.list.length>=PEER_MAX){document.getElementById('peer-note').textContent='⚠️ You can compare up to '+PEER_MAX+' peers. Remove one first.';return;}
+  if(peerState.list.length>=PEER_MAX){document.getElementById('peer-note').textContent='You can compare up to '+PEER_MAX+' peers. Remove one first.';return;}
   peerState.list.push(t);peerState.names[t]=name||'';
   document.getElementById('peer-search').value='';
   renderPeerChips();renderPeerTable();
@@ -2389,7 +2405,7 @@ async function renderPeerTable(){
   const rows=d.groups.map(g=>`<tr class="peer-grp"><td colspan="${cols}">${escapeHtml(g.name)}</td></tr>`+g.metrics.map(m=>
     `<tr><td style="color:var(--t2);font-weight:600">${escapeHtml(m.label)}</td>`+T.map(t=>{
       const v=m.values[t],cls=[t===tgt?'peer-target':'',m.best===t?'peer-best':'',m.format==='text'?peerTextClass(v):''].filter(Boolean).join(' ');
-      const odd=(m.outliers||[]).includes(t)?' <span title="Unusually large. This may reflect a very small starting figure or a data error." style="cursor:help">⚠️</span>':'';
+      const odd=(m.outliers||[]).includes(t)?' <span class="peer-odd" title="Unusually large. This may reflect a very small starting figure or a data error." style="cursor:help;color:var(--amber,#f5a623)">!</span>':'';
       return`<td class="num ${cls}">${peerFmt(m,v)}${odd}${m.best===t?' ★':''}${t===tgt&&m.position?posMark[m.position]||'':''}</td>`;
     }).join('')+`<td class="num" style="color:var(--t3)">${m.median!=null?peerFmt(m,m.median):'—'}</td></tr>`).join('')).join('');
   const missing=(d.missing||[]).length?`<div class="r" style="font-size:11px;margin-top:8px">Not found: ${d.missing.map(escapeHtml).join(', ')}</div>`:'';
@@ -2399,7 +2415,7 @@ async function renderPeerTable(){
     <div class="card" style="margin-top:14px"><div class="chdr"><div class="ctitle">1-year price performance (rebased to 100)</div></div>
       <div id="peer-chart-msg"><div class="load"><div class="spin"></div>Loading prices...</div></div>
       <div style="height:260px;display:none" id="peer-chart-box"><canvas id="peer-px-c"></canvas></div></div>
-    <div class="card" style="margin-top:14px"><div class="chdr"><div class="ctitle">🧠 AI summary</div><button class="linkbtn" id="peer-verdict-btn" onclick="loadPeerVerdict()">Summarize this comparison</button></div>
+    <div class="card" style="margin-top:14px"><div class="chdr"><div class="ctitle">AI summary</div><button class="linkbtn" id="peer-verdict-btn" onclick="loadPeerVerdict()">Summarize this comparison</button></div>
       <div id="peer-verdict" class="ai-result-text"><span style="color:var(--t3);font-size:12px;font-weight:600">A short written comparison based on the table above.</span></div></div>
     <div class="peer-legend">Prices as of ${d.prices_as_of?escapeHtml(new Date(d.prices_as_of).toLocaleString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})):'—'}. Fundamentals come from Yahoo Finance and may lag. Not investment advice.</div>`;
 }
@@ -2444,7 +2460,7 @@ function renderIPOs(){
   if(ipoMeta&&ipoMeta.as_of)asof.textContent='Updated '+new Date(ipoMeta.as_of).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
   const note=document.getElementById('ipo-note');
   const warn=(ipoMeta&&ipoMeta.warnings||[]).map(escapeHtml).join(' ');
-  note.innerHTML='🚀 IPO dates from Yahoo Finance; price range and share count from Nasdaq when announced. Terms are usually set only days before pricing, and dates change often. Not investment advice.'+(warn?` <span class="r">⚠️ ${warn}</span>`:'');
+  note.innerHTML='IPO dates from Yahoo Finance; price range and share count from Nasdaq when announced. Terms are usually set only days before pricing, and dates change often. Not investment advice.'+(warn?` <span class="r">${warn}</span>`:'');
 
   // Next 7 days strip (ignores the filters)
   const soon=aIPO.filter(r=>r.days_until>=0&&r.days_until<=7).slice(0,12);
@@ -2502,7 +2518,7 @@ function switchCalTab(tab){
   document.getElementById('earn-tab-content').style.display = isEco ? 'none' : 'block';
   document.getElementById('eco-tab-content').style.display  = isEco ? 'block' : 'none';
   document.getElementById('earn-cal-title').textContent =
-    isEco ? '🌐 Economic Events Calendar' : '📅 Earnings Calendar — All Sectors';
+    isEco ? 'Economic Events Calendar' : 'Earnings Calendar — All Sectors';
   if(isEco && !ecoDataCache[ecoCurrentMonth]) loadEcoCalendar(ecoCurrentMonth);
   else if(isEco) renderEcoEvents();
 }
@@ -2528,14 +2544,14 @@ async function loadEcoCalendar(month){
     const d = await api(`/api/economic-calendar?month=${month}`);
     if(d.error){
       document.getElementById('eco-calendar-body').innerHTML =
-        `<div class="info-note" style="color:#f87171">⚠️ ${d.error}</div>`;
+        `<div class="info-note" style="color:#f87171">${d.error}</div>`;
       return;
     }
     ecoDataCache[month] = d.events || [];
     renderEcoEvents();
   } catch(e){
     document.getElementById('eco-calendar-body').innerHTML =
-      `<div class="info-note" style="color:#f87171">⚠️ Failed to load: ${e.message}</div>`;
+      `<div class="info-note" style="color:#f87171">Failed to load: ${e.message}</div>`;
   }
 }
 
@@ -2587,9 +2603,9 @@ function renderEcoEvents(){
   }
 
   const IC = {
-    high:   {dot:'🔴', color:'#ff4d4d', bg:'rgba(255,77,77,0.07)',   border:'rgba(255,77,77,0.3)',    label:'HIGH'},
-    medium: {dot:'⚪', color:'#c9cdd8', bg:'rgba(255,255,255,0.04)', border:'rgba(255,255,255,0.2)', label:'MED'},
-    low:    {dot:'🟢', color:'#00c87a', bg:'rgba(0,200,122,0.06)',   border:'rgba(0,200,122,0.3)',    label:'LOW'},
+    high:   {dot:'<span class="idot"></span>', color:'#ff4d4d', bg:'rgba(255,77,77,0.07)',   border:'rgba(255,77,77,0.3)',    label:'HIGH'},
+    medium: {dot:'<span class="idot"></span>', color:'#c9cdd8', bg:'rgba(255,255,255,0.04)', border:'rgba(255,255,255,0.2)', label:'MED'},
+    low:    {dot:'<span class="idot"></span>', color:'#00c87a', bg:'rgba(0,200,122,0.06)',   border:'rgba(0,200,122,0.3)',    label:'LOW'},
   };
   const RESULT_STYLE = {
     beat:   {color:'#00c87a', label:'▲ BEAT'},
@@ -2744,7 +2760,7 @@ function timeAgo(ts){
   return Math.floor(diff/86400)+'d ago';
 }
 
-const CAT_ICONS = {markets:'📈',economy:'💹',global:'🌍',tech:'💻',crypto:'₿',commodities:'🏗️'};
+const CAT_ICONS = {}; // news cards without a photo show a plain newspaper line icon
 
 function renderWorldNews(){
   const grid = document.getElementById('news-grid');
@@ -2756,7 +2772,7 @@ function renderWorldNews(){
   }
   grid.innerHTML = `<div class="news-grid">${filtered.slice(0,6).map(n=>{
     const cat = n.category || 'markets';
-    const icon = CAT_ICONS[cat] || '📰';
+    const icon = CAT_ICONS[cat] || LI.news;
     const imgUrl = safeHttpUrl(n.image);
     const imgHtml = imgUrl
       ? `<img class="news-card-img" src="${escapeHtml(imgUrl)}" alt="" onerror="this.style.display='none'"/>`
@@ -2822,9 +2838,9 @@ function renderStockNews(items, label){
   }
   document.getElementById('news-grid').innerHTML=`<div class="news-grid">${
     items.slice(0,12).map(n=>`<div class="news-card" data-url="${escapeHtml(safeHttpUrl(n.url))}" onclick="openNewsLink(this)">
-      <div class="news-card-img-placeholder">📈</div>
+      <div class="news-card-img-placeholder">${LI.news}</div>
       <div class="news-card-body">
-        <div class="news-card-cat markets">📈 Markets</div>
+        <div class="news-card-cat markets">Markets</div>
         <div class="news-card-title">${escapeHtml(n.title||'No title')}</div>
         <div class="news-card-footer">
           <span class="news-card-source">${escapeHtml(n.source||'Yahoo Finance')}</span>
@@ -2842,8 +2858,8 @@ const CAT_LABELS = {markets:'Markets',economy:'Economy',global:'Global Finance',
 function openNewsModal(cat){
   const modal = document.getElementById('news-modal');
   const title = document.getElementById('news-modal-title');
-  const icon = CAT_ICONS[cat] || '📰';
-  title.textContent = `${icon} ${CAT_LABELS[cat]||cat} News`;
+  const icon = LI.news;
+  title.textContent = `${CAT_LABELS[cat]||cat} News`;
   document.getElementById('news-modal-search-input').value = '';
   // Filter data
   newsModalData = worldNewsData.filter(n=>n.category===cat);
@@ -2870,7 +2886,7 @@ function renderModalNews(items){
   }
   body.innerHTML = `<div class="news-grid">${items.map(n=>{
     const cat = n.category || 'markets';
-    const icon = CAT_ICONS[cat] || '📰';
+    const icon = CAT_ICONS[cat] || LI.news;
     const imgUrl = safeHttpUrl(n.image);
     const imgHtml = imgUrl
       ? `<img class="news-card-img" src="${escapeHtml(imgUrl)}" alt="" onerror="this.style.display='none'"/>`
@@ -2920,7 +2936,7 @@ function filterStocks(){
     return ms&&mq&&mr;
   });
   pg=1;
-  document.getElementById('stocks-title').textContent=document.getElementById('s-sec').value?`📋 ${document.getElementById('s-sec').value} Stocks`:'📋 All Stocks — Live Data';
+  document.getElementById('stocks-title').textContent=document.getElementById('s-sec').value?`${document.getElementById('s-sec').value} Stocks`:'All Stocks — Live Data';
   renderStocks();
 }
 function srt(k){if(sortK===k)sortA=!sortA;else{sortK=k;sortA=false;}fStocks.sort((a,b)=>{const va=a[k],vb=b[k];if(va==null)return 1;if(vb==null)return-1;return sortA?(va>vb?1:-1):(va<vb?1:-1);});renderStocks();}
@@ -3040,7 +3056,7 @@ async function openStock(ticker){
     mi('50D MA',d.ma_50?fp(d.ma_50):'--'),
     mi('200D MA',d.ma_200?fp(d.ma_200):'--'),
     mi('Volatility',d.volatility?f2(d.volatility)+'%':'--'),
-    mi('Golden Cross',d.golden_cross?'✅ Yes':'❌ No',d.golden_cross?'g':'r'),
+    mi('Golden Cross',d.golden_cross?'Yes':'No',d.golden_cross?'g':'r'),
     mi('Short Int.',d.short_interest?f2(d.short_interest*100)+'%':'--'),
     mi('Short Ratio',d.short_ratio?f2(d.short_ratio):'--'),
   ].join('');
@@ -3081,7 +3097,7 @@ async function openStock(ticker){
   // Market Intelligence tab
   const ts=mkTechSignal(d.rsi_14,d.macd,d.current_price,d.ma_50,d.ma_200);
   document.getElementById('fs-int').innerHTML=`
-    <div class="inttitle">🤖 PREDICTION MODEL — ${ticker}</div>
+    <div class="inttitle">PREDICTION MODEL — ${ticker}</div>
     <div class="intgrid">
       <div class="intitem"><div class="intlbl">Analyst Consensus</div><div class="intval" style="font-size:13px">${mkRat(d.analyst_rating)}</div><div class="intchg" style="color:var(--t3)">${d.num_analysts||'N/A'} analysts</div></div>
       <div class="intitem" style="border-color:rgba(0,212,255,0.2)"><div class="intlbl">Technical Signal</div><div class="intval" style="font-size:13px"><span class="badge ${ts.cls}">${ts.label}</span></div><div class="intchg" style="color:var(--t3);font-size:10px">${ts.signals.slice(0,2).join(' · ')||'Based on RSI/MACD/MA'}</div></div>
@@ -3094,10 +3110,10 @@ async function openStock(ticker){
       ${mi('200D MA',d.ma_200?fp(d.ma_200):'--')}
       ${mi('Beta',d.beta?f2(d.beta):'--')}
       ${mi('Volatility',d.volatility?f2(d.volatility)+'%':'--')}
-      ${mi('Golden Cross',d.golden_cross?'✅ Yes':'❌ No',d.golden_cross?'g':'r')}
+      ${mi('Golden Cross',d.golden_cross?'Yes':'No',d.golden_cross?'g':'r')}
     </div>
     <div style="font-size:11px;font-weight:600;color:var(--t3);padding:10px 14px;background:var(--bg2);border-radius:8px;border-left:3px solid var(--yellow)">
-      ⚠️ Analyst ratings = real Wall Street consensus (Yahoo Finance). Technical signal = calculated from live RSI, MACD and moving averages. Combined view for informed analysis. Past performance does not guarantee future results. Not financial advice.
+      Analyst ratings = real Wall Street consensus (Yahoo Finance). Technical signal = calculated from live RSI, MACD and moving averages. Combined view for informed analysis. Past performance does not guarantee future results. Not financial advice.
     </div>`;
 
   // Earnings
@@ -3119,7 +3135,7 @@ async function openStock(ticker){
         <thead><tr><th>Date</th><th>EPS Estimate</th><th>EPS Actual</th><th>Result</th><th>Surprise %</th></tr></thead>
         <tbody>${earn.history.map(e=>{
           const beat=e.eps_actual>e.eps_estimate;
-          return`<tr><td class="num y">${e.date}</td><td class="num">${e.eps_estimate?'$'+f2(e.eps_estimate):'--'}</td><td class="num ${beat?'g':'r'}">${e.eps_actual?'$'+f2(e.eps_actual):'--'}</td><td><span class="badge ${beat?'bg':'br'}">${beat?'✅ Beat':'❌ Miss'}</span></td><td class="num ${beat?'g':'r'}">${e.surprise_pct!=null?(e.surprise_pct>=0?'+':'')+f2(e.surprise_pct)+'%':'--'}</td></tr>`;
+          return`<tr><td class="num y">${e.date}</td><td class="num">${e.eps_estimate?'$'+f2(e.eps_estimate):'--'}</td><td class="num ${beat?'g':'r'}">${e.eps_actual?'$'+f2(e.eps_actual):'--'}</td><td><span class="badge ${beat?'bg':'br'}">${beat?'Beat':'Miss'}</span></td><td class="num ${beat?'g':'r'}">${e.surprise_pct!=null?(e.surprise_pct>=0?'+':'')+f2(e.surprise_pct)+'%':'--'}</td></tr>`;
         }).join('')}</tbody>
       </table></div>
     </div>`:'<div class="card"><div class="chdr"><div class="ctitle">Earnings History — Beat vs Miss</div></div><div class="empty">No earnings history available from Yahoo Finance for this stock.</div></div>'}
@@ -3707,7 +3723,7 @@ async function loadSentimentPanel(ticker){
     const score  = clamp(s.score);
     const label  = s.label ?? 'Neutral';
     const color  = lblCol(label);
-    const emoji  = label==='Bullish'?'🟢':label==='Bearish'?'🔴':'🟡';
+    const emoji  = label==='Bullish'?'':label==='Bearish'?'':'';
     const heads  = s.headlines ?? [];
     const ctx    = s.context_line ?? '';
     const factors = s.factors ?? {};
@@ -3758,17 +3774,17 @@ async function loadSentimentPanel(ticker){
     }
 
     const STOCK_ROWS = [
-      {key:'news',     label:'Company News',  icon:'📰'},
-      {key:'momentum', label:'Price Momentum',icon:'📈'},
-      {key:'volume',   label:'Volume Signal', icon:'📊'},
-      {key:'analyst',  label:'Analyst Rating',icon:'🏦'},
+      {key:'news',     label:'Company News',  icon:''},
+      {key:'momentum', label:'Price Momentum',icon:''},
+      {key:'volume',   label:'Volume Signal', icon:''},
+      {key:'analyst',  label:'Analyst Rating',icon:''},
     ];
     const stockRows = STOCK_ROWS.map(f=>{
       const fd = factors[f.key] || {};
       return factorRow(f.icon, f.label, fd.score ?? 0, Math.round((fd.weight ?? 0)*100)+'%', fd.detail || '');
     }).join('');
-    const MKT_ICONS = {vix:'😨', spy:'📊', sector:'🏭', rates:'🏛️', oil:'🛢️', dollar:'💵', gold:'🥇', world:'🌍'};
-    const marketRows = mfacts.map(f=> factorRow(MKT_ICONS[f.key]||'•', f.label, f.score ?? 0, Math.round((f.weight??0)*100)+'%', f.detail||'')).join('')
+    const MKT_ICONS = {vix:'', spy:'', sector:'', rates:'', oil:'', dollar:'', gold:'', world:''};
+    const marketRows = mfacts.map(f=> factorRow(MKT_ICONS[f.key]||'', f.label, f.score ?? 0, Math.round((f.weight??0)*100)+'%', f.detail||'')).join('')
       || `<div style="font-size:11px;color:var(--t3);">Market data unavailable right now.</div>`;
 
     const hlRows = heads.map(h => {
@@ -3814,7 +3830,7 @@ async function loadSentimentPanel(ticker){
       <div style="margin-top:12px;padding:14px 16px;background:var(--bg3);border:1px solid var(--b2);border-radius:12px;">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
           <div>
-            <div style="font-size:11px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;">🧠 Sentiment used in this prediction</div>
+            <div style="font-size:11px;font-weight:800;color:var(--t1);text-transform:uppercase;letter-spacing:.5px;">Sentiment used in this prediction</div>
             <div style="font-size:10px;color:var(--t3);margin-top:3px;">60% company + 40% market & world · ${s.count??0} company headlines analysed</div>
           </div>
           <div style="font-size:18px;font-weight:900;color:${color};">${emoji} ${label} ${sign(score)}</div>
@@ -3854,7 +3870,7 @@ async function loadSentimentPanel(ticker){
             <button onclick="loadSpikeExplorer('${ticker}')"
               style="background:var(--bg2);border:1px solid var(--b2);color:var(--t2);font-size:11px;font-weight:700;border-radius:8px;padding:7px 14px;cursor:pointer;"
               onmouseover="this.style.borderColor='var(--cyan)';this.style.color='var(--cyan)'"
-              onmouseout="this.style.borderColor='var(--b2)';this.style.color='var(--t2)'">⚡ Why Did the Price Spike? (full list)</button>
+              onmouseout="this.style.borderColor='var(--b2)';this.style.color='var(--t2)'">Why Did the Price Spike? (full list)</button>
           </div>
           <div id="spike-explorer" style="margin-top:10px;"></div>
         </div>
@@ -3902,7 +3918,7 @@ async function loadSpikeExplorer(ticker){
     }).join('');
 
     wrap.innerHTML = `
-      <div style="font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">⚡ Price Spikes & Possible Causes (Last Year)</div>
+      <div style="font-size:10px;font-weight:800;color:var(--t1);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Price Spikes & Possible Causes (Last Year)</div>
       ${rows}
       <div style="font-size:10px;color:var(--t3);margin-top:6px;font-style:italic;">News matched within ±2 days of each spike. Not guaranteed to be causal.</div>`;
   } catch(e){
@@ -4000,14 +4016,14 @@ async function loadPrediction(){
         </div>`;
       intbox.innerHTML = `
         <div style="margin-top:4px;">
-          <div style="font-size:11px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">📊 12-Month Scenarios</div>
+          <div style="font-size:11px;font-weight:800;color:var(--t1);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">12-Month Scenarios</div>
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;">
-            ${d.bull_target?scn('🚀 Bull Case',d.bull_target,pct(d.bull_target),'var(--green)','Best case scenario'):''}
-            ${d.base_target?scn('📈 Base Case',d.base_target,pct(d.base_target),'var(--cyan)','Most likely scenario'):''}
-            ${d.bear_target?scn('🐻 Bear Case',d.bear_target,pct(d.bear_target),'var(--red)','Worst case scenario'):''}
-            ${d.analyst_target?scn('🏦 Wall Street Consensus',d.analyst_target,anUp,'var(--yellow)','Average analyst target, 12 months'):''}
+            ${d.bull_target?scn('Bull Case',d.bull_target,pct(d.bull_target),'var(--green)','Best case scenario'):''}
+            ${d.base_target?scn('Base Case',d.base_target,pct(d.base_target),'var(--cyan)','Most likely scenario'):''}
+            ${d.bear_target?scn('Bear Case',d.bear_target,pct(d.bear_target),'var(--red)','Worst case scenario'):''}
+            ${d.analyst_target?scn('Wall Street Consensus',d.analyst_target,anUp,'var(--yellow)','Average analyst target, 12 months'):''}
           </div>
-          <div style="margin-top:6px;font-size:10px;color:var(--t3);font-style:italic;">⚠️ Longer-term predictions have lower accuracy. Bull/Base/Bear are model scenarios — not guarantees. Analyst consensus is from Wall Street professionals. Not financial advice.</div>
+          <div style="margin-top:6px;font-size:10px;color:var(--t3);font-style:italic;">Longer-term predictions have lower accuracy. Bull/Base/Bear are model scenarios — not guarantees. Analyst consensus is from Wall Street professionals. Not financial advice.</div>
         </div>`;
     }
   }
@@ -4024,8 +4040,8 @@ function buildAccuracyTracker(d, livePrice){
   const pred1w  = d.target_1w;
 
   let html = `<div style="background:var(--bg2);border:1px solid var(--b1);border-radius:10px;padding:12px 14px;height:100%">
-    <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:var(--cyan);margin-bottom:12px">
-      📊 PREDICTION ACCURACY TRACKER
+    <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:var(--t1);margin-bottom:12px">
+      PREDICTION ACCURACY TRACKER
     </div>`;
 
   // Prediction run info
@@ -4043,7 +4059,7 @@ function buildAccuracyTracker(d, livePrice){
     const hit = lo.direction_correct === 1;
     html += `<div style="background:${hit?'rgba(0,230,118,0.08)':'rgba(255,68,68,0.08)'};border:1px solid ${hit?'rgba(0,230,118,0.2)':'rgba(255,68,68,0.2)'};border-radius:8px;padding:12px">
       <div style="font-size:11px;font-weight:800;color:${hit?'var(--green)':'var(--red)'};margin-bottom:4px">
-        ${hit?'✅ Direction Correct':'❌ Direction Wrong'} — last scored prediction
+        ${hit?'Direction Correct':'Direction Wrong'} — last scored prediction
       </div>
       <div style="font-size:10px;color:var(--t3);margin-bottom:8px">Made on ${escapeHtml(String(lo.run_date))} at ${fp(lo.price_at_run)}; scored on ${escapeHtml(String(lo.eval_date))}, 7 trading days later.</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
@@ -4054,7 +4070,7 @@ function buildAccuracyTracker(d, livePrice){
     </div>`;
   } else {
     html += `<div style="color:var(--t3);font-size:12px;font-weight:600;padding:10px;background:var(--bg3);border-radius:7px">
-      ⏳ No scored prediction yet. Each prediction is scored 7 trading days after it is made (this one was made on ${escapeHtml(String(runDate||'--'))}).
+      No scored prediction yet. Each prediction is scored 7 trading days after it is made (this one was made on ${escapeHtml(String(runDate||'--'))}).
       Run predict.py regularly to build the accuracy history.
     </div>`;
   }
@@ -4086,7 +4102,7 @@ async function loadPortfolio(){
     const de=document.getElementById('pf-day');de.textContent=s.day_change!=null?(s.day_change>=0?'+':'')+fb(s.day_change):'$--';de.className='sc-v '+(s.day_change>=0?'g':'r');
     document.getElementById('pf-day-s').textContent=s.day_change_pct!=null?(s.day_change_pct>=0?'+':'')+f2(s.day_change_pct)+'% today':'Today';
     const warn=document.getElementById('pf-warn');
-    if(s.unpriced_holdings>0){warn.style.display='block';warn.textContent=`⚠️ ${s.unpriced_holdings} holding${s.unpriced_holdings>1?'s have':' has'} no live price (${(s.unpriced_tickers||[]).join(', ')}), so ${s.unpriced_holdings>1?'they are':'it is'} left out of value, P&L and return.`;}
+    if(s.unpriced_holdings>0){warn.style.display='block';warn.textContent=`${s.unpriced_holdings} holding${s.unpriced_holdings>1?'s have':' has'} no live price (${(s.unpriced_tickers||[]).join(', ')}), so ${s.unpriced_holdings>1?'they are':'it is'} left out of value, P&L and return.`;}
     else warn.style.display='none';
   }
   if(!Array.isArray(h)){
@@ -4113,8 +4129,8 @@ async function loadPortfolio(){
     <td>${mkRat(x.analyst_rating)}</td>
     <td class="num">${x.target_price?fp(x.target_price):'--'}</td>
     <td style="white-space:nowrap" onclick="event.stopPropagation()">
-      <button class="bm-act" data-id="${x.id}" onclick="editHolding(this.dataset.id)">✏️ Edit</button>
-      <button class="bm-act" data-id="${x.id}" onclick="deleteHolding(this.dataset.id)">🗑 Remove</button>
+      <button class="bm-act" data-id="${x.id}" onclick="editHolding(this.dataset.id)">Edit</button>
+      <button class="bm-act" data-id="${x.id}" onclick="deleteHolding(this.dataset.id)">Remove</button>
     </td>
   </tr>`).join('');
   const total=h.reduce((s,x)=>s+(x.current_value||0),0);
@@ -4176,7 +4192,7 @@ function resetHoldingForm(){
   pfEditId=null;
   ['a-tick','a-qty','a-px','a-dt','a-notes'].forEach(id=>{const el=document.getElementById(id);el.value='';});
   document.getElementById('a-tick').readOnly=false;
-  document.getElementById('pf-form-title').textContent='➕ Add Holding';
+  document.getElementById('pf-form-title').textContent='Add Holding';
   document.getElementById('pf-save-btn').textContent='Add Stock';
   document.getElementById('pf-cancel-btn').style.display='none';
 }
@@ -4188,7 +4204,7 @@ function editHolding(id){
   document.getElementById('a-tick').value=h.ticker;document.getElementById('a-tick').readOnly=true;
   document.getElementById('a-qty').value=h.quantity;document.getElementById('a-px').value=h.avg_buy_price;
   document.getElementById('a-dt').value=String(h.buy_date||'').slice(0,10);document.getElementById('a-notes').value=h.notes||'';
-  document.getElementById('pf-form-title').textContent='✏️ Edit '+h.ticker;
+  document.getElementById('pf-form-title').textContent='Edit '+h.ticker;
   document.getElementById('pf-save-btn').textContent='Save Changes';
   document.getElementById('pf-cancel-btn').style.display='inline-block';
   pfSay('');
@@ -4210,7 +4226,7 @@ async function saveHolding(){
       body:JSON.stringify(editing?{quantity:q,avg_buy_price:p,buy_date:d,notes}:{ticker:t,quantity:q,avg_buy_price:p,buy_date:d,notes})});
     let data=null;try{data=await res.json();}catch(e){}
     if(!res.ok||!data||data.status==='error'){pfSay(apiMessage(data,res),false);return;}
-    resetHoldingForm();pfSay('✅ '+data.message,true);
+    resetHoldingForm();pfSay(data.message,true);
     await loadPortfolio();
   }catch(e){pfSay("Couldn't reach the server. Please try again.",false);}
   finally{btn.disabled=false;}
@@ -4223,7 +4239,7 @@ async function deleteHolding(id){
     let data=null;try{data=await res.json();}catch(e){}
     if(!res.ok||!data||data.status==='error'){pfSay(apiMessage(data,res),false);return;}
     if(pfEditId===h.id)resetHoldingForm();
-    pfSay('✅ '+data.message,true);
+    pfSay(data.message,true);
     await loadPortfolio();
   }catch(e){pfSay("Couldn't reach the server. Please try again.",false);}
 }
@@ -4241,7 +4257,7 @@ async function loadTx(){
     document.getElementById('tx-div').textContent=fb(s.dividends);
     document.getElementById('tx-real-list').innerHTML=(s.realized_by_ticker||[]).length?s.realized_by_ticker.slice(0,6).map(r=>`<div class="allocrow"><div class="allocname" style="min-width:60px">${escapeHtml(r.ticker)}</div><div class="allocval ${gc(r.realized)}" style="margin-left:auto">${(r.realized>=0?'+':'')+fb(r.realized)}</div></div>`).join(''):'<div class="empty">No sales recorded yet.</div>';
     const warn=document.getElementById('tx-warn');
-    if((s.unmatched_sells||[]).length){warn.style.display='block';warn.textContent='⚠️ Some sales are larger than the shares your transactions show you bought ('+s.unmatched_sells.map(u=>`${u.ticker}: ${u.quantity}`).join(', ')+'), so their profit cannot be worked out and is left out of Realized P&L.';}
+    if((s.unmatched_sells||[]).length){warn.style.display='block';warn.textContent='Some sales are larger than the shares your transactions show you bought ('+s.unmatched_sells.map(u=>`${u.ticker}: ${u.quantity}`).join(', ')+'), so their profit cannot be worked out and is left out of Realized P&L.';}
     else warn.style.display='none';
   }
   aTx=Array.isArray(t)?t:[];renderTx();buildTxCharts();
@@ -4252,7 +4268,7 @@ function renderTx(){
   const f=aTx.filter(t=>{const mf=txF==='all'||t.transaction_type===txF;const mq=!q||t.ticker?.toLowerCase().includes(q)||t.company_name?.toLowerCase().includes(q);return mf&&mq;});
   const badge={BUY:'bg',SELL:'br',DIVIDEND:'bc'};
   document.getElementById('tb-tx').innerHTML=f.length?f.map(t=>`<tr><td style="color:var(--t2);font-weight:600">${escapeHtml(String(t.transaction_date||'--').slice(0,10))}</td><td class="sym">${escapeHtml(t.ticker)}</td><td style="color:var(--t2);font-weight:600">${escapeHtml(t.company_name||'--')}</td><td><span class="badge ${badge[t.transaction_type]||'bb'}">${escapeHtml(t.transaction_type)}</span></td><td class="num">${t.quantity}</td><td class="num">${fp(t.price)}</td><td class="num c">${fb(t.total_value)}</td><td style="color:var(--t3);font-size:12px">${escapeHtml(t.notes||'--')}</td>
-    <td style="white-space:nowrap"><button class="bm-act" data-id="${t.id}" onclick="editTx(this.dataset.id)">✏️ Edit</button> <button class="bm-act" data-id="${t.id}" onclick="deleteTx(this.dataset.id)">🗑 Remove</button></td></tr>`).join(''):'<tr><td colspan="9" class="empty">No transactions yet.</td></tr>';
+    <td style="white-space:nowrap"><button class="bm-act" data-id="${t.id}" onclick="editTx(this.dataset.id)">Edit</button> <button class="bm-act" data-id="${t.id}" onclick="deleteTx(this.dataset.id)">Remove</button></td></tr>`).join(''):'<tr><td colspan="9" class="empty">No transactions yet.</td></tr>';
 }
 function buildTxCharts(){
   const buys=aTx.filter(t=>t.transaction_type==='BUY').reduce((s,t)=>s+(t.total_value||0),0);
@@ -4269,7 +4285,7 @@ function resetTxForm(){
   ['tx-tick','tx-qty','tx-px','tx-dt','tx-notes'].forEach(id=>{document.getElementById(id).value='';});
   document.getElementById('tx-tick').readOnly=false;document.getElementById('tx-type').disabled=false;document.getElementById('tx-apply').checked=false;
   document.getElementById('tx-apply-wrap').style.display='flex';
-  document.getElementById('tx-form-title').textContent='➕ Add Transaction';document.getElementById('tx-save-btn').textContent='Add';document.getElementById('tx-cancel-btn').style.display='none';
+  document.getElementById('tx-form-title').textContent='Add Transaction';document.getElementById('tx-save-btn').textContent='Add';document.getElementById('tx-cancel-btn').style.display='none';
 }
 function cancelTxEdit(){resetTxForm();txSay('');}
 function editTx(id){
@@ -4280,7 +4296,7 @@ function editTx(id){
   document.getElementById('tx-qty').value=t.quantity;document.getElementById('tx-px').value=t.price;
   document.getElementById('tx-dt').value=String(t.transaction_date||'').slice(0,10);document.getElementById('tx-notes').value=t.notes||'';
   document.getElementById('tx-apply-wrap').style.display='none';
-  document.getElementById('tx-form-title').textContent='✏️ Edit '+t.transaction_type+' '+t.ticker;document.getElementById('tx-save-btn').textContent='Save Changes';document.getElementById('tx-cancel-btn').style.display='inline-block';
+  document.getElementById('tx-form-title').textContent='Edit '+t.transaction_type+' '+t.ticker;document.getElementById('tx-save-btn').textContent='Save Changes';document.getElementById('tx-cancel-btn').style.display='inline-block';
   txSay('');document.getElementById('tx-form-card').scrollIntoView({behavior:'smooth',block:'center'});
 }
 async function saveTx(){
@@ -4300,7 +4316,7 @@ async function saveTx(){
     let data=null;try{data=await res.json();}catch(e){}
     if(!res.ok||!data||data.status==='error'){txSay(apiMessage(data,res),false);return;}
     const applied=!editing&&document.getElementById('tx-apply').checked;
-    resetTxForm();txSay('✅ '+data.message,true);
+    resetTxForm();txSay(data.message,true);
     await loadTx();if(applied)loadPortfolio();
   }catch(e){txSay("Couldn't reach the server. Please try again.",false);}
   finally{btn.disabled=false;}
@@ -4313,7 +4329,7 @@ async function deleteTx(id){
     let data=null;try{data=await res.json();}catch(e){}
     if(!res.ok||!data||data.status==='error'){txSay(apiMessage(data,res),false);return;}
     if(txEditId===t.id)resetTxForm();
-    txSay('✅ '+data.message,true);await loadTx();
+    txSay(data.message,true);await loadTx();
   }catch(e){txSay("Couldn't reach the server. Please try again.",false);}
 }
 
@@ -4868,7 +4884,7 @@ function addStockToWatchlist(ticker, e){
   }
   watchlist.push(ticker);
   saveWatchlist();
-  alert(ticker+' added to watchlist ⭐');
+  alert(ticker+' added to watchlist');
 }
 
 // ─── MANUAL SCREENER ───────────────────────────────────
@@ -5011,8 +5027,8 @@ async function runAI() {
     // Meta info
     const meta = document.getElementById('ai-meta');
     meta.innerHTML = `
-      <span class="ai-meta-item">📊 ${data.stocks_found} stocks matched</span>
-      <span class="ai-meta-item">🔍 ${data.intent ? 'Intent: ' + data.intent.replace('_',' ') : 'broad search'}</span>
+      <span class="ai-meta-item">${data.stocks_found} stocks matched</span>
+      <span class="ai-meta-item">${data.intent ? 'Intent: ' + data.intent.replace('_',' ') : 'broad search'}</span>
     `;
 
     // Top 10 stock cards
@@ -5210,7 +5226,7 @@ function loadPortfolioTickers() {
 <!-- Alert Modal -->
 <div id="alert-modal">
   <div id="alert-box">
-    <h3>🔔 Set Price Alert</h3>
+    <h3>Set Price Alert</h3>
     <div class="alert-sub" id="alert-stock-name">Set an alert for this stock</div>
     <div class="alert-row">
       <label>Condition</label>
@@ -5225,19 +5241,19 @@ function loadPortfolioTickers() {
     </div>
     <div id="alert-current-price" style="font-size:11px;color:var(--t3);margin-top:-8px;margin-bottom:8px;"></div>
     <div id="alerts-list-wrap">
-      <h4>🔔 Active Alerts for this stock</h4>
+      <h4>Active Alerts for this stock</h4>
       <div id="alerts-list"></div>
     </div>
     <div class="alert-btns">
       <button class="alert-btn-cancel" onclick="closeAlertModal()">Cancel</button>
-      <button class="alert-btn-save" onclick="saveAlert()">Set Alert 🔔</button>
+      <button class="alert-btn-save" onclick="saveAlert()">Set Alert </button>
     </div>
   </div>
 </div>
 
 <!-- Alert Toast Notification -->
 <div class="alert-toast" id="alert-toast">
-  <div style="font-size:13px;font-weight:800;color:var(--green);margin-bottom:4px;">🔔 Price Alert Triggered!</div>
+  <div style="font-size:13px;font-weight:800;color:var(--green);margin-bottom:4px;">Price Alert Triggered!</div>
   <div id="alert-toast-msg" style="font-size:12px;color:var(--t1);"></div>
 </div>
 
@@ -5380,7 +5396,7 @@ function loadPortfolioTickers() {
    (iOS zooms into anything smaller), the stock view's tabs scroll sideways and Bounty opens as a full-screen sheet. */
 html{-webkit-text-size-adjust:100%;}
 button,select,.ntab,.fstab,.stab,.fbtn,.pgbtn{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
-.ntab .ico{margin-right:6px;}
+.ntab .ico{display:none;}
 /* The top bar must never wrap. As the window narrows it drops the least useful items first: "Connected", the email,
    then the clock, and the tabs tighten; below 960px the tabs move to the bottom bar. */
 .ntab,.brand-title,.nuser,.nsignout,.ntime,#nconn{white-space:nowrap;}
@@ -5391,7 +5407,7 @@ button,select,.ntab,.fstab,.stab,.fbtn,.pgbtn{touch-action:manipulation;-webkit-
 @media(max-width:1160px){.nav{padding:0 16px;}.ntab{padding:7px 12px;}}
 @media(max-width:1060px){.nav-r .lpill{display:none;}.ntab{padding:7px 8px;}.nav{padding:0 12px;}.nav-r{gap:8px;}}
 /* An administrator's bar also holds the Admin link, so it sheds items sooner: the clock, then the word "Admin", then Live. */
-.na-icon{font-size:13px;line-height:1;}
+.na-icon{display:inline-flex;line-height:1;}
 @media(max-width:1450px){.nav.has-admin .ntime{display:none;}}
 @media(max-width:1300px){.nav.has-admin .na-text{display:none;}}
 @media(max-width:1200px){.nav.has-admin{padding:0 16px;}.nav.has-admin .ntab{padding:7px 12px;}}
@@ -5412,7 +5428,8 @@ button,select,.ntab,.fstab,.stab,.fbtn,.pgbtn{touch-action:manipulation;-webkit-
   /* the tabs become a bottom bar, in easy reach of a thumb */
   .ntabs{position:fixed;left:0;right:0;bottom:0;z-index:300;gap:0;border:0;border-top:1px solid var(--b1);border-radius:0;background:rgba(8,8,14,0.96);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);padding:4px calc(4px + env(safe-area-inset-right)) calc(4px + env(safe-area-inset-bottom)) calc(4px + env(safe-area-inset-left));}
   .ntab{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 2px;min-height:50px;border-radius:9px;font-size:10px;font-weight:700;}
-  .ntab .ico{margin:0;font-size:19px;line-height:1;}
+  .ntab .ico{display:flex;margin:0;line-height:1;}
+  .ntab .ico .lic{width:19px;height:19px;}
   .ntab .lbl{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:-0.1px;}
   .ntab.on{background:rgba(79,142,247,0.16);color:var(--blue);}
   .page{padding:14px calc(14px + env(safe-area-inset-right)) calc(92px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left));}
@@ -5537,20 +5554,20 @@ button,select,.ntab,.fstab,.stab,.fbtn,.pgbtn{touch-action:manipulation;-webkit-
 
 <!-- Bounty Button -->
 <button id="bounty-btn" onclick="toggleBounty()" title="Chat with Bounty AI">
-  🤖
+  <svg class="lic" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
   <span id="bounty-badge">1</span>
 </button>
 
 <!-- Bounty Window -->
 <div id="bounty-win">
   <div id="bounty-hdr">
-    <div class="b-avatar">🤖</div>
+    <div class="b-avatar"><svg class="lic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
     <div>
       <div class="b-name">Bounty</div>
       <div class="b-status">● Online — Your AI Finance Assistant</div>
     </div>
     <div class="b-hdr-btns">
-      <button class="b-hdr-btn" onclick="clearBounty()" title="Clear chat">🗑</button>
+      <button class="b-hdr-btn" onclick="clearBounty()" title="Clear chat"><svg class="lic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
       <button class="b-hdr-btn" onclick="toggleBounty()" title="Close">✕</button>
     </div>
   </div>
@@ -5560,14 +5577,14 @@ button,select,.ntab,.fstab,.stab,.fbtn,.pgbtn{touch-action:manipulation;-webkit-
     <button class="b-reply-close" onclick="cancelReply()">✕</button>
   </div>
   <div class="b-edit-bar" id="b-edit-bar">
-    <span>✏️ Editing message</span>
+    <span>Editing message</span>
     <button onclick="cancelEdit()">✕</button>
   </div>
   <div id="bounty-input-wrap">
     <textarea id="bounty-input" placeholder="Ask Bounty anything about stocks, markets, commodities..." rows="2" onkeydown="bountyKey(event)" oninput="autoBountyResize(this)"></textarea>
     <div id="bounty-send-row">
       <span class="b-footer">Shift+Enter for new line</span>
-      <button id="bounty-send" onclick="sendBounty()">Send ➤</button>
+      <button id="bounty-send" onclick="sendBounty()">Send</button>
     </div>
   </div>
 </div>
@@ -5608,7 +5625,7 @@ async function loadBenchmark(){
           <div style="font-size:11px;color:var(--t3);">Same period</div>
         </div>
         <div style="text-align:center;">
-          <div style="font-size:11px;color:var(--t3);font-weight:700;text-transform:uppercase;margin-bottom:6px;">${beating?'Beating Market 🏆':'Lagging Market'}</div>
+          <div style="font-size:11px;color:var(--t3);font-weight:700;text-transform:uppercase;margin-bottom:6px;">${beating?'Beating Market ':'Lagging Market'}</div>
           <div style="font-size:28px;font-weight:900;color:${diffCol};">${diffIcon} ${Math.abs(diff).toFixed(2)}%</div>
           <div style="font-size:11px;color:var(--t3);">${beating?'Above S&P 500':'Below S&P 500'}</div>
         </div>
@@ -5632,7 +5649,7 @@ async function loadBenchmark(){
                 <td class="${h.stock_return>=0?'g':'r'} mono">${h.stock_return>=0?'+':''}${h.stock_return.toFixed(2)}%</td>
                 <td class="${h.spy_return>=0?'g':'r'} mono">${h.spy_return>=0?'+':''}${h.spy_return.toFixed(2)}%</td>
                 <td class="${h.difference>=0?'g':'r'} mono" style="font-weight:800;">${h.difference>=0?'+':''}${h.difference.toFixed(2)}%</td>
-                <td>${h.beating?'<span style="color:var(--green);font-weight:800;">✅ Beating</span>':'<span style="color:var(--red);font-weight:700;">⚠️ Lagging</span>'}</td>
+                <td>${h.beating?'<span style="color:var(--green);font-weight:800;">Beating</span>':'<span style="color:var(--red);font-weight:700;">Lagging</span>'}</td>
               </tr>`).join('')}
           </tbody>
         </table></div>
@@ -5719,8 +5736,8 @@ function updateAlertPreview(){
 async function saveChartAlert(){
   const price = parseFloat(document.getElementById('chart-alert-price').value);
   const condition = document.getElementById('chart-alert-condition').value;
-  if(!curTick){ ntToast('⚠️ No stock selected', 'Open a stock first, then set the alert.', 'warn'); return; }
-  if(!price || price <= 0){ ntToast('⚠️ Enter a target price', 'Type a price or use the % buttons.', 'warn'); return; }
+  if(!curTick){ ntToast('No stock selected', 'Open a stock first, then set the alert.', 'warn'); return; }
+  if(!price || price <= 0){ ntToast('Enter a target price', 'Type a price or use the % buttons.', 'warn'); return; }
   const company = document.getElementById('fs-name')?.textContent?.split('·')[0]?.trim() || curTick;
   ntAskPermission();
   const ok = await ntCreateAlert(curTick, company, price, condition);
@@ -5755,7 +5772,7 @@ function closeAlertModal(){
 async function saveAlert(){
   const price = parseFloat(document.getElementById('alert-price').value);
   const condition = document.getElementById('alert-condition').value;
-  if(!price || price <= 0){ ntToast('⚠️ Enter a target price', '', 'warn'); return; }
+  if(!price || price <= 0){ ntToast('Enter a target price', '', 'warn'); return; }
   const ok = await ntCreateAlert(currentAlertTicker, currentAlertCompany, price, condition);
   if(ok){ loadActiveAlerts(currentAlertTicker); document.getElementById('alert-price').value = ''; }
 }
@@ -5774,7 +5791,7 @@ async function loadActiveAlerts(ticker){
           <div class="alert-item-info">${a.condition_type === 'above' ? '▲ Above' : '▼ Below'} $${ntMoney(a.target_price)}</div>
           <div class="alert-item-sub">Set when price was $${ntMoney(a.price_at_creation)}</div>
         </div>
-        <button class="alert-item-del" onclick="deleteAlert(${a.id})">🗑</button>
+        <button class="alert-item-del" onclick="deleteAlert(${a.id})" title="Delete">${LI.trash}</button>
       </div>`).join('');
   } catch(e){}
 }
@@ -5797,7 +5814,7 @@ window.addEventListener('click', function(e){
 // ═══════════════════════════════════════════════════════════
 //  NOTIFICATIONS — price alerts, market news, economic events
 //  Desktop notifications (Windows) when allowed, in-page pop-up otherwise.
-//  Everything shown is also kept in the 🔔 bell (last 20).
+//  Everything shown is also kept in the bell (last 20).
 // ═══════════════════════════════════════════════════════════
 const NT_KEY_HIST = 'smp_nt_history';
 const NT_KEY_SEEN = 'smp_nt_seen';
@@ -5897,15 +5914,15 @@ async function ntCreateAlert(ticker, company, price, condition){
     const d = await res.json();
     if(d.status === 'success'){
       const arrow = condition === 'above' ? '▲ above' : '▼ below';
-      ntNotify('alert_set', `🔔 Alert set: ${ticker} ${arrow} $${ntMoney(price)}`,
+      ntNotify('alert_set', `Alert set: ${ticker} ${arrow} $${ntMoney(price)}`,
                d.message || `You'll be notified when ${ticker} goes ${condition} $${ntMoney(price)}`,
                {type:'stock', ticker}, {tag:'alert-set-'+d.id});
       ntLoadMyAlerts();
       return true;
     }
-    ntToast('⚠️ Alert not set', d.message || 'Please try again.', 'warn');
+    ntToast('Alert not set', d.message || 'Please try again.', 'warn');
   } catch(e){
-    ntToast('⚠️ Alert not set', 'Could not reach the server. Is api.py running?', 'warn');
+    ntToast('Alert not set', 'Could not reach the server. Is api.py running?', 'warn');
   }
   return false;
 }
@@ -5916,7 +5933,7 @@ async function checkAlertsForNotifications(){
     const d = await res.json();
     (d.triggered || []).forEach(a => {
       const word = a.condition_type === 'above' ? 'rose above' : 'fell below';
-      ntNotify('alert_hit', `🎯 ${a.ticker} ${word} $${ntMoney(a.target_price)}`,
+      ntNotify('alert_hit', `${a.ticker} ${word} $${ntMoney(a.target_price)}`,
                `${a.company_name || a.ticker} is now $${ntMoney(a.current_price)} (your target: ${a.condition_type} $${ntMoney(a.target_price)})`,
                {type:'stock', ticker:a.ticker}, {tag:'alert-hit-'+a.id, sticky:true});
     });
@@ -5937,10 +5954,10 @@ async function ntPollFeed(){
   fresh.forEach(n => ntMarkSeen(n.id));
   if(!firstRun && fresh.length){
     if(fresh.length <= 3){
-      fresh.slice().reverse().forEach(n => ntNotify('news', `📰 ${n.title}`, `${n.source || 'Market news'}${n.published ? ' · ' + ntLocalTime(n.published) : ''}`, {type:'url', url:n.url}, {tag:'news-'+n.id}));
+      fresh.slice().reverse().forEach(n => ntNotify('news', `${n.title}`, `${n.source || 'Market news'}${n.published ? ' · ' + ntLocalTime(n.published) : ''}`, {type:'url', url:n.url}, {tag:'news-'+n.id}));
     } else {
       const top = fresh[0];
-      ntNotify('news', `📰 ${fresh.length} new market headlines`, top.title, {type:'url', url:top.url}, {tag:'news-batch'});
+      ntNotify('news', `${fresh.length} new market headlines`, top.title, {type:'url', url:top.url}, {tag:'news-batch'});
     }
   }
 
@@ -5953,12 +5970,12 @@ async function ntPollFeed(){
     const holiday = todays.find(e => e.category === 'holiday');
     const rel = todays.filter(e => e.category !== 'holiday').sort((a,b) => (a.release_ts||0)-(b.release_ts||0));
     if(holiday){
-      ntNotify('event', '📅 US markets closed today', holiday.event.replace(' (Market Closed)',''), {type:'eco'}, {tag:dayKey});
+      ntNotify('event', 'US markets closed today', holiday.event.replace(' (Market Closed)',''), {type:'eco'}, {tag:dayKey});
     }
     if(rel.length){
-      const lines = rel.slice(0,4).map(e => `${ntLocalTime(e.release_ts)} ${e.event}${e.impact==='high'?' ⚠️':''}`);
+      const lines = rel.slice(0,4).map(e => `${ntLocalTime(e.release_ts)} ${e.event}${e.impact==='high'?' ':''}`);
       const more = rel.length > 4 ? ` +${rel.length-4} more` : '';
-      ntNotify('event', `📅 Today: ${rel.length} economic event${rel.length>1?'s':''}`, lines.join(' · ') + more, {type:'eco'}, {tag:dayKey});
+      ntNotify('event', `Today: ${rel.length} economic event${rel.length>1?'s':''}`, lines.join(' · ') + more, {type:'eco'}, {tag:dayKey});
     }
   }
   ntEventResults(firstRun);
@@ -5973,7 +5990,7 @@ function ntEventResults(silent){
     if(ntIsSeen(key)) return;
     ntMarkSeen(key);
     if(silent) return;
-    ntNotify('result', `📊 ${e.event}: ${e.actual}`, e.previous ? `Previous: ${e.previous}` : 'Result just released', {type:'eco'}, {tag:key});
+    ntNotify('result', `${e.event}: ${e.actual}`, e.previous ? `Previous: ${e.previous}` : 'Result just released', {type:'eco'}, {tag:key});
   });
 }
 
@@ -5986,13 +6003,13 @@ function ntEventReminders(){
     const key = 'soon-' + e.id;
     if(left > 0 && left <= 15*60 && !ntIsSeen(key)){
       ntMarkSeen(key);
-      ntNotify('event', `⏰ In ${Math.max(1, Math.round(left/60))} min: ${e.event}`,
+      ntNotify('event', `In ${Math.max(1, Math.round(left/60))} min: ${e.event}`,
                `Released at ${ntLocalTime(e.release_ts)}${e.previous ? ' · previous ' + e.previous : ''}`, {type:'eco'}, {tag:key});
     }
   });
 }
 
-// ─── 🔔 Bell panel ──────────────────────────────────────────
+// ─── Bell panel ──────────────────────────────────────────
 function ntToggleBell(ev){
   if(ev) ev.stopPropagation();
   const p = document.getElementById('nt-panel');
@@ -6041,25 +6058,25 @@ function ntRenderPermission(){
   if(!el) return;
   const p = ntPermission();
   if(p === 'granted'){
-    el.innerHTML = '🖥️ Desktop notifications are <b style="color:var(--green)">ON</b> <button class="nt-btn" onclick="ntTest(event)">Send test</button>';
+    el.innerHTML = 'Desktop notifications are <b style="color:var(--green)">ON</b> <button class="nt-btn" onclick="ntTest(event)">Send test</button>';
   } else if(p === 'denied'){
-    el.innerHTML = '🖥️ Desktop notifications are <b style="color:var(--red)">blocked</b>. Click the 🔒 icon left of the address bar → Notifications → Allow, then reload. (You will still get pop-ups inside the dashboard.)';
+    el.innerHTML = 'Desktop notifications are <b style="color:var(--red)">blocked</b>. Click the lock icon left of the address bar → Notifications → Allow, then reload. (You will still get pop-ups inside the dashboard.)';
   } else if(p === 'unsupported'){
     el.innerHTML = 'This browser does not support desktop notifications. Pop-ups inside the dashboard are used instead.';
   } else {
-    el.innerHTML = '🖥️ Desktop notifications are off <button class="nt-btn" onclick="ntEnable(event)">Turn on</button>';
+    el.innerHTML = 'Desktop notifications are off <button class="nt-btn" onclick="ntEnable(event)">Turn on</button>';
   }
 }
 function ntEnable(ev){
   if(ev) ev.stopPropagation();
   try {
     const p = Notification.requestPermission(ntRenderPermission);
-    if(p && p.then) p.then(perm => { ntRenderPermission(); if(perm === 'granted') ntNotify('info', '✅ Desktop notifications are on', 'You will get price alerts, important market news and economic events here.'); });
+    if(p && p.then) p.then(perm => { ntRenderPermission(); if(perm === 'granted') ntNotify('info', 'Desktop notifications are on', 'You will get price alerts, important market news and economic events here.'); });
   } catch(e){}
 }
 function ntTest(ev){
   if(ev) ev.stopPropagation();
-  ntNotify('info', '🔔 Test notification', 'Desktop notifications are working.', null, {tag:'nt-test'});
+  ntNotify('info', 'Test notification', 'Desktop notifications are working.', null, {tag:'nt-test'});
 }
 
 async function ntLoadMyAlerts(){
@@ -6067,7 +6084,7 @@ async function ntLoadMyAlerts(){
   if(!el) return;
   const d = await api('/api/alerts');
   const all = d?.alerts || [];
-  if(!all.length){ el.innerHTML = '<div class="nt-empty">No price alerts yet.<br>Open any stock and use <b>Set Price Alert 🔔</b> under the chart.</div>'; return; }
+  if(!all.length){ el.innerHTML = '<div class="nt-empty">No price alerts yet.<br>Open any stock and use <b>Set Price Alert</b> under the chart.</div>'; return; }
   const active = all.filter(a => !a.triggered), done = all.filter(a => a.triggered).slice(0,10);
   const row = a => `
     <div class="nt-alert ${a.triggered ? 'done' : ''}">
@@ -6077,7 +6094,7 @@ async function ntLoadMyAlerts(){
             ? `Reached at $${ntMoney(a.triggered_price)}${a.triggered_at ? ' · ' + ntEsc(a.triggered_at.slice(0,16)) : ''}`
             : `Now $${ntMoney(a.current_price)}${a.distance_pct != null ? ` · ${Math.abs(a.distance_pct).toFixed(1)}% to go` : ''}`}</div>
       </div>
-      <button class="alert-item-del" title="Delete" onclick="deleteAlert(${a.id})">🗑</button>
+      <button class="alert-item-del" title="Delete" onclick="deleteAlert(${a.id})">${LI.trash}</button>
     </div>`;
   el.innerHTML = (active.length ? `<div class="nt-sec">Active (${active.length})</div>` + active.map(row).join('') : '<div class="nt-empty" style="padding:12px">No active alerts.</div>')
                + (done.length ? `<div class="nt-sec">Reached</div>` + done.map(row).join('') : '');
@@ -6256,7 +6273,7 @@ function initBountyChat(){
 function showBountyGreeting(){
   const h = new Date().getHours();
   const greet = h<12?'Good morning':h<17?'Good afternoon':'Good evening';
-  addBountyMsg('ai', `${greet}! 👋 I'm **Bounty**, your AI finance assistant.\n\nI can help you with:\n• 📈 Stock analysis and recommendations\n• ⚖️ Side-by-side stock comparisons\n• 🏗️ Commodity prices and linked stocks\n• 💼 Portfolio advice based on your watchlist\n• 🚀 Upcoming US IPOs\n• 🌍 Market and economy questions, using live indicators\n• 📚 Financial concepts explained simply\n\nWhat would you like to know today?`, [], {greeting:true});
+  addBountyMsg('ai', `${greet}! I'm **Bounty**, your AI finance assistant.\n\nI can help you with:\n• Stock analysis and recommendations\n• Side-by-side stock comparisons\n• Commodity prices and linked stocks\n• Portfolio advice based on your watchlist\n• Upcoming US IPOs\n• Market and economy questions, using live indicators\n• Financial concepts explained simply\n\nWhat would you like to know today?`, [], {greeting:true});
 }
 
 function autoBountyResize(el){
@@ -6294,17 +6311,17 @@ function renderBountyMsg(m){
 
   // Buttons only carry the message id; the text is looked up when clicked.
   const actionBtns = m.role === 'user'
-    ? `<button class="bm-act" onclick="editBountyMsg('${m.id}')">✏️ Edit</button>
-       <button class="bm-act" onclick="deleteBountyMsg('${m.id}')">🗑 Delete</button>
-       <button class="bm-act" onclick="copyBountyMsg('${m.id}', this)">📋 Copy</button>`
-    : `<button class="bm-act" onclick="replyBountyMsg('${m.id}')">↩️ Reply</button>
-       <button class="bm-act" onclick="copyBountyMsg('${m.id}', this)">📋 Copy</button>`;
+    ? `<button class="bm-act" onclick="editBountyMsg('${m.id}')">Edit</button>
+       <button class="bm-act" onclick="deleteBountyMsg('${m.id}')">Delete</button>
+       <button class="bm-act" onclick="copyBountyMsg('${m.id}', this)">Copy</button>`
+    : `<button class="bm-act" onclick="replyBountyMsg('${m.id}')">Reply</button>
+       <button class="bm-act" onclick="copyBountyMsg('${m.id}', this)">Copy</button>`;
 
   const div = document.createElement('div');
   div.className = `bm ${m.role}`;
   div.id = m.id;
   div.innerHTML = `
-    <div class="bm-av">${m.role==='ai'?'🤖':'👤'}</div>
+    <div class="bm-av">${m.role==='ai'?LI.chat:LI.user}</div>
     <div class="bm-body">
       <div class="bm-bubble" id="${m.id}-bubble"${m.error ? ' style="border:1px solid rgba(255,68,68,0.5)"' : ''}>${formatBountyText(m.text)}${stocksHtml}</div>
       <div class="bm-time">${escapeHtml(m.time)}</div>
@@ -6333,7 +6350,7 @@ function addBountyTyping(){
   const div = document.createElement('div');
   div.className = 'bm ai';
   div.id = 'bounty-typing';
-  div.innerHTML = `<div class="bm-av">🤖</div><div class="b-typing"><span></span><span></span><span></span></div>`;
+  div.innerHTML = `<div class="bm-av">${LI.chat}</div><div class="b-typing"><span></span><span></span><span></span></div>`;
   msgs.appendChild(div);
   msgs.scrollTop = msgs.scrollHeight;
 }
@@ -6348,7 +6365,7 @@ function setBountySending(on){
   const btn = document.getElementById('bounty-send');
   btn.disabled = on;
   btn.style.opacity = on ? '0.5' : '';
-  btn.textContent = on ? 'Thinking…' : (bountyEditId ? 'Update ✓' : 'Send ➤');
+  btn.textContent = on ? 'Thinking…' : (bountyEditId ? 'Update' : 'Send');
 }
 
 async function sendBounty(){
@@ -6410,7 +6427,7 @@ function showLiveBountyText(text){
     live = document.createElement('div');
     live.className = 'bm ai';
     live.id = 'bounty-live';
-    live.innerHTML = '<div class="bm-av">🤖</div><div class="bm-body"><div class="bm-bubble" id="bounty-live-bubble"></div></div>';
+    live.innerHTML = '<div class="bm-av">'+LI.chat+'</div><div class="bm-body"><div class="bm-bubble" id="bounty-live-bubble"></div></div>';
     document.getElementById('bounty-msgs').appendChild(live);
   }
   document.getElementById('bounty-live-bubble').innerHTML = renderMarkdown(text);
@@ -6468,7 +6485,7 @@ async function askBounty(text, replyTo){
     dropLiveBountyText();
 
     if(failure || !data){
-      addBountyMsg('ai', '⚠️ ' + (failure || "Something went wrong. Please try again."), [], {error:true});
+      addBountyMsg('ai', '' + (failure || "Something went wrong. Please try again."), [], {error:true});
       return;
     }
 
@@ -6482,8 +6499,8 @@ async function askBounty(text, replyTo){
   } catch(e){
     dropLiveBountyText();
     addBountyMsg('ai', e.name === 'AbortError'
-      ? "⚠️ That took too long. Please try again."
-      : "⚠️ I'm having trouble connecting right now. Please try again in a moment.", [], {error:true});
+      ? "That took too long. Please try again."
+      : "I'm having trouble connecting right now. Please try again in a moment.", [], {error:true});
   } finally {
     clearTimeout(timer);
     setBountySending(false);
@@ -6500,13 +6517,13 @@ function editBountyMsg(id){
   input.focus();
   autoBountyResize(input);
   document.getElementById('b-edit-bar').style.display = 'flex';
-  document.getElementById('bounty-send').textContent = 'Update ✓';
+  document.getElementById('bounty-send').textContent = 'Update';
 }
 
 function cancelEdit(){
   bountyEditId = null;
   document.getElementById('b-edit-bar').style.display = 'none';
-  document.getElementById('bounty-send').textContent = bountySending ? 'Thinking…' : 'Send ➤';
+  document.getElementById('bounty-send').textContent = bountySending ? 'Thinking…' : 'Send';
   document.getElementById('bounty-input').value = '';
   document.getElementById('bounty-input').style.height = 'auto';
 }
@@ -6524,7 +6541,7 @@ function copyBountyMsg(id, btn){
   const m = bountyFindMsg(id);
   if(!m || !navigator.clipboard) return;
   navigator.clipboard.writeText(m.text).then(()=>{
-    if(btn){ const orig = btn.textContent; btn.textContent = '✅ Copied'; setTimeout(()=>btn.textContent=orig, 1500); }
+    if(btn){ const orig = btn.textContent; btn.textContent = 'Copied'; setTimeout(()=>btn.textContent=orig, 1500); }
   }).catch(()=>{});
 }
 
@@ -6533,7 +6550,7 @@ function replyBountyMsg(id){
   if(!m) return;
   bountyReplyTo = m.text.slice(0, 300);
   document.getElementById('b-reply-bar').style.display = 'block';
-  document.getElementById('b-reply-text').textContent = '↩️ Replying to: ' + m.text.slice(0, 60);
+  document.getElementById('b-reply-text').textContent = '↩ Replying to: ' + m.text.slice(0, 60);
   document.getElementById('bounty-input').focus();
 }
 
@@ -6595,7 +6612,7 @@ initWatchlist();
 .nt-toast-x{position:absolute;top:6px;right:8px;background:none;border:none;color:var(--t3);font-size:16px;cursor:pointer;}
 </style>
 <div id="nt-panel" onclick="event.stopPropagation()">
-  <div class="nt-head"><h3>🔔 Notifications</h3><button class="alert-item-del" style="color:var(--t3)" onclick="ntCloseBell()">✕</button></div>
+  <div class="nt-head"><h3>Notifications</h3><button class="alert-item-del" style="color:var(--t3)" onclick="ntCloseBell()">✕</button></div>
   <div class="nt-tabs">
     <button class="nt-tab on" data-tab="notifs" onclick="ntSetTab('notifs')">Recent</button>
     <button class="nt-tab" data-tab="alerts" onclick="ntSetTab('alerts')">My Price Alerts</button>

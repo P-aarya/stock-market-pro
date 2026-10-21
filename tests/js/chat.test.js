@@ -8,7 +8,7 @@ function makeEnv(fetchImpl, store = {}) {
   const calls = [];
   const ctx = {
     console, setTimeout, clearTimeout, AbortController, TextDecoder, JSON, Math, Date, Number, String, Array, Object, parseInt,
-    API: 'http://x', watchlist: ['AAPL', 'MSFT'], openFS() {},
+    API: 'http://x', LI: { chat: '<svg></svg>', user: '<svg></svg>' }, watchlist: ['AAPL', 'MSFT'], openFS() {},
     document: page.document,
     localStorage: { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = v; }, removeItem: k => { delete store[k]; } },
     navigator: {},

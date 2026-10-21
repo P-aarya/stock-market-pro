@@ -54,7 +54,7 @@ const settle = () => new Promise(r => setTimeout(r, 15));
     assert(!h.includes('<script>') && h.includes('Micro&lt;script&gt;x&lt;/script&gt;soft'));
   });
   await t('Unusually large growth figures carry a warning marker', async () => {
-    const e = env(std); await e.run('loadPeers()'); const h = e.els['peer-body'].innerHTML; assert.equal((h.match(/⚠️/g) || []).length, 1); assert(h.includes('294.0%') && h.includes('Unusually large'));
+    const e = env(std); await e.run('loadPeers()'); const h = e.els['peer-body'].innerHTML; assert.equal((h.match(/class="peer-odd"/g) || []).length, 1); assert(h.includes('294.0%') && h.includes('Unusually large'));
   });
   await t('A one-year price chart is drawn for the compared stocks (target line thicker)', async () => {
     const e = env(std); await e.run('loadPeers()'); await settle();
