@@ -104,6 +104,23 @@ body{background:var(--bg0);color:var(--t1);font-family:var(--sans);min-height:10
 .card{background:var(--bg2);border:1px solid var(--b1);border-radius:11px;padding:16px;overflow:hidden;}
 .chdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;}
 .ctitle{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--t2);display:flex;align-items:center;gap:7px;}
+/* Headings: tables & sections white; chart cards keep the grey heading */
+.ctitle{color:var(--t1)!important;}
+.card:has(canvas) .ctitle,.chartcard .ctitle{color:var(--t2)!important;}
+.inttitle{color:var(--t1)!important;}
+/* Main tabs: white text; the selected tab keeps its highlight */
+.ntab{color:var(--t1);}
+/* Line icons + impact dots */
+.lic{display:block;flex-shrink:0;}
+.idot{display:inline-block;width:7px;height:7px;border-radius:50%;background:currentColor;margin-right:5px;vertical-align:middle;position:relative;top:-1px;}
+.brand-icon{color:#fff;}
+.nt-bell{color:var(--t1);}
+#bounty-btn,.b-avatar,.bm-av{color:#fff;}
+.bm-av .lic{width:15px;height:15px;}
+.alert-item-del{display:inline-flex;align-items:center;justify-content:center;}
+.b-hdr-btn{display:inline-flex;align-items:center;}
+.news-card-img-placeholder{color:var(--t3);}
+.news-card-img-placeholder .lic{width:26px;height:26px;}
 .ctitle::before{content:'';width:3px;height:12px;background:var(--cyan);border-radius:2px;display:block;}
 .stitle{font-size:14px;font-weight:800;color:var(--t1);margin-bottom:14px;display:flex;align-items:center;gap:8px;}
 .stitle::before{content:'';width:3px;height:15px;background:var(--cyan);border-radius:2px;}
@@ -338,21 +355,21 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 
 <nav class="nav">
   <div class="brand">
-    <div class="brand-icon">📈</div>
+    <div class="brand-icon"><svg class="lic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></svg></div>
     <div>
       <div class="brand-title">Stock Market <span>Pro</span></div>
       <div class="brand-sub">AYEIM Ventures</div>
     </div>
   </div>
   <div class="ntabs">
-    <button class="ntab on" onclick="showPage('market',this)">📊 Market</button>
-    <button class="ntab" onclick="showPage('watchlist',this)">⭐ Watchlist</button>
-    <button class="ntab" onclick="showPage('commodities',this)">🏗️ Commodities</button>
-    <button class="ntab" onclick="showPage('portfolio',this)">💼 Portfolio</button>
-    <button class="ntab" onclick="showPage('transactions',this)">🔄 Transactions</button>
+    <button class="ntab on" onclick="showPage('market',this)">Market</button>
+    <button class="ntab" onclick="showPage('watchlist',this)">Watchlist</button>
+    <button class="ntab" onclick="showPage('commodities',this)">Commodities</button>
+    <button class="ntab" onclick="showPage('portfolio',this)">Portfolio</button>
+    <button class="ntab" onclick="showPage('transactions',this)">Transactions</button>
   </div>
   <div class="nav-r">
-    <button id="nt-bell" class="nt-bell" onclick="ntToggleBell(event)" title="Notifications">🔔<span id="nt-badge" class="nt-badge" style="display:none">0</span></button>
+    <button id="nt-bell" class="nt-bell" onclick="ntToggleBell(event)" title="Notifications"><svg class="lic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span id="nt-badge" class="nt-badge" style="display:none">0</span></button>
     <div class="lpill"><span class="ldot"></span>Live</div>
     <span class="ntime" id="ntime">--:--:--</span>
     <span id="nconn" style="font-size:12px;font-weight:700;color:var(--green)">● Connected</span>
@@ -381,7 +398,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   <!-- Currency Exchange Rates -->
   <div class="card" style="margin-bottom:16px;">
     <div class="chdr">
-      <div class="ctitle">💱 Live Currency Exchange Rates</div>
+      <div class="ctitle">Live Currency Exchange Rates</div>
       <div style="font-size:10px;font-weight:600;color:var(--t3);">Updates every 60 seconds</div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;" id="currency-grid">
@@ -397,7 +414,6 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   <!-- AI Stock Finder + Manual Screener Combined -->
   <div class="ai-wrap">
     <div class="ai-header">
-      <div class="ai-icon">🤖</div>
       <div>
         <div class="ai-title">AI Stock Finder</div>
         <div class="ai-sub">Type anything in plain English — or use manual filters below</div>
@@ -405,7 +421,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     </div>
     <div class="ai-input-row">
       <input class="ai-input" id="ai-query" placeholder="e.g. find me small cap stocks with strong growth and low debt..." onkeydown="if(event.key==='Enter')runAI()"/>
-      <button class="ai-btn" id="ai-btn" onclick="runAI()">🔍 Ask AI</button>
+      <button class="ai-btn" id="ai-btn" onclick="runAI()">Ask AI</button>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
       <span style="font-size:11px;font-weight:700;color:var(--t3);">Try:</span>
@@ -416,19 +432,19 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     </div>
     <div class="ai-loading" id="ai-loading"><div class="spin"></div>AI is analysing stocks — this takes about 10 seconds...</div>
     <div class="ai-result" id="ai-result">
-      <div class="ai-result-title">🤖 AI Recommendation</div>
+      <div class="ai-result-title">AI Recommendation</div>
       <div class="ai-result-text" id="ai-result-text"></div>
       <div class="ai-meta" id="ai-meta"></div>
       <div id="ai-stocks-grid" class="ai-stocks-grid"></div>
       <div id="ai-explorer" style="display:none;margin-top:18px;border-top:1px solid var(--b2);padding-top:16px;">
-        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--t3);margin-bottom:10px;">📋 Explore All Matched Stocks — Select Any for Full AI Explanation</div>
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--t3);margin-bottom:10px;">Explore All Matched Stocks — Select Any for Full AI Explanation</div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <select id="ai-stock-select" style="flex:1;min-width:220px;background:var(--bg3);border:1px solid var(--b2);border-radius:9px;padding:10px 14px;color:var(--t1);font-size:13px;font-weight:600;outline:none;cursor:pointer;font-family:var(--sans);"><option value="">Select a company...</option></select>
-          <button class="ai-btn" onclick="explainSelectedStock()" style="padding:10px 20px;">🤖 Get AI Explanation</button>
+          <button class="ai-btn" onclick="explainSelectedStock()" style="padding:10px 20px;">Get AI Explanation</button>
         </div>
         <div class="ai-loading" id="explain-loading" style="margin-top:10px;"><div class="spin"></div>AI is analysing this stock...</div>
         <div id="explain-result" style="display:none;margin-top:12px;background:var(--bg2);border:1px solid var(--b2);border-radius:10px;padding:16px 18px;">
-          <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--cyan);margin-bottom:10px;">🤖 Stock Explanation</div>
+          <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--cyan);margin-bottom:10px;">Stock Explanation</div>
           <div id="explain-result-text" style="font-size:13px;font-weight:500;color:var(--t2);line-height:1.7;white-space:pre-wrap;"></div>
         </div>
       </div>
@@ -437,7 +453,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 
   <!-- Charts: 3 per row (2 on smaller screens, 1 on a phone) -->
   <div class="g3">
-    <div class="card">
+    <div class="card chartcard">
       <div class="chdr"><div class="ctitle">Market Sentiment</div></div>
       <div class="gauge">
         <div class="gscore" id="g-score" style="color:var(--t1)">--</div>
@@ -468,9 +484,9 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   <div class="g3">
     <div class="card">
       <div class="stabs">
-        <button class="stab on" onclick="showSub('gl','gainers',this)">🟢 Gainers</button>
-        <button class="stab" onclick="showSub('gl','losers',this)">🔴 Losers</button>
-        <button class="stab" onclick="showSub('gl','active',this)">⚡ Active</button>
+        <button class="stab on" onclick="showSub('gl','gainers',this)">Gainers</button>
+        <button class="stab" onclick="showSub('gl','losers',this)">Losers</button>
+        <button class="stab" onclick="showSub('gl','active',this)">Active</button>
       </div>
       <div id="gl-gainers"><div class="tw"><table class="gltable"><thead><tr><th>Ticker</th><th>Company</th><th>Price</th><th>Change</th><th>Volume</th></tr></thead><tbody id="tb-g"></tbody></table></div></div>
       <div id="gl-losers" style="display:none"><div class="tw"><table class="gltable"><thead><tr><th>Ticker</th><th>Company</th><th>Price</th><th>Change</th><th>Volume</th></tr></thead><tbody id="tb-l"></tbody></table></div></div>
@@ -487,12 +503,12 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   </div>
 
   <div class="g3">
-    <div class="card span2">
-      <div class="chdr"><div class="ctitle">🌡️ Sector Performance Heatmap — Today's Change %</div></div>
+    <div class="card span2 chartcard">
+      <div class="chdr"><div class="ctitle">Sector Performance Heatmap — Today's Change %</div></div>
       <div id="heatmap-wrap" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:5px;align-content:start"></div>
     </div>
     <div class="card">
-      <div class="chdr"><div class="ctitle">📍 52-Week High/Low Proximity — Where Are Stocks Now?</div></div>
+      <div class="chdr"><div class="ctitle">52-Week High/Low Proximity — Where Are Stocks Now?</div></div>
       <div class="chbox" style="--chmin:200px"><canvas id="w52-c"></canvas></div>
     </div>
   </div>
@@ -507,14 +523,14 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <div class="chbox" style="--chmin:200px"><canvas id="div-c"></canvas></div>
     </div>
     <div class="card">
-      <div class="chdr"><div class="ctitle">⚡ Volume Spikes — Unusual Activity Today</div></div>
+      <div class="chdr"><div class="ctitle">Volume Spikes — Unusual Activity Today</div></div>
       <div class="chbox" style="--chmin:200px"><canvas id="vspike-c"></canvas></div>
     </div>
   </div>
 
   <div class="g3">
     <div class="card span3">
-      <div class="chdr"><div class="ctitle">🏆 Top Stocks by Analyst Upside Potential</div></div>
+      <div class="chdr"><div class="ctitle">Top Stocks by Analyst Upside Potential</div></div>
       <div class="chbox" style="--chmin:190px"><canvas id="upside-c"></canvas></div>
     </div>
   </div>
@@ -522,12 +538,12 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   <!-- Earnings + Economic Calendar Card -->
   <div class="card" style="margin-bottom:16px">
     <div class="chdr">
-      <div class="ctitle" id="earn-cal-title">📅 Earnings Calendar — All Sectors</div>
+      <div class="ctitle" id="earn-cal-title">Earnings Calendar — All Sectors</div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
         <!-- Main tab toggle -->
         <div style="display:flex;background:var(--bg3);border:1px solid var(--b2);border-radius:8px;overflow:hidden;">
-          <button id="btn-earn-cal" onclick="switchCalTab('earnings')" style="padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:var(--cyan);color:#000;transition:all .2s;">📅 Earnings</button>
-          <button id="btn-eco-cal" onclick="switchCalTab('economic')" style="padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:transparent;color:var(--t2);transition:all .2s;">🌐 Economic Events</button>
+          <button id="btn-earn-cal" onclick="switchCalTab('earnings')" style="padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:var(--cyan);color:#000;transition:all .2s;">Earnings</button>
+          <button id="btn-eco-cal" onclick="switchCalTab('economic')" style="padding:5px 14px;font-size:11px;font-weight:700;cursor:pointer;border:none;background:transparent;color:var(--t2);transition:all .2s;">Economic Events</button>
         </div>
         <!-- Earnings controls -->
         <div id="earn-controls" style="display:flex;gap:8px;flex-wrap:wrap">
@@ -547,8 +563,8 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
         <div id="eco-controls" style="display:none;gap:8px;flex-wrap:wrap;align-items:center">
           <select class="sel" id="eco-impact-filter" onchange="applyEcoFilter()">
             <option value="all">All Impact</option>
-            <option value="high">🔴 High Only</option>
-            <option value="medium">⚪ Medium+</option>
+            <option value="high">High Only</option>
+            <option value="medium">Medium+</option>
           </select>
           <button onclick="refreshEcoCalendar()" style="background:var(--bg3);border:1px solid var(--b2);border-radius:6px;padding:4px 10px;color:var(--cyan);font-size:11px;font-weight:700;cursor:pointer;">↻ Refresh</button>
         </div>
@@ -570,9 +586,9 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <!-- Impact legend -->
       <div style="display:flex;gap:16px;padding:8px 0 8px;flex-wrap:wrap;border-bottom:1px solid var(--b2);margin-bottom:10px">
         <span style="font-size:10px;color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:.5px;align-self:center">Impact:</span>
-        <span style="font-size:11px;font-weight:700;color:#ff4d4d;">🔴 High — Major mover</span>
-        <span style="font-size:11px;font-weight:700;color:#c9cdd8;">⚪ Medium</span>
-        <span style="font-size:11px;font-weight:700;color:#00c87a;">🟢 Low</span>
+        <span style="font-size:11px;font-weight:700;color:#ff4d4d;"><span class="idot"></span>High — Major mover</span>
+        <span style="font-size:11px;font-weight:700;color:#c9cdd8;"><span class="idot"></span>Medium</span>
+        <span style="font-size:11px;font-weight:700;color:#00c87a;"><span class="idot"></span>Low</span>
         <span style="font-size:10px;color:var(--t3);margin-left:auto;align-self:center">Click any event for details</span>
       </div>
       <!-- Month tabs -->
@@ -585,7 +601,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   <!-- World Finance News -->
   <div class="card" style="margin-bottom:16px">
     <div class="chdr">
-      <div class="ctitle">🌍 World Finance & Market News</div>
+      <div class="ctitle">World Finance & Market News</div>
       <div style="display:flex;gap:6px;align-items:center;">
         <div id="news-live-dot" style="width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;"></div>
         <span style="font-size:11px;color:var(--green);font-weight:700;">Live</span>
@@ -607,7 +623,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 
   <!-- All Stocks Table -->
   <div class="card">
-    <div class="stitle" id="stocks-title">📋 All Stocks — Live Data</div>
+    <div class="stitle" id="stocks-title">All Stocks — Live Data</div>
     <div class="toolbar">
       <input class="srch" style="width:220px" placeholder="Ticker or company..." id="s-srch" oninput="filterStocks()"/>
       <select class="sel" id="s-sec" onchange="filterStocks()">
@@ -661,7 +677,6 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   <!-- AI Portfolio Review — top after KPI -->
   <div class="ai-wrap" style="margin-bottom:16px;">
     <div class="ai-header">
-      <div class="ai-icon">🧠</div>
       <div>
         <div class="ai-title">AI Portfolio Review</div>
         <div class="ai-sub">Enter tickers you own and our AI will review each one — hold, add more, or consider swapping</div>
@@ -669,14 +684,14 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     </div>
     <div class="ai-input-row">
       <input class="ai-input" id="pf-tickers" placeholder="e.g. Apple, Tesla, Nvidia  or  AAPL, TSLA, NVDA"/>
-      <button class="ai-btn" id="pf-ai-btn" onclick="runPfReview()">🔍 Review Portfolio</button>
+      <button class="ai-btn" id="pf-ai-btn" onclick="runPfReview()">Review Portfolio</button>
     </div>
     <div style="margin-bottom:8px;">
-      <button style="font-size:11px;font-weight:700;color:var(--cyan);background:none;border:none;cursor:pointer;padding:0;" onclick="loadPortfolioTickers()">📋 Load from my holdings above</button>
+      <button style="font-size:11px;font-weight:700;color:var(--cyan);background:none;border:none;cursor:pointer;padding:0;" onclick="loadPortfolioTickers()">Load from my holdings above</button>
     </div>
     <div class="ai-loading" id="pf-ai-loading"><div class="spin"></div>AI is reviewing your portfolio — this takes about 10 seconds...</div>
     <div class="ai-result" id="pf-ai-result">
-      <div class="ai-result-title">🧠 Portfolio Review</div>
+      <div class="ai-result-title">Portfolio Review</div>
       <div class="ai-result-text" id="pf-ai-result-text"></div>
     </div>
   </div>
@@ -684,15 +699,15 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   <!-- Portfolio vs S&P 500 Benchmark -->
   <div class="card" style="margin-bottom:16px;" id="benchmark-card">
     <div class="chdr">
-      <div class="ctitle">📊 Portfolio vs S&P 500 Benchmark</div>
-      <button onclick="loadBenchmark()" style="background:var(--bg3);border:1px solid var(--b2);border-radius:7px;padding:5px 12px;color:var(--cyan);font-size:11px;font-weight:700;cursor:pointer;">🔄 Refresh</button>
+      <div class="ctitle">Portfolio vs S&P 500 Benchmark</div>
+      <button onclick="loadBenchmark()" style="background:var(--bg3);border:1px solid var(--b2);border-radius:7px;padding:5px 12px;color:var(--cyan);font-size:11px;font-weight:700;cursor:pointer;">Refresh</button>
     </div>
     <div id="benchmark-content"><div class="load"><div class="spin"></div>Loading benchmark data...</div></div>
   </div>
 
   <div class="g2">
     <div class="card"><div class="chdr"><div class="ctitle">Allocation</div></div><div style="height:220px"><canvas id="alloc-c"></canvas></div></div>
-    <div class="card"><div class="chdr"><div class="ctitle">Sector Breakdown</div></div><div id="sec-alloc"><div class="load"><div class="spin"></div></div></div></div>
+    <div class="card chartcard"><div class="chdr"><div class="ctitle">Sector Breakdown</div></div><div id="sec-alloc"><div class="load"><div class="spin"></div></div></div></div>
   </div>
   <div class="card" style="margin-bottom:16px">
     <div class="chdr"><div class="ctitle">P&L Per Holding</div></div>
@@ -706,7 +721,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     </table></div>
   </div>
   <div class="card">
-    <div class="stitle">➕ Add Holding</div>
+    <div class="stitle">Add Holding</div>
     <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;align-items:end">
       <div><label class="flbl">Ticker</label><input class="finp" id="a-tick" placeholder="AAPL"/></div>
       <div><label class="flbl">Quantity</label><input class="finp" type="number" id="a-qty" placeholder="100"/></div>
@@ -733,7 +748,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   <div class="card" style="margin-bottom:16px">
     <div class="stitle">Transactions</div>
     <div class="toolbar">
-      <input class="srch" style="width:200px" placeholder="🔍 Search..." id="tx-srch" oninput="renderTx()"/>
+      <input class="srch" style="width:200px" placeholder="Search..." id="tx-srch" oninput="renderTx()"/>
       <button class="fbtn on" onclick="setTxF('all',this)">All</button>
       <button class="fbtn" onclick="setTxF('BUY',this)">Buy</button>
       <button class="fbtn" onclick="setTxF('SELL',this)">Sell</button>
@@ -744,7 +759,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     </table></div>
   </div>
   <div class="card">
-    <div class="stitle">➕ Add Transaction</div>
+    <div class="stitle">Add Transaction</div>
     <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;align-items:end">
       <div><label class="flbl">Ticker</label><input class="finp" id="tx-tick" placeholder="AAPL"/></div>
       <div><label class="flbl">Type</label><select class="finp" id="tx-type"><option>BUY</option><option>SELL</option></select></div>
@@ -767,7 +782,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 
   <!-- Macro Economic Indicators -->
   <div class="card" style="margin-bottom:16px;">
-    <div class="chdr"><div class="ctitle">🌍 Macro Economic Indicators</div></div>
+    <div class="chdr"><div class="ctitle">Macro Economic Indicators</div></div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;" id="macro-grid">
       <div class="sc" style="--sc-t:var(--red)"><div class="sc-l">VIX — Fear Index</div><div class="sc-v" id="mac-vix">--</div><div class="sc-s" id="mac-vix-c">--</div></div>
       <div class="sc" style="--sc-t:var(--blue)"><div class="sc-l">Dollar Index (DXY)</div><div class="sc-v" id="mac-dxy">--</div><div class="sc-s" id="mac-dxy-c">--</div></div>
@@ -779,7 +794,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   <!-- Commodity Prices — KPI Cards with Dropdown Filter -->
   <div class="card" style="margin-bottom:16px;">
     <div class="chdr">
-      <div class="ctitle">🏗️ Live Commodity Prices</div>
+      <div class="ctitle">Live Commodity Prices</div>
       <div style="display:flex;gap:8px;align-items:center;">
         <select id="com-filter-select" onchange="filterComFromSelect(this.value)" style="background:var(--bg3);border:1px solid var(--b2);border-radius:8px;padding:6px 12px;color:var(--t1);font-size:12px;font-weight:700;outline:none;cursor:pointer;">
           <option value="all">All Commodities</option>
@@ -812,7 +827,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   <!-- Commodity-Linked Companies — KPI Cards -->
   <div class="card">
     <div class="chdr">
-      <div class="ctitle">🏢 Commodity-Linked Companies</div>
+      <div class="ctitle">Commodity-Linked Companies</div>
       <select id="comco-filter-select" onchange="filterComCoFromSelect(this.value)" style="background:var(--bg3);border:1px solid var(--b2);border-radius:8px;padding:6px 12px;color:var(--t1);font-size:12px;font-weight:700;outline:none;cursor:pointer;">
         <option value="all">All Companies</option>
         <option value="gold">Gold</option>
@@ -853,17 +868,17 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 
   <div class="card" style="margin-bottom:16px;">
     <div class="chdr">
-      <div class="ctitle">⭐ My Watchlist</div>
+      <div class="ctitle">My Watchlist</div>
       <div style="position:relative;display:flex;gap:8px;align-items:center;">
         <div style="position:relative;">
-          <input class="srch" placeholder="🔍 Search by name or ticker..." id="wl-add-input" style="width:260px;" oninput="searchWatchlistStocks(this.value)" onkeydown="if(event.key==='Escape')closeWlSuggestions()"/>
+          <input class="srch" placeholder="Search by name or ticker..." id="wl-add-input" style="width:260px;" oninput="searchWatchlistStocks(this.value)" onkeydown="if(event.key==='Escape')closeWlSuggestions()"/>
           <div id="wl-suggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg2);border:1px solid var(--b2);border-radius:8px;z-index:100;max-height:220px;overflow-y:auto;margin-top:4px;box-shadow:0 8px 24px rgba(0,0,0,0.4);"></div>
         </div>
         <button class="btn btns" onclick="addToWatchlistManual()" style="padding:8px 16px;font-size:12px;">+ Add</button>
       </div>
     </div>
     <div id="wl-empty" style="text-align:center;padding:40px;color:var(--t3);font-size:13px;display:none;">
-      ⭐ Your watchlist is empty. Search for a stock and click the ⭐ button to add it here.
+      Your watchlist is empty. Search for a stock above and add it here.
     </div>
     <div class="tw"><table id="wl-table">
       <thead><tr><th>Ticker</th><th>Company</th><th>Sector</th><th>Price</th><th>Change</th><th>Action</th></tr></thead>
@@ -916,8 +931,8 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
           <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">
             <!-- Chart type toggle -->
             <div style="display:flex;gap:3px;background:var(--bg3);border-radius:7px;padding:2px;margin-right:6px;">
-              <button id="chart-line-btn" onclick="setChartType('line',this)" style="padding:4px 10px;border-radius:5px;border:none;background:var(--blue);color:#fff;font-size:11px;font-weight:700;cursor:pointer;">📈 Line</button>
-              <button id="chart-candle-btn" onclick="setChartType('candle',this)" style="padding:4px 10px;border-radius:5px;border:none;background:none;color:var(--t3);font-size:11px;font-weight:700;cursor:pointer;">🕯 Candle</button>
+              <button id="chart-line-btn" onclick="setChartType('line',this)" style="padding:4px 10px;border-radius:5px;border:none;background:var(--blue);color:#fff;font-size:11px;font-weight:700;cursor:pointer;">Line</button>
+              <button id="chart-candle-btn" onclick="setChartType('candle',this)" style="padding:4px 10px;border-radius:5px;border:none;background:none;color:var(--t3);font-size:11px;font-weight:700;cursor:pointer;">Candle</button>
             </div>
             <!-- Period buttons -->
             <button class="fbtn on" onclick="setPer('3mo',this)">3M</button>
@@ -935,7 +950,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <!-- Price Alert Quick Bar -->
       <div class="card" style="margin-bottom:14px;">
         <div class="chdr">
-          <div class="ctitle">🔔 Set Price Alert</div>
+          <div class="ctitle">Set Price Alert</div>
           <div id="chart-alert-preview" style="font-size:12px;color:var(--cyan);font-weight:700;"></div>
         </div>
         <div style="padding:14px 16px;">
@@ -958,7 +973,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
             <input type="number" id="chart-alert-price" placeholder="Enter target price $" step="0.01" min="0"
               style="background:var(--bg3);border:1px solid var(--b2);border-radius:8px;padding:10px 12px;color:var(--t1);font-size:13px;font-weight:700;outline:none;width:100%;box-sizing:border-box;"
               oninput="updateAlertPreview()"/>
-            <button onclick="saveChartAlert()" style="background:linear-gradient(135deg,var(--cyan),var(--blue));border:none;border-radius:8px;padding:10px 20px;color:#fff;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;">Set Alert 🔔</button>
+            <button onclick="saveChartAlert()" style="background:linear-gradient(135deg,var(--cyan),var(--blue));border:none;border-radius:8px;padding:10px 20px;color:#fff;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;">Set Alert </button>
           </div>
         </div>
       </div>
@@ -980,13 +995,13 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <!-- Balance Sheet + P&L Tables -->
       <div class="fs2" style="margin-top:8px;">
         <div class="card">
-          <div class="chdr"><div class="ctitle">📊 Balance Sheet — Latest Annual</div></div>
+          <div class="chdr"><div class="ctitle">Balance Sheet — Latest Annual</div></div>
           <div id="fs-balance-sheet">
             <div class="load"><div class="spin"></div>Loading...</div>
           </div>
         </div>
         <div class="card">
-          <div class="chdr"><div class="ctitle">📈 Profit & Loss — Latest Annual</div></div>
+          <div class="chdr"><div class="ctitle">Profit & Loss — Latest Annual</div></div>
           <div id="fs-pnl">
             <div class="load"><div class="spin"></div>Loading...</div>
           </div>
@@ -1026,7 +1041,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     <div class="fssec" id="fss-earnings">
       <div id="fs-earn"><div class="load"><div class="spin"></div>Loading earnings...</div></div>
       <div class="card" style="margin-top:12px">
-        <div class="chdr"><div class="ctitle">📆 Quarterly Results — Last 8 Quarters</div></div>
+        <div class="chdr"><div class="ctitle">Quarterly Results — Last 8 Quarters</div></div>
         <div id="fs-quarterly"><div class="load"><div class="spin"></div>Loading quarterly data...</div></div>
       </div>
     </div>
@@ -1050,6 +1065,8 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 </div>
 
 <script>
+// ─── LINE ICONS (simple outline icons, used only where an icon is needed) ───
+const LI={chart:'<svg class="lic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></svg>',bell:'<svg class="lic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>',chat:'<svg class="lic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',trash:'<svg class="lic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>',news:'<svg class="lic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h13a1 1 0 0 1 1 1v14a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2z"/><path d="M18 9h2a1 1 0 0 1 1 1v9a2 2 0 0 1-2 2"/><path d="M8 8h6"/><path d="M8 12h6"/><path d="M8 16h4"/></svg>',user:'<svg class="lic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>'};
 // ─── COMPANY LOGO HELPER — defined first so available everywhere ───
 const DOMAIN_MAP={'AAPL':'apple.com','MSFT':'microsoft.com','GOOGL':'google.com','GOOG':'google.com','AMZN':'amazon.com','META':'meta.com','NFLX':'netflix.com','TSLA':'tesla.com','NVDA':'nvidia.com','AMD':'amd.com','INTC':'intel.com','CSCO':'cisco.com','ORCL':'oracle.com','IBM':'ibm.com','ADBE':'adobe.com','CRM':'salesforce.com','PYPL':'paypal.com','SQ':'block.xyz','SHOP':'shopify.com','UBER':'uber.com','LYFT':'lyft.com','ABNB':'airbnb.com','COIN':'coinbase.com','SPOT':'spotify.com','DIS':'disney.com','SBUX':'starbucks.com','MCD':'mcdonalds.com','NKE':'nike.com','KO':'coca-cola.com','PEP':'pepsico.com','WMT':'walmart.com','TGT':'target.com','COST':'costco.com','HD':'homedepot.com','LOW':'lowes.com','AMGN':'amgen.com','JPM':'jpmorganchase.com','BAC':'bankofamerica.com','WFC':'wellsfargo.com','GS':'goldmansachs.com','MS':'morganstanley.com','V':'visa.com','MA':'mastercard.com','AXP':'americanexpress.com','BLK':'blackrock.com','SCHW':'schwab.com','XOM':'exxonmobil.com','CVX':'chevron.com','COP':'conocophillips.com','SLB':'slb.com','HAL':'halliburton.com','OXY':'oxy.com','EOG':'eogresources.com','NEM':'newmont.com','GOLD':'barrick.com','AEM':'agnicoeagle.com','FNV':'franco-nevada.com','WPM':'wheatonpreciousmetals.com','AG':'firstmajestic.com','PAAS':'panamericansilver.com','FCX':'fcx.com','SCCO':'southerncopper.com','BHP':'bhp.com','RIO':'riotinto.com','VALE':'vale.com','TECK':'teck.com','NUE':'nucor.com','STLD':'steeldynamics.com','AA':'alcoa.com','ALB':'albemarle.com','MP':'mpmaterials.com','CCJ':'cameco.com','ADM':'adm.com','BG':'bunge.com','MOS':'mosaicco.com','DE':'deere.com','NTR':'nutrien.com','CF':'cfindustries.com','MSTR':'microstrategy.com','MARA':'marathondh.com','RIOT':'riotplatforms.com','NEE':'nexteraenergy.com','FSLR':'firstsolar.com','ENPH':'enphase.com','PLUG':'plugpower.com','BE':'bloomenergy.com','RUN':'sunrun.com','CHPT':'chargepoint.com','SEDG':'solaredge.com','AWK':'amwater.com','XYL':'xylem.com','WM':'wm.com','RSG':'rsg.com','ZIM':'zim.com','SBLK':'starbulk.com','GOGL':'goldenocean.com','ISRG':'intuitive.com','ABB':'abb.com','TER':'teradyne.com','CGNX':'cognex.com','ROK':'rockwellautomation.com','SYM':'symbotic.com','PATH':'uipath.com','PLTR':'palantir.com','SNOW':'snowflake.com','DDOG':'datadoghq.com','ZM':'zoom.us','DOCU':'docusign.com','TWLO':'twilio.com','NET':'cloudflare.com','NOW':'servicenow.com','WDAY':'workday.com','OKTA':'okta.com','CRWD':'crowdstrike.com','ZS':'zscaler.com'};
 function getLogoUrl(ticker){return DOMAIN_MAP[ticker]?`https://www.google.com/s2/favicons?domain=${DOMAIN_MAP[ticker]}&sz=32`:null;}
@@ -1172,7 +1189,6 @@ async function loadDividends(){
       wrap.innerHTML = `
         <div class="card" style="border-left:4px solid #58697a;margin-bottom:14px;">
           <div style="display:flex;align-items:center;gap:10px;">
-            <span style="font-size:28px;">📭</span>
             <div>
               <div style="font-size:15px;font-weight:700;color:#8a9bb0;line-height:1.5;">
                 ${curTick} does not currently pay a dividend.
@@ -1205,7 +1221,7 @@ async function loadDividends(){
 
     const streakYrs  = d.streak_years || 0;
     const streakBadge = streakYrs >= 1
-      ? `<span style="margin-left:10px;background:rgba(255,200,0,.15);border:1px solid #ffc800;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:700;color:#ffc800;">🔥 ${streakYrs} yr streak</span>`
+      ? `<span style="margin-left:10px;background:rgba(255,200,0,.15);border:1px solid #ffc800;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:700;color:#ffc800;">${streakYrs} yr streak</span>`
       : '';
 
     // ── KPI values ───────────────────────────────────────────────────────────
@@ -1258,7 +1274,7 @@ async function loadDividends(){
           <text x="${x+bW/2}" y="${y-4}" text-anchor="middle" fill="${color}" font-size="11" font-family="monospace" font-weight="700">$${h.total.toFixed(2)}</text>`;
       }).join('');
       barChartSvg = `
-        <div class="card" style="margin-bottom:14px;overflow:hidden;">
+        <div class="card chartcard" style="margin-bottom:14px;overflow:hidden;">
           <div class="chdr"><div class="ctitle">Annual Dividend Per Share</div>
             <div style="font-size:11px;color:var(--t3);display:flex;gap:10px;align-items:center;">
               <span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;background:#00e676;border-radius:2px;display:inline-block;"></span>Growth</span>
@@ -1301,7 +1317,7 @@ async function loadDividends(){
     // ── Plain English guide ──────────────────────────────────────────────────
     const guideHtml = `
       <div class="card" style="margin-bottom:14px;background:rgba(79,142,247,.06);border:1px solid rgba(79,142,247,.2);">
-        <div class="chdr"><div class="ctitle" style="color:#4f8ef7;">📘 Dividend Glossary</div></div>
+        <div class="chdr"><div class="ctitle">Dividend Glossary</div></div>
         <div style="display:grid;gap:10px;padding-top:4px;">
           <div><span style="font-size:12px;font-weight:700;color:var(--t1);">Dividend Yield</span>
             <div style="font-size:12px;color:var(--t3);margin-top:2px;">How much you earn per year as a % of the current share price. A 3% yield on a $100 stock = $3/year per share.</div>
@@ -1366,7 +1382,7 @@ async function loadCompanyTab(){
     wrap.innerHTML = `
       <!-- Company Overview -->
       <div style="margin-bottom:24px;">
-        <div class="inttitle">🏢 COMPANY OVERVIEW</div>
+        <div class="inttitle">COMPANY OVERVIEW</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
           <div>
             ${d.description ? `<p style="font-size:13px;color:var(--t2);line-height:1.7;margin-bottom:16px;">${d.description.substring(0,400)}${d.description.length>400?'...':''}</p>` : ''}
@@ -1399,7 +1415,7 @@ async function loadCompanyTab(){
 
       <!-- Shareholder Structure -->
       <div style="margin-bottom:24px;">
-        <div class="inttitle">👥 SHAREHOLDER STRUCTURE</div>
+        <div class="inttitle">SHAREHOLDER STRUCTURE</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
           <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:10px;padding:16px;">
             <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--cyan);margin-bottom:12px;">Ownership Breakdown</div>
@@ -1407,7 +1423,7 @@ async function loadCompanyTab(){
 
               <!-- Within Company — Insiders -->
               <div style="border-bottom:1px solid var(--b1);padding-bottom:10px;">
-                <div style="font-size:10px;font-weight:800;color:var(--yellow);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">🏢 Within Company (Insiders)</div>
+                <div style="font-size:10px;font-weight:800;color:var(--yellow);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Within Company (Insiders)</div>
                 ${d.insider_pct!=null?`
                 <div style="margin-bottom:6px;">
                   <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
@@ -1421,7 +1437,7 @@ async function loadCompanyTab(){
 
               <!-- Outside Company — Institutional -->
               <div style="border-bottom:1px solid var(--b1);padding-bottom:10px;">
-                <div style="font-size:10px;font-weight:800;color:var(--blue);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">🏦 Outside Company (Institutional)</div>
+                <div style="font-size:10px;font-weight:800;color:var(--blue);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Outside Company (Institutional)</div>
                 ${d.institution_pct!=null?`
                 <div style="margin-bottom:6px;">
                   <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
@@ -1435,7 +1451,7 @@ async function loadCompanyTab(){
 
               <!-- Public — Retail Investors -->
               <div>
-                <div style="font-size:10px;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">🌍 Public (Retail Investors)</div>
+                <div style="font-size:10px;font-weight:800;color:var(--green);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Public (Retail Investors)</div>
                 ${d.public_float_pct!=null?`
                 <div style="margin-bottom:6px;">
                   <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
@@ -1458,7 +1474,7 @@ async function loadCompanyTab(){
 
           <!-- Top Institutional Holders -->
           <div style="background:var(--bg3);border:1px solid var(--b1);border-radius:10px;padding:16px;">
-            <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--cyan);margin-bottom:12px;">🏆 Top Institutional Holders</div>
+            <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--t1);margin-bottom:12px;">Top Institutional Holders</div>
             ${d.top_holders && d.top_holders.length ? `
               <div style="display:grid;gap:10px;">
                 ${d.top_holders.slice(0,8).map((h,i)=>`
@@ -1558,7 +1574,7 @@ async function loadSectors(){
 function filterBySector(sector){
   document.getElementById('s-sec').value=sector;
   filterStocks();
-  document.getElementById('stocks-title').textContent='📋 '+sector+' Stocks';
+  document.getElementById('stocks-title').textContent=''+sector+' Stocks';
   setTimeout(()=>document.querySelector('#page-market .card:last-of-type').scrollIntoView({behavior:'smooth'}),100);
 }
 
@@ -1889,7 +1905,7 @@ function switchCalTab(tab){
   document.getElementById('earn-tab-content').style.display = isEco ? 'none' : 'block';
   document.getElementById('eco-tab-content').style.display  = isEco ? 'block' : 'none';
   document.getElementById('earn-cal-title').textContent =
-    isEco ? '🌐 Economic Events Calendar' : '📅 Earnings Calendar — All Sectors';
+    isEco ? 'Economic Events Calendar' : 'Earnings Calendar — All Sectors';
   if(isEco && !ecoDataCache[ecoCurrentMonth]) loadEcoCalendar(ecoCurrentMonth);
   else if(isEco) renderEcoEvents();
 }
@@ -1915,14 +1931,14 @@ async function loadEcoCalendar(month){
     const d = await api(`/api/economic-calendar?month=${month}`);
     if(d.error){
       document.getElementById('eco-calendar-body').innerHTML =
-        `<div class="info-note" style="color:#f87171">⚠️ ${d.error}</div>`;
+        `<div class="info-note" style="color:#f87171">${d.error}</div>`;
       return;
     }
     ecoDataCache[month] = d.events || [];
     renderEcoEvents();
   } catch(e){
     document.getElementById('eco-calendar-body').innerHTML =
-      `<div class="info-note" style="color:#f87171">⚠️ Failed to load: ${e.message}</div>`;
+      `<div class="info-note" style="color:#f87171">Failed to load: ${e.message}</div>`;
   }
 }
 
@@ -1974,9 +1990,9 @@ function renderEcoEvents(){
   }
 
   const IC = {
-    high:   {dot:'🔴', color:'#ff4d4d', bg:'rgba(255,77,77,0.07)',   border:'rgba(255,77,77,0.3)',    label:'HIGH'},
-    medium: {dot:'⚪', color:'#c9cdd8', bg:'rgba(255,255,255,0.04)', border:'rgba(255,255,255,0.2)', label:'MED'},
-    low:    {dot:'🟢', color:'#00c87a', bg:'rgba(0,200,122,0.06)',   border:'rgba(0,200,122,0.3)',    label:'LOW'},
+    high:   {dot:'<span class="idot"></span>', color:'#ff4d4d', bg:'rgba(255,77,77,0.07)',   border:'rgba(255,77,77,0.3)',    label:'HIGH'},
+    medium: {dot:'<span class="idot"></span>', color:'#c9cdd8', bg:'rgba(255,255,255,0.04)', border:'rgba(255,255,255,0.2)', label:'MED'},
+    low:    {dot:'<span class="idot"></span>', color:'#00c87a', bg:'rgba(0,200,122,0.06)',   border:'rgba(0,200,122,0.3)',    label:'LOW'},
   };
   const RESULT_STYLE = {
     beat:   {color:'#00c87a', label:'▲ BEAT'},
@@ -2131,7 +2147,7 @@ function timeAgo(ts){
   return Math.floor(diff/86400)+'d ago';
 }
 
-const CAT_ICONS = {markets:'📈',economy:'💹',global:'🌍',tech:'💻',crypto:'₿',commodities:'🏗️'};
+const CAT_ICONS = {}; // news cards without a photo show a plain newspaper line icon
 
 function renderWorldNews(){
   const grid = document.getElementById('news-grid');
@@ -2143,7 +2159,7 @@ function renderWorldNews(){
   }
   grid.innerHTML = `<div class="news-grid">${filtered.slice(0,6).map(n=>{
     const cat = n.category || 'markets';
-    const icon = CAT_ICONS[cat] || '📰';
+    const icon = LI.news;
     const imgHtml = n.image
       ? `<img class="news-card-img" src="${n.image}" alt="" onerror="this.style.display='none'"/>`
       : `<div class="news-card-img-placeholder">${icon}</div>`;
@@ -2208,9 +2224,9 @@ function renderStockNews(items, label){
   }
   document.getElementById('news-grid').innerHTML=`<div class="news-grid">${
     items.slice(0,12).map(n=>`<div class="news-card" onclick="window.open('${n.url||'#'}','_blank')">
-      <div class="news-card-img-placeholder">📈</div>
+      <div class="news-card-img-placeholder">${LI.news}</div>
       <div class="news-card-body">
-        <div class="news-card-cat markets">📈 Markets</div>
+        <div class="news-card-cat markets">Markets</div>
         <div class="news-card-title">${n.title||'No title'}</div>
         <div class="news-card-footer">
           <span class="news-card-source">${n.source||'Yahoo Finance'}</span>
@@ -2228,8 +2244,8 @@ const CAT_LABELS = {markets:'Markets',economy:'Economy',global:'Global Finance',
 function openNewsModal(cat){
   const modal = document.getElementById('news-modal');
   const title = document.getElementById('news-modal-title');
-  const icon = CAT_ICONS[cat] || '📰';
-  title.textContent = `${icon} ${CAT_LABELS[cat]||cat} News`;
+  const icon = LI.news;
+  title.textContent = `${CAT_LABELS[cat]||cat} News`;
   document.getElementById('news-modal-search-input').value = '';
   // Filter data
   newsModalData = worldNewsData.filter(n=>n.category===cat);
@@ -2256,7 +2272,7 @@ function renderModalNews(items){
   }
   body.innerHTML = `<div class="news-grid">${items.map(n=>{
     const cat = n.category || 'markets';
-    const icon = CAT_ICONS[cat] || '📰';
+    const icon = LI.news;
     const imgHtml = n.image
       ? `<img class="news-card-img" src="${n.image}" alt="" onerror="this.style.display='none'"/>`
       : `<div class="news-card-img-placeholder">${icon}</div>`;
@@ -2305,7 +2321,7 @@ function filterStocks(){
     return ms&&mq&&mr;
   });
   pg=1;
-  document.getElementById('stocks-title').textContent=document.getElementById('s-sec').value?`📋 ${document.getElementById('s-sec').value} Stocks`:'📋 All Stocks — Live Data';
+  document.getElementById('stocks-title').textContent=document.getElementById('s-sec').value?`${document.getElementById('s-sec').value} Stocks`:'All Stocks — Live Data';
   renderStocks();
 }
 function srt(k){if(sortK===k)sortA=!sortA;else{sortK=k;sortA=false;}fStocks.sort((a,b)=>{const va=a[k],vb=b[k];if(va==null)return 1;if(vb==null)return-1;return sortA?(va>vb?1:-1):(va<vb?1:-1);});renderStocks();}
@@ -2425,7 +2441,7 @@ async function openStock(ticker){
     mi('50D MA',d.ma_50?fp(d.ma_50):'--'),
     mi('200D MA',d.ma_200?fp(d.ma_200):'--'),
     mi('Volatility',d.volatility?f2(d.volatility)+'%':'--'),
-    mi('Golden Cross',d.golden_cross?'✅ Yes':'❌ No',d.golden_cross?'g':'r'),
+    mi('Golden Cross',d.golden_cross?'Yes':'No',d.golden_cross?'g':'r'),
     mi('Short Int.',d.short_interest?f2(d.short_interest*100)+'%':'--'),
     mi('Short Ratio',d.short_ratio?f2(d.short_ratio):'--'),
   ].join('');
@@ -2466,7 +2482,7 @@ async function openStock(ticker){
   // Market Intelligence tab
   const ts=mkTechSignal(d.rsi_14,d.macd,d.current_price,d.ma_50,d.ma_200);
   document.getElementById('fs-int').innerHTML=`
-    <div class="inttitle">🤖 PREDICTION MODEL — ${ticker}</div>
+    <div class="inttitle">PREDICTION MODEL — ${ticker}</div>
     <div class="intgrid">
       <div class="intitem"><div class="intlbl">Analyst Consensus</div><div class="intval" style="font-size:13px">${mkRat(d.analyst_rating)}</div><div class="intchg" style="color:var(--t3)">${d.num_analysts||'N/A'} analysts</div></div>
       <div class="intitem" style="border-color:rgba(0,212,255,0.2)"><div class="intlbl">Technical Signal</div><div class="intval" style="font-size:13px"><span class="badge ${ts.cls}">${ts.label}</span></div><div class="intchg" style="color:var(--t3);font-size:10px">${ts.signals.slice(0,2).join(' · ')||'Based on RSI/MACD/MA'}</div></div>
@@ -2479,10 +2495,10 @@ async function openStock(ticker){
       ${mi('200D MA',d.ma_200?fp(d.ma_200):'--')}
       ${mi('Beta',d.beta?f2(d.beta):'--')}
       ${mi('Volatility',d.volatility?f2(d.volatility)+'%':'--')}
-      ${mi('Golden Cross',d.golden_cross?'✅ Yes':'❌ No',d.golden_cross?'g':'r')}
+      ${mi('Golden Cross',d.golden_cross?'Yes':'No',d.golden_cross?'g':'r')}
     </div>
     <div style="font-size:11px;font-weight:600;color:var(--t3);padding:10px 14px;background:var(--bg2);border-radius:8px;border-left:3px solid var(--yellow)">
-      ⚠️ Analyst ratings = real Wall Street consensus (Yahoo Finance). Technical signal = calculated from live RSI, MACD and moving averages. Combined view for informed analysis. Past performance does not guarantee future results. Not financial advice.
+      Analyst ratings = real Wall Street consensus (Yahoo Finance). Technical signal = calculated from live RSI, MACD and moving averages. Combined view for informed analysis. Past performance does not guarantee future results. Not financial advice.
     </div>`;
 
   // Earnings
@@ -2504,7 +2520,7 @@ async function openStock(ticker){
         <thead><tr><th>Date</th><th>EPS Estimate</th><th>EPS Actual</th><th>Result</th><th>Surprise %</th></tr></thead>
         <tbody>${earn.history.map(e=>{
           const beat=e.eps_actual>e.eps_estimate;
-          return`<tr><td class="num y">${e.date}</td><td class="num">${e.eps_estimate?'$'+f2(e.eps_estimate):'--'}</td><td class="num ${beat?'g':'r'}">${e.eps_actual?'$'+f2(e.eps_actual):'--'}</td><td><span class="badge ${beat?'bg':'br'}">${beat?'✅ Beat':'❌ Miss'}</span></td><td class="num ${beat?'g':'r'}">${e.surprise_pct!=null?(e.surprise_pct>=0?'+':'')+f2(e.surprise_pct)+'%':'--'}</td></tr>`;
+          return`<tr><td class="num y">${e.date}</td><td class="num">${e.eps_estimate?'$'+f2(e.eps_estimate):'--'}</td><td class="num ${beat?'g':'r'}">${e.eps_actual?'$'+f2(e.eps_actual):'--'}</td><td><span class="badge ${beat?'bg':'br'}">${beat?'Beat':'Miss'}</span></td><td class="num ${beat?'g':'r'}">${e.surprise_pct!=null?(e.surprise_pct>=0?'+':'')+f2(e.surprise_pct)+'%':'--'}</td></tr>`;
         }).join('')}</tbody>
       </table></div>
     </div>`:'<div class="card"><div class="chdr"><div class="ctitle">Earnings History — Beat vs Miss</div></div><div class="empty">No earnings history available from Yahoo Finance for this stock.</div></div>'}
@@ -3092,7 +3108,7 @@ async function loadSentimentPanel(ticker){
     const score  = clamp(s.score);
     const label  = s.label ?? 'Neutral';
     const color  = lblCol(label);
-    const emoji  = label==='Bullish'?'🟢':label==='Bearish'?'🔴':'🟡';
+    const emoji  = label==='Bullish'?'':label==='Bearish'?'':'';
     const heads  = s.headlines ?? [];
     const ctx    = s.context_line ?? '';
     const factors = s.factors ?? {};
@@ -3143,17 +3159,17 @@ async function loadSentimentPanel(ticker){
     }
 
     const STOCK_ROWS = [
-      {key:'news',     label:'Company News',  icon:'📰'},
-      {key:'momentum', label:'Price Momentum',icon:'📈'},
-      {key:'volume',   label:'Volume Signal', icon:'📊'},
-      {key:'analyst',  label:'Analyst Rating',icon:'🏦'},
+      {key:'news',     label:'Company News',  icon:''},
+      {key:'momentum', label:'Price Momentum',icon:''},
+      {key:'volume',   label:'Volume Signal', icon:''},
+      {key:'analyst',  label:'Analyst Rating',icon:''},
     ];
     const stockRows = STOCK_ROWS.map(f=>{
       const fd = factors[f.key] || {};
       return factorRow(f.icon, f.label, fd.score ?? 0, Math.round((fd.weight ?? 0)*100)+'%', fd.detail || '');
     }).join('');
-    const MKT_ICONS = {vix:'😨', spy:'📊', sector:'🏭', rates:'🏛️', oil:'🛢️', dollar:'💵', gold:'🥇', world:'🌍'};
-    const marketRows = mfacts.map(f=> factorRow(MKT_ICONS[f.key]||'•', f.label, f.score ?? 0, Math.round((f.weight??0)*100)+'%', f.detail||'')).join('')
+    const MKT_ICONS = {vix:'', spy:'', sector:'', rates:'', oil:'', dollar:'', gold:'', world:''};
+    const marketRows = mfacts.map(f=> factorRow(MKT_ICONS[f.key]||'', f.label, f.score ?? 0, Math.round((f.weight??0)*100)+'%', f.detail||'')).join('')
       || `<div style="font-size:11px;color:var(--t3);">Market data unavailable right now.</div>`;
 
     const hlRows = heads.map(h => {
@@ -3199,7 +3215,7 @@ async function loadSentimentPanel(ticker){
       <div style="margin-top:12px;padding:14px 16px;background:var(--bg3);border:1px solid var(--b2);border-radius:12px;">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
           <div>
-            <div style="font-size:11px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;">🧠 Sentiment used in this prediction</div>
+            <div style="font-size:11px;font-weight:800;color:var(--t1);text-transform:uppercase;letter-spacing:.5px;">Sentiment used in this prediction</div>
             <div style="font-size:10px;color:var(--t3);margin-top:3px;">60% company + 40% market & world · ${s.count??0} company headlines analysed</div>
           </div>
           <div style="font-size:18px;font-weight:900;color:${color};">${emoji} ${label} ${sign(score)}</div>
@@ -3239,7 +3255,7 @@ async function loadSentimentPanel(ticker){
             <button onclick="loadSpikeExplorer('${ticker}')"
               style="background:var(--bg2);border:1px solid var(--b2);color:var(--t2);font-size:11px;font-weight:700;border-radius:8px;padding:7px 14px;cursor:pointer;"
               onmouseover="this.style.borderColor='var(--cyan)';this.style.color='var(--cyan)'"
-              onmouseout="this.style.borderColor='var(--b2)';this.style.color='var(--t2)'">⚡ Why Did the Price Spike? (full list)</button>
+              onmouseout="this.style.borderColor='var(--b2)';this.style.color='var(--t2)'">Why Did the Price Spike? (full list)</button>
           </div>
           <div id="spike-explorer" style="margin-top:10px;"></div>
         </div>
@@ -3287,7 +3303,7 @@ async function loadSpikeExplorer(ticker){
     }).join('');
 
     wrap.innerHTML = `
-      <div style="font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">⚡ Price Spikes & Possible Causes (Last Year)</div>
+      <div style="font-size:10px;font-weight:800;color:var(--t1);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Price Spikes & Possible Causes (Last Year)</div>
       ${rows}
       <div style="font-size:10px;color:var(--t3);margin-top:6px;font-style:italic;">News matched within ±2 days of each spike. Not guaranteed to be causal.</div>`;
   } catch(e){
@@ -3383,14 +3399,14 @@ async function loadPrediction(){
         </div>`;
       intbox.innerHTML = `
         <div style="margin-top:4px;">
-          <div style="font-size:11px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">📊 12-Month Scenarios</div>
+          <div style="font-size:11px;font-weight:800;color:var(--t1);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">12-Month Scenarios</div>
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;">
-            ${d.bull_target?scn('🚀 Bull Case',d.bull_target,pct(d.bull_target),'var(--green)','Best case scenario'):''}
-            ${d.base_target?scn('📈 Base Case',d.base_target,pct(d.base_target),'var(--cyan)','Most likely scenario'):''}
-            ${d.bear_target?scn('🐻 Bear Case',d.bear_target,pct(d.bear_target),'var(--red)','Worst case scenario'):''}
-            ${d.analyst_target?scn('🏦 Wall Street Consensus',d.analyst_target,anUp,'var(--yellow)','Average analyst target, 12 months'):''}
+            ${d.bull_target?scn('Bull Case',d.bull_target,pct(d.bull_target),'var(--green)','Best case scenario'):''}
+            ${d.base_target?scn('Base Case',d.base_target,pct(d.base_target),'var(--cyan)','Most likely scenario'):''}
+            ${d.bear_target?scn('Bear Case',d.bear_target,pct(d.bear_target),'var(--red)','Worst case scenario'):''}
+            ${d.analyst_target?scn('Wall Street Consensus',d.analyst_target,anUp,'var(--yellow)','Average analyst target, 12 months'):''}
           </div>
-          <div style="margin-top:6px;font-size:10px;color:var(--t3);font-style:italic;">⚠️ Longer-term predictions have lower accuracy. Bull/Base/Bear are model scenarios — not guarantees. Analyst consensus is from Wall Street professionals. Not financial advice.</div>
+          <div style="margin-top:6px;font-size:10px;color:var(--t3);font-style:italic;">Longer-term predictions have lower accuracy. Bull/Base/Bear are model scenarios — not guarantees. Analyst consensus is from Wall Street professionals. Not financial advice.</div>
         </div>`;
     }
   }
@@ -3409,8 +3425,8 @@ function buildAccuracyTracker(d, livePrice){
   const correct = d.direction_correct_1w;
 
   let html = `<div style="background:var(--bg2);border:1px solid var(--b1);border-radius:10px;padding:12px 14px;height:100%">
-    <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:var(--cyan);margin-bottom:12px">
-      📊 PREDICTION ACCURACY TRACKER
+    <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:var(--t1);margin-bottom:12px">
+      PREDICTION ACCURACY TRACKER
     </div>`;
 
   // Prediction run info
@@ -3427,7 +3443,7 @@ function buildAccuracyTracker(d, livePrice){
     const hit = correct === 1;
     html += `<div style="background:${hit?'rgba(0,230,118,0.08)':'rgba(255,68,68,0.08)'};border:1px solid ${hit?'rgba(0,230,118,0.2)':'rgba(255,68,68,0.2)'};border-radius:8px;padding:12px">
       <div style="font-size:11px;font-weight:800;color:${hit?'var(--green)':'var(--red)'};margin-bottom:8px">
-        ${hit?'✅ Direction Correct':'❌ Direction Wrong'} — 1 Week Prediction
+        ${hit?'Direction Correct':'Direction Wrong'} — 1 Week Prediction
       </div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
         <div class="mi"><div class="ml">1W Prediction</div><div class="mv">${fp(pred1w)}</div><div style="font-size:10px;color:var(--t3)">${predDir}</div></div>
@@ -3437,7 +3453,7 @@ function buildAccuracyTracker(d, livePrice){
     </div>`;
   } else {
     html += `<div style="color:var(--t3);font-size:12px;font-weight:600;padding:10px;background:var(--bg3);border-radius:7px">
-      ⏳ Accuracy data will be available 7 days after predictions were run (${runDate||'--'}).
+      Accuracy data will be available 7 days after predictions were run (${runDate||'--'}).
       Run predict.py weekly to build accuracy history.
     </div>`;
   }
@@ -4044,7 +4060,7 @@ function addStockToWatchlist(ticker, e){
   }
   watchlist.push(ticker);
   localStorage.setItem('wl_tickers',JSON.stringify(watchlist));
-  alert(ticker+' added to watchlist ⭐');
+  alert(ticker+' added to watchlist');
 }
 
 // ─── MANUAL SCREENER ───────────────────────────────────
@@ -4187,8 +4203,8 @@ async function runAI() {
     // Meta info
     const meta = document.getElementById('ai-meta');
     meta.innerHTML = `
-      <span class="ai-meta-item">📊 ${data.stocks_found} stocks matched</span>
-      <span class="ai-meta-item">🔍 ${data.intent ? 'Intent: ' + data.intent.replace('_',' ') : 'broad search'}</span>
+      <span class="ai-meta-item">${data.stocks_found} stocks matched</span>
+      <span class="ai-meta-item">${data.intent ? 'Intent: ' + data.intent.replace('_',' ') : 'broad search'}</span>
     `;
 
     // Top 10 stock cards
@@ -4385,7 +4401,7 @@ function loadPortfolioTickers() {
 <!-- Alert Modal -->
 <div id="alert-modal">
   <div id="alert-box">
-    <h3>🔔 Set Price Alert</h3>
+    <h3>Set Price Alert</h3>
     <div class="alert-sub" id="alert-stock-name">Set an alert for this stock</div>
     <div class="alert-row">
       <label>Condition</label>
@@ -4400,19 +4416,19 @@ function loadPortfolioTickers() {
     </div>
     <div id="alert-current-price" style="font-size:11px;color:var(--t3);margin-top:-8px;margin-bottom:8px;"></div>
     <div id="alerts-list-wrap">
-      <h4>🔔 Active Alerts for this stock</h4>
+      <h4>Active Alerts for this stock</h4>
       <div id="alerts-list"></div>
     </div>
     <div class="alert-btns">
       <button class="alert-btn-cancel" onclick="closeAlertModal()">Cancel</button>
-      <button class="alert-btn-save" onclick="saveAlert()">Set Alert 🔔</button>
+      <button class="alert-btn-save" onclick="saveAlert()">Set Alert </button>
     </div>
   </div>
 </div>
 
 <!-- Alert Toast Notification -->
 <div class="alert-toast" id="alert-toast">
-  <div style="font-size:13px;font-weight:800;color:var(--green);margin-bottom:4px;">🔔 Price Alert Triggered!</div>
+  <div style="font-size:13px;font-weight:800;color:var(--green);margin-bottom:4px;">Price Alert Triggered!</div>
   <div id="alert-toast-msg" style="font-size:12px;color:var(--t1);"></div>
 </div>
 
@@ -4498,20 +4514,20 @@ function loadPortfolioTickers() {
 
 <!-- Bounty Button -->
 <button id="bounty-btn" onclick="toggleBounty()" title="Chat with Bounty AI">
-  🤖
+  <svg class="lic" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
   <span id="bounty-badge">1</span>
 </button>
 
 <!-- Bounty Window -->
 <div id="bounty-win">
   <div id="bounty-hdr">
-    <div class="b-avatar">🤖</div>
+    <div class="b-avatar"><svg class="lic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
     <div>
       <div class="b-name">Bounty</div>
       <div class="b-status">● Online — Your AI Finance Assistant</div>
     </div>
     <div class="b-hdr-btns">
-      <button class="b-hdr-btn" onclick="clearBounty()" title="Clear chat">🗑</button>
+      <button class="b-hdr-btn" onclick="clearBounty()" title="Clear chat"><svg class="lic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
       <button class="b-hdr-btn" onclick="toggleBounty()" title="Close">✕</button>
     </div>
   </div>
@@ -4521,14 +4537,14 @@ function loadPortfolioTickers() {
     <button class="b-reply-close" onclick="cancelReply()">✕</button>
   </div>
   <div class="b-edit-bar" id="b-edit-bar">
-    <span>✏️ Editing message</span>
+    <span>Editing message</span>
     <button onclick="cancelEdit()">✕</button>
   </div>
   <div id="bounty-input-wrap">
     <textarea id="bounty-input" placeholder="Ask Bounty anything about stocks, markets, commodities..." rows="2" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendBounty();}" oninput="autoBountyResize(this)"></textarea>
     <div id="bounty-send-row">
       <span class="b-footer">Shift+Enter for new line</span>
-      <button id="bounty-send" onclick="sendBounty()">Send ➤</button>
+      <button id="bounty-send" onclick="sendBounty()">Send</button>
     </div>
   </div>
 </div>
@@ -4569,7 +4585,7 @@ async function loadBenchmark(){
           <div style="font-size:11px;color:var(--t3);">Same period</div>
         </div>
         <div style="text-align:center;">
-          <div style="font-size:11px;color:var(--t3);font-weight:700;text-transform:uppercase;margin-bottom:6px;">${beating?'Beating Market 🏆':'Lagging Market'}</div>
+          <div style="font-size:11px;color:var(--t3);font-weight:700;text-transform:uppercase;margin-bottom:6px;">${beating?'Beating Market ':'Lagging Market'}</div>
           <div style="font-size:28px;font-weight:900;color:${diffCol};">${diffIcon} ${Math.abs(diff).toFixed(2)}%</div>
           <div style="font-size:11px;color:var(--t3);">${beating?'Above S&P 500':'Below S&P 500'}</div>
         </div>
@@ -4593,7 +4609,7 @@ async function loadBenchmark(){
                 <td class="${h.stock_return>=0?'g':'r'} mono">${h.stock_return>=0?'+':''}${h.stock_return.toFixed(2)}%</td>
                 <td class="${h.spy_return>=0?'g':'r'} mono">${h.spy_return>=0?'+':''}${h.spy_return.toFixed(2)}%</td>
                 <td class="${h.difference>=0?'g':'r'} mono" style="font-weight:800;">${h.difference>=0?'+':''}${h.difference.toFixed(2)}%</td>
-                <td>${h.beating?'<span style="color:var(--green);font-weight:800;">✅ Beating</span>':'<span style="color:var(--red);font-weight:700;">⚠️ Lagging</span>'}</td>
+                <td>${h.beating?'<span style="color:var(--green);font-weight:800;">Beating</span>':'<span style="color:var(--red);font-weight:700;">Lagging</span>'}</td>
               </tr>`).join('')}
           </tbody>
         </table></div>
@@ -4680,8 +4696,8 @@ function updateAlertPreview(){
 async function saveChartAlert(){
   const price = parseFloat(document.getElementById('chart-alert-price').value);
   const condition = document.getElementById('chart-alert-condition').value;
-  if(!curTick){ ntToast('⚠️ No stock selected', 'Open a stock first, then set the alert.', 'warn'); return; }
-  if(!price || price <= 0){ ntToast('⚠️ Enter a target price', 'Type a price or use the % buttons.', 'warn'); return; }
+  if(!curTick){ ntToast('No stock selected', 'Open a stock first, then set the alert.', 'warn'); return; }
+  if(!price || price <= 0){ ntToast('Enter a target price', 'Type a price or use the % buttons.', 'warn'); return; }
   const company = document.getElementById('fs-name')?.textContent?.split('·')[0]?.trim() || curTick;
   ntAskPermission();
   const ok = await ntCreateAlert(curTick, company, price, condition);
@@ -4716,7 +4732,7 @@ function closeAlertModal(){
 async function saveAlert(){
   const price = parseFloat(document.getElementById('alert-price').value);
   const condition = document.getElementById('alert-condition').value;
-  if(!price || price <= 0){ ntToast('⚠️ Enter a target price', '', 'warn'); return; }
+  if(!price || price <= 0){ ntToast('Enter a target price', '', 'warn'); return; }
   const ok = await ntCreateAlert(currentAlertTicker, currentAlertCompany, price, condition);
   if(ok){ loadActiveAlerts(currentAlertTicker); document.getElementById('alert-price').value = ''; }
 }
@@ -4735,7 +4751,7 @@ async function loadActiveAlerts(ticker){
           <div class="alert-item-info">${a.condition_type === 'above' ? '▲ Above' : '▼ Below'} $${ntMoney(a.target_price)}</div>
           <div class="alert-item-sub">Set when price was $${ntMoney(a.price_at_creation)}</div>
         </div>
-        <button class="alert-item-del" onclick="deleteAlert(${a.id})">🗑</button>
+        <button class="alert-item-del" onclick="deleteAlert(${a.id})" title="Delete">${LI.trash}</button>
       </div>`).join('');
   } catch(e){}
 }
@@ -4758,7 +4774,7 @@ window.addEventListener('click', function(e){
 // ═══════════════════════════════════════════════════════════
 //  NOTIFICATIONS — price alerts, market news, economic events
 //  Desktop notifications (Windows) when allowed, in-page pop-up otherwise.
-//  Everything shown is also kept in the 🔔 bell (last 20).
+//  Everything shown is also kept in the bell (last 20).
 // ═══════════════════════════════════════════════════════════
 const NT_KEY_HIST = 'smp_nt_history';
 const NT_KEY_SEEN = 'smp_nt_seen';
@@ -4858,15 +4874,15 @@ async function ntCreateAlert(ticker, company, price, condition){
     const d = await res.json();
     if(d.status === 'success'){
       const arrow = condition === 'above' ? '▲ above' : '▼ below';
-      ntNotify('alert_set', `🔔 Alert set: ${ticker} ${arrow} $${ntMoney(price)}`,
+      ntNotify('alert_set', `Alert set: ${ticker} ${arrow} $${ntMoney(price)}`,
                d.message || `You'll be notified when ${ticker} goes ${condition} $${ntMoney(price)}`,
                {type:'stock', ticker}, {tag:'alert-set-'+d.id});
       ntLoadMyAlerts();
       return true;
     }
-    ntToast('⚠️ Alert not set', d.message || 'Please try again.', 'warn');
+    ntToast('Alert not set', d.message || 'Please try again.', 'warn');
   } catch(e){
-    ntToast('⚠️ Alert not set', 'Could not reach the server. Is api.py running?', 'warn');
+    ntToast('Alert not set', 'Could not reach the server. Is api.py running?', 'warn');
   }
   return false;
 }
@@ -4877,7 +4893,7 @@ async function checkAlertsForNotifications(){
     const d = await res.json();
     (d.triggered || []).forEach(a => {
       const word = a.condition_type === 'above' ? 'rose above' : 'fell below';
-      ntNotify('alert_hit', `🎯 ${a.ticker} ${word} $${ntMoney(a.target_price)}`,
+      ntNotify('alert_hit', `${a.ticker} ${word} $${ntMoney(a.target_price)}`,
                `${a.company_name || a.ticker} is now $${ntMoney(a.current_price)} (your target: ${a.condition_type} $${ntMoney(a.target_price)})`,
                {type:'stock', ticker:a.ticker}, {tag:'alert-hit-'+a.id, sticky:true});
     });
@@ -4898,10 +4914,10 @@ async function ntPollFeed(){
   fresh.forEach(n => ntMarkSeen(n.id));
   if(!firstRun && fresh.length){
     if(fresh.length <= 3){
-      fresh.slice().reverse().forEach(n => ntNotify('news', `📰 ${n.title}`, `${n.source || 'Market news'}${n.published ? ' · ' + ntLocalTime(n.published) : ''}`, {type:'url', url:n.url}, {tag:'news-'+n.id}));
+      fresh.slice().reverse().forEach(n => ntNotify('news', `${n.title}`, `${n.source || 'Market news'}${n.published ? ' · ' + ntLocalTime(n.published) : ''}`, {type:'url', url:n.url}, {tag:'news-'+n.id}));
     } else {
       const top = fresh[0];
-      ntNotify('news', `📰 ${fresh.length} new market headlines`, top.title, {type:'url', url:top.url}, {tag:'news-batch'});
+      ntNotify('news', `${fresh.length} new market headlines`, top.title, {type:'url', url:top.url}, {tag:'news-batch'});
     }
   }
 
@@ -4914,12 +4930,12 @@ async function ntPollFeed(){
     const holiday = todays.find(e => e.category === 'holiday');
     const rel = todays.filter(e => e.category !== 'holiday').sort((a,b) => (a.release_ts||0)-(b.release_ts||0));
     if(holiday){
-      ntNotify('event', '📅 US markets closed today', holiday.event.replace(' (Market Closed)',''), {type:'eco'}, {tag:dayKey});
+      ntNotify('event', 'US markets closed today', holiday.event.replace(' (Market Closed)',''), {type:'eco'}, {tag:dayKey});
     }
     if(rel.length){
-      const lines = rel.slice(0,4).map(e => `${ntLocalTime(e.release_ts)} ${e.event}${e.impact==='high'?' ⚠️':''}`);
+      const lines = rel.slice(0,4).map(e => `${ntLocalTime(e.release_ts)} ${e.event}${e.impact==='high'?' ':''}`);
       const more = rel.length > 4 ? ` +${rel.length-4} more` : '';
-      ntNotify('event', `📅 Today: ${rel.length} economic event${rel.length>1?'s':''}`, lines.join(' · ') + more, {type:'eco'}, {tag:dayKey});
+      ntNotify('event', `Today: ${rel.length} economic event${rel.length>1?'s':''}`, lines.join(' · ') + more, {type:'eco'}, {tag:dayKey});
     }
   }
   ntEventResults(firstRun);
@@ -4934,7 +4950,7 @@ function ntEventResults(silent){
     if(ntIsSeen(key)) return;
     ntMarkSeen(key);
     if(silent) return;
-    ntNotify('result', `📊 ${e.event}: ${e.actual}`, e.previous ? `Previous: ${e.previous}` : 'Result just released', {type:'eco'}, {tag:key});
+    ntNotify('result', `${e.event}: ${e.actual}`, e.previous ? `Previous: ${e.previous}` : 'Result just released', {type:'eco'}, {tag:key});
   });
 }
 
@@ -4947,13 +4963,13 @@ function ntEventReminders(){
     const key = 'soon-' + e.id;
     if(left > 0 && left <= 15*60 && !ntIsSeen(key)){
       ntMarkSeen(key);
-      ntNotify('event', `⏰ In ${Math.max(1, Math.round(left/60))} min: ${e.event}`,
+      ntNotify('event', `In ${Math.max(1, Math.round(left/60))} min: ${e.event}`,
                `Released at ${ntLocalTime(e.release_ts)}${e.previous ? ' · previous ' + e.previous : ''}`, {type:'eco'}, {tag:key});
     }
   });
 }
 
-// ─── 🔔 Bell panel ──────────────────────────────────────────
+// ─── Bell panel ──────────────────────────────────────────
 function ntToggleBell(ev){
   if(ev) ev.stopPropagation();
   const p = document.getElementById('nt-panel');
@@ -5002,25 +5018,25 @@ function ntRenderPermission(){
   if(!el) return;
   const p = ntPermission();
   if(p === 'granted'){
-    el.innerHTML = '🖥️ Desktop notifications are <b style="color:var(--green)">ON</b> <button class="nt-btn" onclick="ntTest(event)">Send test</button>';
+    el.innerHTML = 'Desktop notifications are <b style="color:var(--green)">ON</b> <button class="nt-btn" onclick="ntTest(event)">Send test</button>';
   } else if(p === 'denied'){
-    el.innerHTML = '🖥️ Desktop notifications are <b style="color:var(--red)">blocked</b>. Click the 🔒 icon left of the address bar → Notifications → Allow, then reload. (You will still get pop-ups inside the dashboard.)';
+    el.innerHTML = 'Desktop notifications are <b style="color:var(--red)">blocked</b>. Click the lock icon left of the address bar → Notifications → Allow, then reload. (You will still get pop-ups inside the dashboard.)';
   } else if(p === 'unsupported'){
     el.innerHTML = 'This browser does not support desktop notifications. Pop-ups inside the dashboard are used instead.';
   } else {
-    el.innerHTML = '🖥️ Desktop notifications are off <button class="nt-btn" onclick="ntEnable(event)">Turn on</button>';
+    el.innerHTML = 'Desktop notifications are off <button class="nt-btn" onclick="ntEnable(event)">Turn on</button>';
   }
 }
 function ntEnable(ev){
   if(ev) ev.stopPropagation();
   try {
     const p = Notification.requestPermission(ntRenderPermission);
-    if(p && p.then) p.then(perm => { ntRenderPermission(); if(perm === 'granted') ntNotify('info', '✅ Desktop notifications are on', 'You will get price alerts, important market news and economic events here.'); });
+    if(p && p.then) p.then(perm => { ntRenderPermission(); if(perm === 'granted') ntNotify('info', 'Desktop notifications are on', 'You will get price alerts, important market news and economic events here.'); });
   } catch(e){}
 }
 function ntTest(ev){
   if(ev) ev.stopPropagation();
-  ntNotify('info', '🔔 Test notification', 'Desktop notifications are working.', null, {tag:'nt-test'});
+  ntNotify('info', 'Test notification', 'Desktop notifications are working.', null, {tag:'nt-test'});
 }
 
 async function ntLoadMyAlerts(){
@@ -5028,7 +5044,7 @@ async function ntLoadMyAlerts(){
   if(!el) return;
   const d = await api('/api/alerts');
   const all = d?.alerts || [];
-  if(!all.length){ el.innerHTML = '<div class="nt-empty">No price alerts yet.<br>Open any stock and use <b>Set Price Alert 🔔</b> under the chart.</div>'; return; }
+  if(!all.length){ el.innerHTML = '<div class="nt-empty">No price alerts yet.<br>Open any stock and use <b>Set Price Alert</b> under the chart.</div>'; return; }
   const active = all.filter(a => !a.triggered), done = all.filter(a => a.triggered).slice(0,10);
   const row = a => `
     <div class="nt-alert ${a.triggered ? 'done' : ''}">
@@ -5038,7 +5054,7 @@ async function ntLoadMyAlerts(){
             ? `Reached at $${ntMoney(a.triggered_price)}${a.triggered_at ? ' · ' + ntEsc(a.triggered_at.slice(0,16)) : ''}`
             : `Now $${ntMoney(a.current_price)}${a.distance_pct != null ? ` · ${Math.abs(a.distance_pct).toFixed(1)}% to go` : ''}`}</div>
       </div>
-      <button class="alert-item-del" title="Delete" onclick="deleteAlert(${a.id})">🗑</button>
+      <button class="alert-item-del" title="Delete" onclick="deleteAlert(${a.id})">${LI.trash}</button>
     </div>`;
   el.innerHTML = (active.length ? `<div class="nt-sec">Active (${active.length})</div>` + active.map(row).join('') : '<div class="nt-empty" style="padding:12px">No active alerts.</div>')
                + (done.length ? `<div class="nt-sec">Reached</div>` + done.map(row).join('') : '');
@@ -5128,7 +5144,7 @@ function toggleBounty(){
 function showBountyGreeting(){
   const h = new Date().getHours();
   const greet = h<12?'Good morning':h<17?'Good afternoon':'Good evening';
-  addBountyMsg('ai', `${greet}! 👋 I'm **Bounty**, your AI finance assistant.\n\nI can help you with:\n• 📈 Stock analysis and recommendations\n• 🏗️ Commodity prices and trends\n• 💼 Portfolio advice and strategy\n• 🌍 US market insights and news\n• 📚 Financial concepts explained simply\n\nWhat would you like to know today?`);
+  addBountyMsg('ai', `${greet}! I'm **Bounty**, your AI finance assistant.\n\nI can help you with:\n• Stock analysis and recommendations\n• Commodity prices and trends\n• Portfolio advice and strategy\n• US market insights and news\n• Financial concepts explained simply\n\nWhat would you like to know today?`);
 }
 
 function autoBountyResize(el){
@@ -5164,18 +5180,18 @@ function addBountyMsg(role, text, stocks=[], msgId=null){
   }
 
   const actionBtns = role === 'user'
-    ? `<button class="b-act" onclick="editBountyMsg('${id}')">✏️ Edit</button>
-       <button class="b-act" onclick="deleteBountyMsg('${id}')">🗑 Delete</button>
-       <button class="b-act" onclick="copyBountyMsg('${id}')">📋 Copy</button>`
-    : `<button class="b-act" onclick="replyBountyMsg('${id}','${text.substring(0,60).replace(/'/g,"\\'")}')">↩️ Reply</button>
-       <button class="b-act" onclick="copyBountyMsg('${id}')">📋 Copy</button>`;
+    ? `<button class="b-act" onclick="editBountyMsg('${id}')">Edit</button>
+       <button class="b-act" onclick="deleteBountyMsg('${id}')">Delete</button>
+       <button class="b-act" onclick="copyBountyMsg('${id}')">Copy</button>`
+    : `<button class="b-act" onclick="replyBountyMsg('${id}','${text.substring(0,60).replace(/'/g,"\\'")}')">↩ Reply</button>
+       <button class="b-act" onclick="copyBountyMsg('${id}')">Copy</button>`;
 
   const div = document.createElement('div');
   div.className = `bm ${role}`;
   div.id = id;
   div.dataset.text = text;
   div.innerHTML = `
-    <div class="bm-av">${role==='ai'?'🤖':'👤'}</div>
+    <div class="bm-av">${role==='ai'?LI.chat:LI.user}</div>
     <div class="bm-body">
       <div class="bm-bubble" id="${id}-bubble">${formatted}${stocksHtml}</div>
       <div class="bm-time">${now}</div>
@@ -5192,7 +5208,7 @@ function addBountyTyping(){
   const div = document.createElement('div');
   div.className = 'bm ai';
   div.id = 'bounty-typing';
-  div.innerHTML = `<div class="bm-av">🤖</div><div class="b-typing"><span></span><span></span><span></span></div>`;
+  div.innerHTML = `<div class="bm-av">${LI.chat}</div><div class="b-typing"><span></span><span></span><span></span></div>`;
   msgs.appendChild(div);
   msgs.scrollTop = msgs.scrollHeight;
 }
@@ -5256,7 +5272,7 @@ async function sendBounty(){
 
   } catch(e){
     removeBountyTyping();
-    addBountyMsg('ai', "Sorry, I'm having trouble connecting right now. Please try again in a moment. 🙏");
+    addBountyMsg('ai', "Sorry, I'm having trouble connecting right now. Please try again in a moment. ");
   }
 }
 
@@ -5270,13 +5286,13 @@ function editBountyMsg(id){
   input.focus();
   autoBountyResize(input);
   document.getElementById('b-edit-bar').style.display = 'flex';
-  document.getElementById('bounty-send').textContent = 'Update ✓';
+  document.getElementById('bounty-send').textContent = 'Update';
 }
 
 function cancelEdit(){
   bountyEditId = null;
   document.getElementById('b-edit-bar').style.display = 'none';
-  document.getElementById('bounty-send').textContent = 'Send ➤';
+  document.getElementById('bounty-send').textContent = 'Send';
   document.getElementById('bounty-input').value = '';
   document.getElementById('bounty-input').style.height = 'auto';
 }
@@ -5292,14 +5308,14 @@ function copyBountyMsg(id){
   const text = el.dataset.text || el.querySelector('.bm-bubble')?.innerText || '';
   navigator.clipboard.writeText(text).then(()=>{
     const btn = el.querySelector('.b-act');
-    if(btn){ const orig = btn.textContent; btn.textContent = '✅ Copied'; setTimeout(()=>btn.textContent=orig, 1500); }
+    if(btn){ const orig = btn.textContent; btn.textContent = 'Copied'; setTimeout(()=>btn.textContent=orig, 1500); }
   });
 }
 
 function replyBountyMsg(id, preview){
   bountyReplyTo = preview;
   document.getElementById('b-reply-bar').style.display = 'block';
-  document.getElementById('b-reply-text').textContent = '↩️ Replying to: ' + preview;
+  document.getElementById('b-reply-text').textContent = '↩ Replying to: ' + preview;
   document.getElementById('bounty-input').focus();
 }
 
@@ -5353,7 +5369,7 @@ setTimeout(()=>{ if(!bountyOpen) document.getElementById('bounty-badge').style.d
 .nt-toast-x{position:absolute;top:6px;right:8px;background:none;border:none;color:var(--t3);font-size:16px;cursor:pointer;}
 </style>
 <div id="nt-panel" onclick="event.stopPropagation()">
-  <div class="nt-head"><h3>🔔 Notifications</h3><button class="alert-item-del" style="color:var(--t3)" onclick="ntCloseBell()">✕</button></div>
+  <div class="nt-head"><h3>Notifications</h3><button class="alert-item-del" style="color:var(--t3)" onclick="ntCloseBell()">✕</button></div>
   <div class="nt-tabs">
     <button class="nt-tab on" data-tab="notifs" onclick="ntSetTab('notifs')">Recent</button>
     <button class="nt-tab" data-tab="alerts" onclick="ntSetTab('alerts')">My Price Alerts</button>
