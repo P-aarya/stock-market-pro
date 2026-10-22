@@ -21,6 +21,7 @@ const PERIOD = (o = {}) => ({ status: 'success', ticker: 'NVDA', dates: ['2024-0
     trading_days: 63, starts_late: false, ends_early: false, benchmark_change_pct: 4.56, difference_pp: 32.17, ...(o.stats || {}) }, ...o, ...(o.stats ? { stats: { ...PERIOD().stats, ...o.stats } } : {}) });
 const std = (url) => url.includes('/price-range') ? ok(RANGE) : url.includes('/period?') ? ok(PERIOD()) : ok({}, 404);
 const open = async (e) => { await e.run("initPeriodBar('NVDA')"); };
+const lastPeriod = (e) => e.requests.filter(u => u.includes('/period?')).pop();   // the big-move markers are a separate request
 
 (async () => {
   const { t, done } = suite('Performance period (under the prediction chart)');
@@ -59,7 +60,7 @@ const open = async (e) => { await e.run("initPeriodBar('NVDA')"); };
     const e = env((u) => (u.includes('/price-range') ? ok({ ...RANGE, first_date: '2005-08-10' }) : std(u))); await open(e);      // listed in August 2005
     e.els['period-year'].value = '2005'; await e.run('periodYearChanged()');
     const q05 = e.els['period-quarter'].innerHTML; assert(q05.includes('value="Q1" disabled') && q05.includes('value="Q2" disabled') && !q05.includes('value="Q3" disabled') && !q05.includes('value="Q4" disabled'));
-    assert.equal(e.els['period-quarter'].disabled, false); assert(e.requests[e.requests.length - 1].endsWith('/period?start=2005-01-01&end=2005-12-31'));
+    assert.equal(e.els['period-quarter'].disabled, false); assert(lastPeriod(e).endsWith('/period?start=2005-01-01&end=2005-12-31'));
     const thisYear = new Date().getFullYear(); e.els['period-year'].value = String(thisYear); await e.run('periodYearChanged()');
     const month = new Date().getMonth() + 1; const qNow = Math.ceil(month / 3), qCurrent = e.els['period-quarter'].innerHTML;
     for (let n = 1; n <= 4; n++) assert.equal(qCurrent.includes(`value="Q${n}" disabled`), n > qNow, `Q${n}`);
@@ -67,8 +68,8 @@ const open = async (e) => { await e.run("initPeriodBar('NVDA')"); };
 
   await t('Choosing a quarter requests exactly that quarter', async () => {
     const e = env(std); await open(e); e.els['period-year'].value = '2024'; await e.run('periodYearChanged()');
-    e.els['period-quarter'].value = 'Q2'; await e.run('periodQuarterChanged()'); assert(e.requests[e.requests.length - 1].endsWith('/period?start=2024-04-01&end=2024-06-30'));
-    e.els['period-quarter'].value = ''; await e.run('periodQuarterChanged()'); assert(e.requests[e.requests.length - 1].endsWith('start=2024-01-01&end=2024-12-31'));
+    e.els['period-quarter'].value = 'Q2'; await e.run('periodQuarterChanged()'); assert(lastPeriod(e).endsWith('/period?start=2024-04-01&end=2024-06-30'));
+    e.els['period-quarter'].value = ''; await e.run('periodQuarterChanged()'); assert(lastPeriod(e).endsWith('start=2024-01-01&end=2024-12-31'));
   });
 
   await t('The period view shows the change, the comparison, eight stat cards, a two-line chart, and hides the forecast', async () => {
@@ -88,7 +89,7 @@ const open = async (e) => { await e.run("initPeriodBar('NVDA')"); };
 
   await t('Quick buttons highlight the active one; Back restores the forecast and clears everything', async () => {
     const e = env(std); await open(e); await e.run("periodQuick('5Y')");
-    assert(e.requests[e.requests.length - 1].includes('/period?start=')); assert(e.quick.find(b => b.dataset.quick === '5Y').classList.s.has('on') && !e.quick.find(b => b.dataset.quick === '1Y').classList.s.has('on'));
+    assert(lastPeriod(e).includes('/period?start=')); assert(e.quick.find(b => b.dataset.quick === '5Y').classList.s.has('on') && !e.quick.find(b => b.dataset.quick === '1Y').classList.s.has('on'));
     e.run('backToForecast()'); assert.equal(e.els['pred-wrap'].style.display, ''); assert.equal(e.els['pred-period-view'].style.display, 'none'); assert.equal(e.els['pred-period-view'].innerHTML, ''); assert.equal(e.els['period-back'].style.display, 'none'); assert(!e.charts['period-c']);
     assert(e.quick.every(b => !b.classList.s.has('on')));
   });
@@ -97,7 +98,7 @@ const open = async (e) => { await e.run("initPeriodBar('NVDA')"); };
     const e = env(std); await open(e); const before = e.requests.length;
     e.run('periodApplyCustom()'); assert(e.els['period-msg'].textContent.includes('both a start and an end')); e.els['period-from'].value = '2024-05-01'; e.els['period-to'].value = '2024-04-01'; e.run('periodApplyCustom()');
     assert(e.els['period-msg'].textContent.includes('must be before')); assert.equal(e.requests.length, before);
-    e.els['period-to'].value = '2024-05-31'; await e.run('periodApplyCustom()'); assert(e.requests[e.requests.length - 1].endsWith('start=2024-05-01&end=2024-05-31')); assert.equal(e.els['period-msg'].textContent, '');
+    e.els['period-to'].value = '2024-05-31'; await e.run('periodApplyCustom()'); assert(lastPeriod(e).endsWith('start=2024-05-01&end=2024-05-31')); assert.equal(e.els['period-msg'].textContent, '');
   });
 
   await t('A refused period shows the server\'s own explanation and returns to the forecast, not a blank chart', async () => {
@@ -120,6 +121,30 @@ const open = async (e) => { await e.run("initPeriodBar('NVDA')"); };
     const e = env(std); await open(e); await e.run("applyPeriod({start:'2024-01-01',end:'2024-12-31',partial:false,label:'<img src=x onerror=1>'})");
     assert(!e.els['pred-period-view'].innerHTML.includes('<img') && e.els['pred-period-view'].innerHTML.includes('&lt;img'));
     e.run('resetPeriodBar()'); assert.equal(e.els['period-bar'].style.display, 'none'); assert.equal(e.els['pred-period-view'].innerHTML, ''); assert(!e.charts['period-c']);
+  });
+
+  await t('Big moves get a marker at the nearest chart point, with the move, earnings, market and headline in the tooltip', async () => {
+    const SP = { status: 'success', spikes: [
+      { date: '2024-04-02', change_pct: 8.42, market_change_pct: -0.6, driver: 'Stock-specific - it moved against the market (S&P 500 -0.6% that day)', earnings: true, reason: 'Chipmaker beats estimates', reason_source: 'Reuters' },
+      { date: '2024-06-27', change_pct: -5.1, market_change_pct: -2.2, driver: 'Market-wide move - the S&P 500 was -2.2% that day', earnings: false, reason: null } ] };
+    const e = env((u) => u.includes('/price-range') ? ok(RANGE) : u.includes('/period-spikes?') ? ok(SP) : u.includes('/period?') ? ok(PERIOD()) : ok({}, 404));
+    await open(e); await e.run("applyPeriod({start:'2024-04-01',end:'2024-06-30',partial:false,label:'Q2 2024'})"); await new Promise(r => setTimeout(r, 5));
+    assert(e.requests.some(u => u === '/api/stocks/NVDA/period-spikes?start=2024-04-01&end=2024-06-30'));
+    const ds = e.charts['period-c'].cfg.data.datasets.find(x => x.spikes); assert(ds, 'spike markers added');
+    assert.deepEqual(Array.from(ds.data), [null, 91, 123.2]);                      // 2024-04-02 is a chart point; 2024-06-27 snaps to the nearest one (06-28)
+    const up = e.run('periodSpikeLines').call(null, ds.spikes[1]).join('\n'); const down = e.run('periodSpikeLines').call(null, ds.spikes[2]).join('\n');
+    assert(up.includes('+8.42%') && up.includes('Earnings') && up.includes('against the market') && up.includes('Chipmaker beats estimates (Reuters)'));
+    assert(down.includes('-5.10%') && down.includes('Market-wide') && down.includes('No headline found') && !down.includes('Earnings'));
+    const label = e.charts['period-c'].cfg.options.plugins.tooltip.callbacks.label; assert(Array.isArray(label({ dataset: ds, dataIndex: 1 })));
+  });
+
+  await t('Big moves for an old choice, or a failed request, never touch the chart on screen', async () => {
+    let release; const gate = new Promise(r => { release = r; });
+    const SP = { status: 'success', spikes: [{ date: '2024-04-02', change_pct: 8, driver: '', earnings: false, reason: null }] };
+    const e = env(async (u) => { if (u.includes('/price-range')) return ok(RANGE); if (u.includes('/period-spikes?') && u.includes('2023')) { await gate; return ok(SP); } if (u.includes('/period-spikes?')) return ok({}, 500); return ok(PERIOD()); });
+    await open(e); await e.run("applyPeriod({start:'2023-01-01',end:'2023-12-31',partial:false,label:'2023'})");
+    await e.run("applyPeriod({start:'2024-01-01',end:'2024-12-31',partial:false,label:'2024'})"); release(); await new Promise(r => setTimeout(r, 5));
+    assert(!e.charts['period-c'].cfg.data.datasets.some(x => x.spikes));
   });
 
   done();

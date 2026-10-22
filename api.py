@@ -1897,6 +1897,114 @@ def stock_period_performance(ticker: str = Path(pattern=r"^[A-Za-z0-9.\-^=]{1,10
         return agent_error(500, "Something went wrong loading the price history.")
 
 
+
+# Big one-day moves inside a chosen period, each with what happened: the S&P 500 that day, whether it was an
+# earnings day, and the closest headline. Yahoo only has recent news, so older days use a dated Google News search.
+_SPIKE_NAME_RE = re.compile(r"[,.]?\s+(inc|incorporated|corp|corporation|co|company|ltd|limited|plc|holdings?|group|sa|nv|ag|se)\.?$", re.I)
+
+
+def _spike_company(ticker):
+    try:
+        rows = query("SELECT company_name FROM stocks_live WHERE ticker=%s LIMIT 1", [ticker])
+        name = (rows[0].get("company_name") if rows else "") or ""
+    except Exception:
+        name = ""
+    for _ in range(2):
+        name = _SPIKE_NAME_RE.sub("", name.strip())
+    return name.strip()
+
+
+def _spike_earnings_days(ticker):
+    """Past earnings dates (YYYY-MM-DD) from Yahoo, cached for a day. Empty if Yahoo has none."""
+    key = "earndays:" + ticker
+    hit = _NEWS_CACHE.get(key)
+    if hit and time.time() - hit[0] < 86400:
+        return hit[1]
+    days = set()
+    try:
+        df = yf.Ticker(ticker).get_earnings_dates(limit=60)
+        if df is not None:
+            days = {str(ix)[:10] for ix in df.index}
+    except Exception:
+        days = set()
+    _NEWS_CACHE[key] = (time.time(), days)
+    return days
+
+
+def _spike_headline(ticker, name, day):
+    """Closest headline to `day` (YYYY-MM-DD) from a Google News search limited to the days around it."""
+    d0 = datetime.strptime(day, "%Y-%m-%d")
+    after = datetime.fromtimestamp(d0.timestamp() - 2 * 86400).strftime("%Y-%m-%d")
+    before = datetime.fromtimestamp(d0.timestamp() + 2 * 86400).strftime("%Y-%m-%d")
+    who = f'({ticker} OR "{name}")' if name and name.upper() != ticker else ticker
+    q = urllib.parse.quote(f"{who} stock after:{after} before:{before}")
+    items = _nu_fetch_feed(f"https://news.google.com/rss/search?q={q}&hl=en-US&gl=US&ceid=US:en",
+                           "Google News", "markets", 8)
+    if not items:
+        return None
+    target = d0.timestamp() + 12 * 3600
+    items.sort(key=lambda a: abs(float(a.get("published") or target) - target))
+    a = items[0]
+    title = _nu_re.sub(r"\s+-\s+[^-]{2,60}$", "", a["title"]).strip() or a["title"]
+    return {"reason": title, "reason_url": a.get("url"), "reason_source": a.get("source")}
+
+
+@app.get("/api/stocks/{ticker}/period-spikes")
+def stock_period_spikes(ticker: str = Path(pattern=r"^[A-Za-z0-9.\-^=]{1,10}$"), start: Date = Query(...), end: Date = Query(...)):
+    """The biggest one-day moves in a period (for the markers on the Performance period chart)."""
+    t = ticker.upper()
+    if not _tracked_stock(t):
+        return agent_error(404, f"{t} isn't in our database.")
+    try:
+        start, end = stock_period.validate_dates(start, end)
+    except stock_period.PeriodError as e:
+        return agent_error(e.status, e.message)
+    key = f"pspikes:{t}:{start}:{end}"
+    hit = _NEWS_CACHE.get(key)
+    if hit and time.time() - hit[0] < 6 * 3600:
+        return hit[1]
+    try:
+        closes = stock_period.full_history(t)
+        try:
+            bench = stock_period.full_history(stock_period.BENCHMARK)
+        except Exception:
+            bench = None
+        spikes = stock_period.find_spikes(closes, bench, start, end)
+        if spikes:
+            earn = _spike_earnings_days(t)
+            for sp in spikes:
+                d = datetime.strptime(sp["date"], "%Y-%m-%d")
+                near = {datetime.fromtimestamp(d.timestamp() - k * 86400).strftime("%Y-%m-%d") for k in range(0, 4)}
+                sp["earnings"] = bool(earn & near)      # results usually come out the evening before the move
+                sp["reason"] = sp["reason_url"] = sp["reason_source"] = None
+            # recent days: today's news feed; older days: dated search
+            recent = []
+            if any((datetime.now() - datetime.strptime(sp["date"], "%Y-%m-%d")).days <= 7 for sp in spikes):
+                recent = _fetch_news(t, 20) or []
+            for sp in spikes:
+                st = datetime.strptime(sp["date"], "%Y-%m-%d").timestamp() + 12 * 3600
+                best, delta = None, 2 * 86400
+                for a in recent:
+                    if a.get("published") and abs(float(a["published"]) - st) < delta:
+                        best, delta = a, abs(float(a["published"]) - st)
+                if best:
+                    sp["reason"], sp["reason_url"], sp["reason_source"] = best["title"], best.get("url"), best.get("source")
+            todo = [sp for sp in spikes if not sp["reason"]]
+            if todo:
+                name = _spike_company(t)
+                with _NuPool(max_workers=6) as pool:
+                    for sp, res in zip(todo, pool.map(lambda x: _spike_headline(t, name, x["date"]), todo)):
+                        if res:
+                            sp.update(res)
+        out = {"status": "success", "ticker": t, "spikes": spikes}
+        _NEWS_CACHE[key] = (time.time(), out)
+        return out
+    except stock_period.PeriodError as e:
+        return agent_error(e.status, e.message)
+    except Exception:
+        log.exception("Period spikes failed")
+        return agent_error(500, "Something went wrong finding the big moves.")
+
 def _parse_compare_tickers(tickers: str):
     parts = [t.strip() for t in tickers.split(",") if t.strip()]
     valid = _valid_tickers(parts)

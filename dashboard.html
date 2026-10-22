@@ -103,6 +103,7 @@ body{background:var(--bg0);color:var(--t1);font-family:var(--sans);min-height:10
 #page-market td.sym{white-space:nowrap;}
 #page-market .disclaimer{background:var(--bg2)!important;border-color:var(--b1)!important;color:var(--t3)!important;}
 #page-market #heatmap-wrap{flex:1 1 auto;grid-auto-rows:1fr;} /* tiles stretch to fill the card - no blank space */
+.txrow{align-items:stretch;} /* Transactions: cards in a row share one height, no gaps */
 .g31{display:grid;grid-template-columns:3fr 1fr;gap:12px;margin-bottom:16px;align-items:start;}
 
 .sc{background:var(--bg2);border:1px solid var(--b1);border-radius:11px;padding:11px 16px;border-top:2px solid var(--sc-t,var(--blue));
@@ -606,12 +607,12 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     <!-- Economic Calendar Tab -->
     <div id="eco-tab-content" style="display:none">
       <!-- Impact legend -->
-      <div style="display:flex;gap:16px;padding:8px 0 8px;flex-wrap:wrap;border-bottom:1px solid var(--b2);margin-bottom:10px">
-        <span style="font-size:10px;color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:.5px;align-self:center">Impact:</span>
-        <span style="font-size:11px;font-weight:700;color:#ff4d4d;"><span class="idot"></span>High — Major mover</span>
-        <span style="font-size:11px;font-weight:700;color:#c9cdd8;"><span class="idot"></span>Medium</span>
-        <span style="font-size:11px;font-weight:700;color:#00c87a;"><span class="idot"></span>Low</span>
-        <span style="font-size:10px;color:var(--t3);margin-left:auto;align-self:center">Click any event for details</span>
+      <div class="eco-legend">
+        <span class="eco-k">Impact</span>
+        <span class="eco-imp high"><span class="idot"></span>High</span>
+        <span class="eco-imp med"><span class="idot"></span>Medium</span>
+        <span class="eco-imp low"><span class="idot"></span>Low</span>
+        <span class="eco-hint">Click any event for details</span>
       </div>
       <!-- Month tabs -->
       <div id="eco-month-tabs" style="display:flex;gap:4px;margin-bottom:12px;flex-wrap:wrap"></div>
@@ -619,16 +620,6 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <div id="eco-calendar-body"><div class="load"><div class="spin"></div>Loading economic events...</div></div>
     </div>
   </div>
-
-  <!-- Upcoming IPOs (summary; full calendar is on the IPOs tab) -->
-  <div class="card" style="margin-bottom:16px">
-    <div class="chdr">
-      <div class="ctitle">Upcoming IPOs</div>
-      <button class="linkbtn" onclick="showPage('ipos',document.getElementById('ntab-ipos'))">See full calendar →</button>
-    </div>
-    <div id="ipo-mini"><div class="load"><div class="spin"></div>Loading...</div></div>
-  </div>
-
 
   <!-- World Finance News -->
   <div class="card" style="margin-bottom:16px">
@@ -777,15 +768,6 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     </div>
   </div>
 
-  <!-- Portfolio vs S&P 500 Benchmark -->
-  <div class="card" style="margin-bottom:16px;" id="benchmark-card">
-    <div class="chdr">
-      <div class="ctitle">Portfolio vs S&P 500 Benchmark</div>
-      <button onclick="loadBenchmark()" style="background:var(--bg3);border:1px solid var(--b2);border-radius:7px;padding:5px 12px;color:var(--cyan);font-size:11px;font-weight:700;cursor:pointer;">Refresh</button>
-    </div>
-    <div id="benchmark-content"><div class="load"><div class="spin"></div>Loading benchmark data...</div></div>
-  </div>
-
   <div class="g2">
     <div class="card"><div class="chdr"><div class="ctitle">Allocation</div></div><div style="height:220px"><canvas id="alloc-c"></canvas></div></div>
     <div class="card chartcard"><div class="chdr"><div class="ctitle">Sector Breakdown</div></div><div id="sec-alloc"><div class="load"><div class="spin"></div></div></div></div>
@@ -828,15 +810,15 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     <div class="sc" style="--sc-t:var(--purple)"><div class="sc-l">Total Sold</div><div class="sc-v p" id="tx-sold">$--</div><div class="sc-s">Sell volume</div></div>
     <div class="sc" style="--sc-t:var(--yellow)"><div class="sc-l">Largest Trade</div><div class="sc-v y" id="tx-big">$--</div><div class="sc-s">Single tx</div></div>
   </div>
-  <div class="g3">
+  <div class="g2 txrow">
     <div class="sc" style="--sc-t:var(--green)"><div class="sc-l">Realized P&L</div><div class="sc-v" id="tx-real">$--</div><div class="sc-s">From sales, average-cost method</div></div>
     <div class="sc" style="--sc-t:var(--cyan)"><div class="sc-l">Dividends received</div><div class="sc-v c" id="tx-div">$--</div><div class="sc-s">All time</div></div>
-    <div class="card"><div class="chdr"><div class="ctitle">Realized by stock</div></div><div id="tx-real-list"><div class="empty">No sales recorded yet.</div></div></div>
   </div>
   <div class="info-note" id="tx-warn" style="display:none;border-left-color:var(--yellow)"></div>
-  <div class="g2">
+  <div class="g3 txrow">
     <div class="card"><div class="chdr"><div class="ctitle">Buy vs Sell</div></div><div style="height:190px"><canvas id="bs-c"></canvas></div></div>
     <div class="card"><div class="chdr"><div class="ctitle">Monthly Volume</div></div><div style="height:190px"><canvas id="txm-c"></canvas></div></div>
+    <div class="card"><div class="chdr"><div class="ctitle">Realized by stock</div></div><div id="tx-real-list"><div class="empty">No sales recorded yet.</div></div></div>
   </div>
   <div class="card" style="margin-bottom:16px">
     <div class="stitle">Transactions</div>
@@ -1119,28 +1101,16 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
             <span id="model-badge" style="font-size:10px;font-weight:700;color:var(--cyan);background:rgba(0,212,255,0.1);padding:3px 10px;border-radius:5px;border:1px solid rgba(0,212,255,0.2)"></span>
           </div>
         </div>
-        <!-- Period buttons -->
-        <div style="display:flex;gap:6px;padding:10px 0 4px;">
-          <button class="fbtn on" onclick="setPredPer(7,this)">7D</button>
-          <button class="fbtn" onclick="setPredPer(30,this)">1M</button>
-          <button class="fbtn" onclick="setPredPer(90,this)">3M</button>
-          <button class="fbtn" onclick="setPredPer(180,this)">6M</button>
-          <button class="fbtn" onclick="setPredPer(365,this)">1Y</button>
-        </div>
-        <div id="pred-wrap" style="height:320px;display:flex;align-items:center;justify-content:center">
-          <div class="load"><div class="spin"></div>Loading predictions...</div>
-        </div>
-        <div id="pred-sent-strip"></div>
         <div id="period-bar" class="period-bar" style="display:none">
           <div class="period-row">
             <span class="period-lbl">Performance period</span>
             <select class="sel" id="period-year" onchange="periodYearChanged()"><option value="">Year…</option></select>
             <select class="sel" id="period-quarter" onchange="periodQuarterChanged()" disabled><option value="">Full year</option></select>
             <span class="period-or">or</span>
-            <input type="date" class="srch" id="period-from" aria-label="From date"/>
+            <input type="date" class="srch" id="period-from" aria-label="From date" oninput="periodDatesChanged()"/>
             <span class="period-or">to</span>
-            <input type="date" class="srch" id="period-to" aria-label="To date"/>
-            <button class="fbtn" id="period-apply" onclick="periodApplyCustom()">Apply</button>
+            <input type="date" class="srch" id="period-to" aria-label="To date" oninput="periodDatesChanged()"/>
+            <button class="fbtn" id="period-apply" onclick="periodApplyCustom()" disabled>Apply</button>
           </div>
           <div class="period-row">
             <span class="period-lbl">Quick</span>
@@ -1150,13 +1120,25 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
             <button class="fbtn" data-quick="5Y" onclick="periodQuick('5Y')">5Y</button>
             <button class="fbtn" data-quick="10Y" onclick="periodQuick('10Y')">10Y</button>
             <button class="fbtn" data-quick="MAX" onclick="periodQuick('MAX')">Max</button>
-            <button class="linkbtn" id="period-back" style="display:none;margin-left:auto" onclick="backToForecast()">↩ Back to forecast</button>
+            <button class="linkbtn" id="period-back" style="display:none" onclick="backToForecast(true)">↩ Back to forecast</button>
           </div>
           <div id="period-msg" style="font-size:12px;font-weight:700;color:var(--red);min-height:0"></div>
         </div>
+        <!-- Forecast range buttons: they control the forecast chart only, so they hide while a past period is shown -->
+        <div id="pred-per-btns" class="pred-per-btns">
+          <button class="fbtn on" onclick="setPredPer(7,this)">7D</button>
+          <button class="fbtn" onclick="setPredPer(30,this)">1M</button>
+          <button class="fbtn" onclick="setPredPer(90,this)">3M</button>
+          <button class="fbtn" onclick="setPredPer(180,this)">6M</button>
+          <button class="fbtn" onclick="setPredPer(365,this)">1Y</button>
+        </div>
+        <div id="pred-wrap" style="height:320px;display:flex;align-items:center;justify-content:center">
+          <div class="load"><div class="spin"></div>Loading predictions...</div>
+        </div>
         <div id="pred-period-view" style="display:none"></div>
+        <div id="pred-sent-strip"></div>
         <div id="pred-targets" class="intgrid" style="margin-top:16px"></div>
-        <div class="info-note" style="margin-top:12px">Treat these as rough guides. In backtests on 59 large stocks the model's up/down calls were about as accurate as a coin flip, so its targets are pulled toward "no change". <b>Hit rate</b> is how often the model called direction correctly on held-out history, not a probability. Horizons are trading days (7 ≈ 1.5 weeks, 30 ≈ 6 weeks, 90 ≈ 4 months).</div>
+        <div class="info-note" id="pred-note" style="margin-top:12px">Treat these as rough guides. In backtests on 59 large stocks the model's up/down calls were about as accurate as a coin flip, so its targets are pulled toward "no change". <b>Hit rate</b> is how often the model called direction correctly on held-out history, not a probability. Horizons are trading days (7 ≈ 1.5 weeks, 30 ≈ 6 weeks, 90 ≈ 4 months).</div>
       </div>
       <div class="fcpair">
         <div class="intbox" id="fs-int"></div>
@@ -1332,7 +1314,7 @@ function showPage(n,btn){
   document.getElementById('page-'+n).classList.add('on');
   btn.classList.add('on');
   if(typeof window!=='undefined'&&window.scrollTo)window.scrollTo(0,0);   // a new tab starts at the top, not where the last one was scrolled
-  if(n==='portfolio'){loadPortfolio();loadBenchmark();}
+  if(n==='portfolio')loadPortfolio();
   if(n==='transactions')loadTx();
   if(n==='commodities'){loadCommodities();loadMacro();loadComCo();}
   if(n==='watchlist')loadWatchlist();
@@ -2108,7 +2090,25 @@ function resetPeriodBar(){
   periodState.seq++;periodState.active=false;
   const bar=document.getElementById('period-bar');if(bar)bar.style.display='none';
   const view=document.getElementById('pred-period-view');if(view){view.style.display='none';view.innerHTML='';}
-  dc('period-c');
+  dc('period-c');showForecastParts(true);
+  const wrap=document.getElementById('pred-wrap');if(wrap)wrap.style.display='';     // a new stock always starts on its forecast
+  const back=document.getElementById('period-back');if(back)back.style.display='none';
+  markPeriodButton(null);clearPeriodInputs();
+}
+/** Only one way of picking a period is shown at a time: picking one clears the others. */
+function clearPeriodInputs(keep){
+  const y=document.getElementById('period-year'),q=document.getElementById('period-quarter');
+  const f=document.getElementById('period-from'),t=document.getElementById('period-to'),a=document.getElementById('period-apply');
+  if(keep!=='year'){if(y)y.value='';if(q){q.innerHTML='<option value="">Full year</option>';q.value='';q.disabled=true;}}
+  if(keep!=='dates'){if(f)f.value='';if(t)t.value='';if(a)a.disabled=true;}
+}
+function periodDatesChanged(){
+  const f=document.getElementById('period-from').value,t=document.getElementById('period-to').value;
+  document.getElementById('period-apply').disabled=!(f&&t);setPeriodMsg('');
+}
+/** The forecast's own parts (range buttons, sentiment strip, targets, note) hide while a past period is shown in their place. */
+function showForecastParts(show){
+  ['pred-per-btns','pred-sent-strip','pred-targets','pred-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=show?'':'none';});
 }
 function setPeriodMsg(text){const el=document.getElementById('period-msg');if(el)el.textContent=text||'';}
 async function initPeriodBar(ticker){
@@ -2125,7 +2125,7 @@ async function initPeriodBar(ticker){
   document.getElementById('period-year').innerHTML=years;
   const q=document.getElementById('period-quarter');q.innerHTML='<option value="">Full year</option>';q.disabled=true;
   const from=document.getElementById('period-from'),to=document.getElementById('period-to');
-  from.min=to.min=periodState.first;from.max=to.max=todayIso();from.value=to.value='';
+  from.min=to.min=periodState.first;from.max=to.max=todayIso();from.value=to.value='';document.getElementById('period-apply').disabled=true;
   setPeriodMsg('');bar.style.display='flex';
 }
 /** Quarter choices for a year: quarters that haven't started, or ended before the stock's first price, are disabled. */
@@ -2142,6 +2142,7 @@ function periodYearChanged(){
   const year=document.getElementById('period-year').value,q=document.getElementById('period-quarter');
   q.innerHTML=year?buildQuarterOptions(year):'<option value="">Full year</option>';q.disabled=!year;
   if(!year){return;}
+  clearPeriodInputs('year');
   applyPeriod(periodRange(year,'',todayIso()));
 }
 function periodQuarterChanged(){
@@ -2152,10 +2153,11 @@ function periodApplyCustom(){
   const from=document.getElementById('period-from').value,to=document.getElementById('period-to').value;
   if(!from||!to){setPeriodMsg('Pick both a start and an end date.');return;}
   if(from>=to){setPeriodMsg('The start date must be before the end date.');return;}
+  clearPeriodInputs('dates');
   applyPeriod({start:from,end:to,partial:false,label:`${from} to ${to}`});
 }
 function periodQuick(kind){
-  const r=quickRange(kind,todayIso(),periodState.first);if(r)applyPeriod(r,kind);
+  const r=quickRange(kind,todayIso(),periodState.first);if(r){clearPeriodInputs();applyPeriod(r,kind);}
 }
 /** The request helper that keeps the server's own wording when something is wrong. */
 async function periodFetch(path){
@@ -2175,18 +2177,19 @@ async function applyPeriod(range,quickKind){
   setPeriodMsg('');markPeriodButton(quickKind||null);
   const seq=++periodState.seq,ticker=periodState.ticker;
   const view=document.getElementById('pred-period-view'),wrap=document.getElementById('pred-wrap');
-  wrap.style.display='none';view.style.display='block';periodState.active=true;
+  wrap.style.display='none';view.style.display='block';periodState.active=true;showForecastParts(false);
   document.getElementById('period-back').style.display='inline';
   view.innerHTML='<div class="load"><div class="spin"></div>Loading '+escapeHtml(range.label)+'...</div>';
   const res=await periodFetch(`/api/stocks/${encodeURIComponent(ticker)}/period?start=${range.start}&end=${range.end}`);
   if(seq!==periodState.seq||curTick!==ticker)return;                    // a newer choice (or another stock) took over
   if(!res.ok){backToForecast();setPeriodMsg(res.message);return;}      // show the forecast again rather than a blank chart
   renderPeriodView(res.data,range);
+  loadPeriodSpikes(ticker,range,res.data,seq);                         // markers for the big moves arrive a moment later
 }
-function backToForecast(){
-  periodState.seq++;periodState.active=false;markPeriodButton(null);setPeriodMsg('');
+function backToForecast(clear){
+  periodState.seq++;periodState.active=false;markPeriodButton(null);setPeriodMsg('');if(clear)clearPeriodInputs();
   const view=document.getElementById('pred-period-view');view.style.display='none';view.innerHTML='';dc('period-c');
-  document.getElementById('pred-wrap').style.display='';
+  document.getElementById('pred-wrap').style.display='';showForecastParts(true);
   document.getElementById('period-back').style.display='none';
 }
 function renderPeriodView(d,range){
@@ -2222,8 +2225,43 @@ function renderPeriodView(d,range){
   if(d.benchmark)datasets.push({label:(d.benchmark_name||'S&P 500')+' (from the same starting price)',data:d.benchmark,borderColor:'#ffc800',borderWidth:1.8,borderDash:[6,4],pointRadius:0,tension:0.1});
   if(ctx)charts['period-c']=new Chart(ctx,{type:'line',data:{labels:d.dates,datasets},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
-      plugins:{legend:{labels:{color:'#c0cce0',font:{size:11,weight:'700'}}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+fp(c.raw)}}},
+      plugins:{legend:{labels:{color:'#c0cce0',font:{size:11,weight:'700'}}},
+        tooltip:{filter:item=>item.raw!=null,callbacks:{label:c=>c.dataset.spikes?periodSpikeLines(c.dataset.spikes[c.dataIndex]):c.dataset.label+': '+fp(c.raw)}}},
       scales:{x:{ticks:{color:'#58697a',maxTicksLimit:8},grid:{display:false}},y:{ticks:{color:'#58697a',callback:v=>fp(v)},grid:{color:'rgba(28,28,48,0.5)'}}}}});
+}
+
+/** Tooltip lines for one big move: the move, earnings, market or company, and the headline from around that day. */
+function periodSpikeLines(sp){
+  if(!sp)return '';
+  const wrap=t=>typeof wrapText==='function'?wrapText(t,60):[t];
+  const day=new Date(sp.date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  const lines=[`${sp.change_pct>=0?'▲ +':'▼ '}${f2(sp.change_pct)}% on ${day}`];
+  if(sp.earnings)lines.push('Earnings: results were released around this day');
+  if(sp.driver)wrap(sp.driver).forEach(l=>lines.push(l));
+  if(sp.reason){lines.push('News around this day:');wrap(sp.reason+(sp.reason_source?' ('+sp.reason_source+')':'')).forEach(l=>lines.push('  '+l));}
+  else lines.push('No headline found for this day');
+  return lines;
+}
+/** Adds a marker on the period chart for each big one-day move (they come from a slower request, so they arrive after the chart). */
+async function loadPeriodSpikes(ticker,range,d,seq){
+  const res=await periodFetch(`/api/stocks/${encodeURIComponent(ticker)}/period-spikes?start=${range.start}&end=${range.end}`);
+  if(seq!==periodState.seq||curTick!==ticker||!res.ok)return;           // another period or stock took over, or no data: keep the plain chart
+  const spikes=(res.data&&Array.isArray(res.data.spikes))?res.data.spikes:[];
+  const chart=charts['period-c'];if(!spikes.length||!chart)return;
+  const labels=d.dates||[],n=labels.length;if(!n)return;
+  const t=x=>new Date(x+'T00:00:00').getTime();
+  const data=new Array(n).fill(null),byIdx={},colors=new Array(n).fill('transparent'),rot=new Array(n).fill(0);
+  spikes.forEach(sp=>{
+    let best=0,gap=Infinity;labels.forEach((l,i)=>{const g=Math.abs(t(l)-t(sp.date));if(g<gap){gap=g;best=i;}});   // long periods are thinned out, so use the nearest point
+    if(byIdx[best]&&Math.abs(byIdx[best].change_pct)>=Math.abs(sp.change_pct))return;
+    byIdx[best]=sp;data[best]=d.prices[best];
+    colors[best]=sp.change_pct>=0?'#00e676':'#ff4444';rot[best]=sp.change_pct>=0?0:180;
+  });
+  const cfg=chart.data?chart:chart.cfg;
+  cfg.data.datasets.push({label:'Big move (hover for details)',data,spikes:byIdx,showLine:false,pointStyle:'triangle',rotation:rot,
+    pointRadius:data.map(v=>v==null?0:7),pointHoverRadius:data.map(v=>v==null?0:9),pointBackgroundColor:colors,pointBorderColor:'#0a0a14',pointBorderWidth:1,
+    borderColor:'#ffc800',backgroundColor:'#ffc800',order:-1});
+  if(typeof chart.update==='function')chart.update();
 }
 
 // News sentiment
@@ -2602,16 +2640,18 @@ function renderEcoEvents(){
     return;
   }
 
+  // Impact is shown only by a small coloured tag; names and numbers stay plain white on a dark row so nothing blends.
   const IC = {
-    high:   {dot:'<span class="idot"></span>', color:'#ff4d4d', bg:'rgba(255,77,77,0.07)',   border:'rgba(255,77,77,0.3)',    label:'HIGH'},
-    medium: {dot:'<span class="idot"></span>', color:'#c9cdd8', bg:'rgba(255,255,255,0.04)', border:'rgba(255,255,255,0.2)', label:'MED'},
-    low:    {dot:'<span class="idot"></span>', color:'#00c87a', bg:'rgba(0,200,122,0.06)',   border:'rgba(0,200,122,0.3)',    label:'LOW'},
+    high:   {cls:'high', label:'High'},
+    medium: {cls:'med',  label:'Medium'},
+    low:    {cls:'low',  label:'Low'},
   };
   const RESULT_STYLE = {
-    beat:   {color:'#00c87a', label:'▲ BEAT'},
-    miss:   {color:'#ff4d4d', label:'▼ MISS'},
-    inline: {color:'#ffffff', label:'= IN LINE'},
+    beat:   {cls:'g', label:'Beat'},
+    miss:   {cls:'r', label:'Miss'},
+    inline: {cls:'',  label:'In line'},
   };
+  const val = v => (v==null || v==='') ? '—' : escapeHtml(String(v));
 
   const todayStr = new Date().toISOString().split('T')[0];
   let html = '';
@@ -2620,99 +2660,46 @@ function renderEcoEvents(){
   filtered.forEach((e, idx) => {
     const ic = IC[e.impact] || IC.low;
     const isToday   = e.date === todayStr;
-    const isPast    = e.date < todayStr;
     const isExpanded = (ecoExpandedEvent === idx);
     const hasActual  = e.actual && e.actual !== '—';
     const rs = hasActual && e.result ? RESULT_STYLE[e.result] : null;
 
-    // Date divider
+    // One block per day
     if(e.date !== lastDate){
-      if(lastDate) html += '</div>';   // close previous day block
-      html += '<div style="display:flex;flex-direction:column;gap:4px;min-width:0">';
+      if(lastDate) html += '</div>';
       lastDate = e.date;
       const dateObj = new Date(e.date + 'T12:00:00');
-      const dLabel = dateObj.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
-      html += `<div style="font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;
-                            padding:2px 0 0;${lastDate===todayStr?'color:var(--cyan)':''}">${dLabel}${isToday?' — TODAY':''}</div>`;
+      const dLabel = dateObj.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+      html += `<div class="eco-day${isToday?' today':''}"><div class="eco-dh"><span>${dLabel}</span>${isToday?'<span class="eco-today">Today</span>':''}</div>`;
     }
 
-    // Event row
     html += `
-      <div onclick="toggleEcoEvent(${idx})" style="
-        display:grid;grid-template-columns:58px 1fr auto auto;gap:8px;align-items:center;
-        padding:7px 10px;border-radius:7px;cursor:pointer;min-width:0;
-        background:${isExpanded?'var(--bg3)':ic.bg};
-        border-left:3px solid ${ic.color};
-        opacity:${isPast && !hasActual ? '0.65' : '1'};
-        transition:background .15s,opacity .15s;
-      " onmouseover="if(!${isExpanded})this.style.background='var(--bg3)'"
-         onmouseout="if(!${isExpanded})this.style.background='${ic.bg}'">
-
-        <div style="text-align:center">
-          <div style="font-size:9px;font-weight:800;color:${ic.color};background:rgba(0,0,0,0.2);
-                       border-radius:4px;padding:2px 0;letter-spacing:.3px">${ic.dot} ${ic.label}</div>
-          <div style="font-size:9px;color:var(--t3);margin-top:3px">${e.time}</div>
-        </div>
-
-        <div>
-          <div style="font-size:12px;font-weight:700;color:var(--t1);line-height:1.3">${e.event}</div>
-        </div>
-
-        <div style="text-align:right;min-width:58px">
-          ${hasActual ? `
-            <div style="font-size:8px;color:var(--t3);font-weight:700;margin-bottom:1px">ACTUAL</div>
-            <div style="font-size:12px;font-weight:800;color:${rs?rs.color:'var(--t1)'};font-family:var(--mono)">${e.actual}</div>
-            ${rs ? `<div style="font-size:8px;font-weight:800;color:${rs.color}">${rs.label}</div>` : ''}
-          ` : `
-            <div style="font-size:8px;color:var(--t3);font-weight:700;margin-bottom:1px">FORECAST</div>
-            <div style="font-size:12px;font-weight:700;color:var(--yellow);font-family:var(--mono)">${e.estimate}</div>
-          `}
-        </div>
-
-        <div style="text-align:right;min-width:58px">
-          <div style="font-size:8px;color:var(--t3);font-weight:700;margin-bottom:1px">PREVIOUS</div>
-          <div style="font-size:12px;font-weight:700;color:var(--t2);font-family:var(--mono)">${e.previous}</div>
-        </div>
+      <div class="eco-row${isExpanded?' open':''}" onclick="toggleEcoEvent(${idx})">
+        <div class="eco-when"><span class="eco-imp ${ic.cls}"><span class="idot"></span>${ic.label}</span><span class="eco-time">${val(e.time)}</span></div>
+        <div class="eco-name">${val(e.event)}</div>
+        <div class="eco-num"><span class="eco-k">${hasActual?'Actual':'Forecast'}</span><span class="eco-v">${hasActual?val(e.actual):val(e.estimate)}</span>${rs?`<span class="eco-res ${rs.cls}">${rs.label}</span>`:''}</div>
+        <div class="eco-num"><span class="eco-k">Previous</span><span class="eco-v">${val(e.previous)}</span></div>
       </div>`;
 
-    // Expanded detail panel
     if(isExpanded){
+      const u = e.unit ? ' '+escapeHtml(e.unit) : '';
       html += `
-        <div style="background:var(--bg2);border:1px solid var(--b2);border-radius:7px;
-                     padding:12px 14px;animation:fadeIn .2s ease">
-          <div style="font-size:12px;line-height:1.6;color:var(--t2);margin-bottom:10px">${e.description}</div>
-          <div style="display:flex;gap:20px;flex-wrap:wrap">
-            ${hasActual ? `
-              <div>
-                <div style="font-size:9px;color:var(--t3);font-weight:700;text-transform:uppercase">Actual</div>
-                <div style="font-size:15px;font-weight:900;color:${rs?rs.color:'var(--t1)'};font-family:var(--mono)">${e.actual}${e.unit?' '+e.unit:''}</div>
-              </div>` : ''}
-            <div>
-              <div style="font-size:9px;color:var(--t3);font-weight:700;text-transform:uppercase">Forecast</div>
-              <div style="font-size:15px;font-weight:900;color:var(--yellow);font-family:var(--mono)">${e.estimate}${e.unit?' '+e.unit:''}</div>
-            </div>
-            <div>
-              <div style="font-size:9px;color:var(--t3);font-weight:700;text-transform:uppercase">Previous</div>
-              <div style="font-size:15px;font-weight:900;color:var(--t2);font-family:var(--mono)">${e.previous}${e.unit?' '+e.unit:''}</div>
-            </div>
-            <div>
-              <div style="font-size:9px;color:var(--t3);font-weight:700;text-transform:uppercase">Date & Time</div>
-              <div style="font-size:12px;font-weight:700;color:var(--t1)">${e.date} · ${e.time}</div>
-            </div>
-            ${rs ? `
-              <div>
-                <div style="font-size:9px;color:var(--t3);font-weight:700;text-transform:uppercase">Result</div>
-                <div style="font-size:13px;font-weight:800;color:${rs.color}">${rs.label}</div>
-              </div>` : ''}
+        <div class="eco-detail">
+          <div class="eco-desc">${val(e.description)}</div>
+          <div class="eco-facts">
+            ${hasActual ? `<div><span class="eco-k">Actual</span><span class="eco-v">${val(e.actual)}${u}</span></div>` : ''}
+            <div><span class="eco-k">Forecast</span><span class="eco-v">${val(e.estimate)}${u}</span></div>
+            <div><span class="eco-k">Previous</span><span class="eco-v">${val(e.previous)}${u}</span></div>
+            <div><span class="eco-k">Date &amp; time</span><span class="eco-v">${val(e.date)} · ${val(e.time)}</span></div>
+            ${rs ? `<div><span class="eco-k">Result</span><span class="eco-v ${rs.cls}">${rs.label}</span></div>` : ''}
           </div>
         </div>`;
     }
   });
 
   if(lastDate) html += '</div>';
-  // Compact layout: each day is a small block, days sit side by side (4 across on a wide screen, 1 on a phone)
-  document.getElementById('eco-calendar-body').innerHTML =
-    `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:12px 10px;align-items:start">${html}</div>`;
+  // Each day is a small block; days sit side by side (3-4 across on a wide screen, 1 on a phone)
+  document.getElementById('eco-calendar-body').innerHTML = `<div class="eco-grid">${html}</div>`;
 }
 
 function toggleEcoEvent(idx){
@@ -3541,8 +3528,9 @@ function wrapText(t, n){
 
 function setPredPer(days, btn){
   curPredPer = days;
-  document.querySelectorAll('#fss-intelligence .fbtn').forEach(b=>b.classList.remove('on'));
+  document.querySelectorAll('#pred-per-btns .fbtn').forEach(b=>b.classList.remove('on'));
   if(btn) btn.classList.add('on');
+  if(periodState.active) backToForecast(true);
   if(curPredData) renderPredChart(curPredData, days);
 }
 
@@ -3570,7 +3558,7 @@ function renderPredChart(d, futureDays){
 
   dc('pred-c');
   document.getElementById('pred-wrap').innerHTML='<canvas id="pred-c"></canvas>';
-  document.getElementById('pred-wrap').style.cssText='height:320px;';
+  document.getElementById('pred-wrap').style.cssText='height:320px;'+(periodState.active?'display:none;':'');
 
   const histLabels = filteredHist.map(h=>h.date);
   const lastHistPrice = filteredHist[filteredHist.length-1]?.price;
@@ -3954,8 +3942,8 @@ async function loadPrediction(){
 
   // Render chart with default period (7D)
   curPredPer = 7;
-  document.querySelectorAll('#fss-intelligence .fbtn').forEach(b=>b.classList.remove('on'));
-  document.querySelector('#fss-intelligence .fbtn')?.classList.add('on');
+  document.querySelectorAll('#pred-per-btns .fbtn').forEach(b=>b.classList.remove('on'));
+  document.querySelector('#pred-per-btns .fbtn')?.classList.add('on');
   curPredSpikes = [];
   renderPredChart(d, curPredPer);
 
@@ -5334,10 +5322,44 @@ function loadPortfolioTickers() {
 .b-stock-item .bsi-left .bsi-name{font-size:11px;color:var(--t3);}
 .b-stock-item .bsi-right .bsi-price{font-size:12px;font-weight:700;color:var(--t1);text-align:right;}
 .b-stock-item .bsi-right .bsi-chg{font-size:11px;font-weight:600;text-align:right;}
-/* ── Performance period (under the prediction chart) ── */
-.period-bar{margin-top:14px;padding:12px;background:var(--bg3);border:1px solid var(--b1);border-radius:10px;display:flex;flex-direction:column;gap:10px;}
+/* ── Economic events: plain white text and numbers, impact shown only by a small coloured tag ── */
+.eco-legend{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:4px 0 10px;border-bottom:1px solid var(--b2);margin-bottom:12px;}
+.eco-hint{font-size:10px;color:var(--t3);margin-left:auto;}
+.eco-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:12px;align-items:start;}
+.eco-day{background:var(--bg2);border:1px solid var(--b1);border-radius:10px;overflow:hidden;min-width:0;}
+.eco-dh{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;font-size:11px;font-weight:800;color:var(--t1);text-transform:uppercase;letter-spacing:.6px;background:var(--bg3);border-bottom:1px solid var(--b1);}
+.eco-day.today{border-color:rgba(0,212,255,0.45);}
+.eco-today{font-size:9px;font-weight:800;color:#000;background:var(--cyan);border-radius:4px;padding:2px 6px;letter-spacing:.5px;}
+.eco-row{display:grid;grid-template-columns:64px minmax(0,1fr) 66px 66px;gap:10px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--b1);cursor:pointer;transition:background .15s;}
+.eco-row:last-child{border-bottom:none;}
+.eco-row:hover,.eco-row.open{background:var(--bg3);}
+.eco-when{display:flex;flex-direction:column;gap:4px;align-items:flex-start;}
+.eco-imp{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;padding:2px 6px;border-radius:4px;border:1px solid;background:transparent;white-space:nowrap;}
+.eco-imp .idot{width:6px;height:6px;margin:0;}
+.eco-imp.high{color:#ff4d4d;border-color:rgba(255,77,77,0.45);}
+.eco-imp.med{color:#c9cdd8;border-color:rgba(201,205,216,0.35);}
+.eco-imp.low{color:#00c87a;border-color:rgba(0,200,122,0.45);}
+.eco-time{font-size:10px;font-weight:600;color:var(--t3);font-family:var(--mono);}
+.eco-name{font-size:12px;font-weight:700;color:var(--t1);line-height:1.35;overflow-wrap:anywhere;}
+.eco-num{display:flex;flex-direction:column;align-items:flex-end;gap:1px;min-width:0;}
+.eco-k{font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;}
+.eco-v{font-size:12px;font-weight:800;color:var(--t1);font-family:var(--mono);white-space:nowrap;}
+.eco-res{font-size:9px;font-weight:800;text-transform:uppercase;color:var(--t2);}
+.eco-res.g,.eco-v.g{color:var(--green);}
+.eco-res.r,.eco-v.r{color:var(--red);}
+.eco-detail{padding:10px 12px 12px;background:var(--bg3);border-bottom:1px solid var(--b1);animation:fadeIn .2s ease;}
+.eco-desc{font-size:12px;line-height:1.6;color:var(--t2);margin-bottom:10px;}
+.eco-facts{display:flex;gap:18px;flex-wrap:wrap;}
+.eco-facts>div{display:flex;flex-direction:column;gap:2px;}
+@media(max-width:400px){.eco-row{grid-template-columns:58px minmax(0,1fr) 60px;}.eco-row .eco-num:last-child{display:none;}}
+/* ── Performance period (one bar above the prediction chart: dates on the left, quick ranges on the right) ── */
+.period-bar{margin:10px 0 12px;padding:10px 12px;background:var(--bg3);border:1px solid var(--b1);border-radius:10px;display:flex;flex-direction:row;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px 18px;}
 .period-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
-.period-lbl{font-size:11px;font-weight:800;color:var(--t2);text-transform:uppercase;letter-spacing:1px;min-width:110px;}
+.period-lbl{font-size:11px;font-weight:800;color:var(--t2);text-transform:uppercase;letter-spacing:1px;}
+.pred-per-btns{display:flex;gap:6px;flex-wrap:wrap;padding:0 0 8px;}
+#period-msg{flex-basis:100%;}
+#period-apply:disabled{opacity:.45;cursor:not-allowed;}
+#period-msg:empty{display:none;}
 .period-or{font-size:11px;font-weight:700;color:var(--t3);}
 .period-bar .srch{padding:6px 10px;font-size:12px;}
 .period-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:14px;margin:14px 0 8px;}
@@ -5591,121 +5613,6 @@ button,select,.ntab,.fstab,.stab,.fbtn,.pgbtn{touch-action:manipulation;-webkit-
 
 <script>
 // ─── PORTFOLIO BENCHMARK ───────────────────────────────────
-async function loadBenchmark(){
-  const el = document.getElementById('benchmark-content');
-  if(!el) return;
-  el.innerHTML = '<div class="load"><div class="spin"></div>Fetching S&P 500 comparison data...</div>';
-  try {
-    const data = await api('/api/portfolio/benchmark');
-    if(!data || data.error || data.portfolio_return === undefined){
-      const msg = !data ? 'Could not reach the benchmark API. Restart api.py and click Refresh.'
-        : data.error === 'No holdings found' ? 'Add stocks to your portfolio to see benchmark comparison.'
-        : data.error ? 'Error loading benchmark: '+data.error
-        : 'api.py is still running the old benchmark code. Restart api.py and click Refresh.';
-      el.innerHTML = `<div style="color:var(--t3);padding:20px;text-align:center;">${msg}</div>`;
-      return;
-    }
-
-    const beating = data.beating_market;
-    const diff = data.difference;
-    const diffCol = diff >= 0 ? 'var(--green)' : 'var(--red)';
-    const diffIcon = diff >= 0 ? '▲' : '▼';
-
-    el.innerHTML = `
-      <!-- Summary Cards -->
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:16px;border-bottom:1px solid var(--b2);">
-        <div style="text-align:center;">
-          <div style="font-size:11px;color:var(--t3);font-weight:700;text-transform:uppercase;margin-bottom:6px;">Your Portfolio</div>
-          <div style="font-size:28px;font-weight:900;color:${data.portfolio_return>=0?'var(--green)':'var(--red)'};">${data.portfolio_return>=0?'+':''}${data.portfolio_return.toFixed(2)}%</div>
-          <div style="font-size:11px;color:var(--t3);">Since ${data.start_date}</div>
-        </div>
-        <div style="text-align:center;border-left:1px solid var(--b2);border-right:1px solid var(--b2);">
-          <div style="font-size:11px;color:var(--t3);font-weight:700;text-transform:uppercase;margin-bottom:6px;">S&P 500</div>
-          <div style="font-size:28px;font-weight:900;color:${data.spy_return>=0?'var(--green)':'var(--red)'};">${data.spy_return>=0?'+':''}${data.spy_return.toFixed(2)}%</div>
-          <div style="font-size:11px;color:var(--t3);">Same period</div>
-        </div>
-        <div style="text-align:center;">
-          <div style="font-size:11px;color:var(--t3);font-weight:700;text-transform:uppercase;margin-bottom:6px;">${beating?'Beating Market ':'Lagging Market'}</div>
-          <div style="font-size:28px;font-weight:900;color:${diffCol};">${diffIcon} ${Math.abs(diff).toFixed(2)}%</div>
-          <div style="font-size:11px;color:var(--t3);">${beating?'Above S&P 500':'Below S&P 500'}</div>
-        </div>
-      </div>
-
-      <!-- Chart -->
-      <div style="padding:16px;border-bottom:1px solid var(--b2);">
-        <div style="height:200px;"><canvas id="benchmark-chart"></canvas></div>
-      </div>
-
-      <!-- Per Stock Breakdown -->
-      <div style="padding:16px;">
-        <div style="font-size:12px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;">Holdings vs S&P 500</div>
-        <div class="tw"><table>
-          <thead><tr><th>Stock</th><th>Company</th><th>Your Return</th><th>S&P 500 Return</th><th>Difference</th><th>Status</th></tr></thead>
-          <tbody>
-            ${(data.holdings||[]).map(h=>`
-              <tr onclick="openFS('${h.ticker}')" style="cursor:pointer;">
-                <td class="sym">${h.ticker}</td>
-                <td style="color:var(--t2);font-size:12px;">${h.company_name||''}</td>
-                <td class="${h.stock_return>=0?'g':'r'} mono">${h.stock_return>=0?'+':''}${h.stock_return.toFixed(2)}%</td>
-                <td class="${h.spy_return>=0?'g':'r'} mono">${h.spy_return>=0?'+':''}${h.spy_return.toFixed(2)}%</td>
-                <td class="${h.difference>=0?'g':'r'} mono" style="font-weight:800;">${h.difference>=0?'+':''}${h.difference.toFixed(2)}%</td>
-                <td>${h.beating?'<span style="color:var(--green);font-weight:800;">Beating</span>':'<span style="color:var(--red);font-weight:700;">Lagging</span>'}</td>
-              </tr>`).join('')}
-          </tbody>
-        </table></div>
-      </div>`;
-
-    // Draw benchmark chart
-    setTimeout(()=>{
-      const ctx = document.getElementById('benchmark-chart');
-      if(!ctx) return;
-      const chartData = data.combined_chart || [];
-      if(!chartData.length){
-        ctx.parentElement.innerHTML = '<div style="color:var(--t3);text-align:center;padding:60px;">Not enough data to draw chart. Add more holdings with buy dates.</div>';
-        return;
-      }
-      mkC('benchmark-chart',{
-        type:'line',
-        data:{
-          labels: chartData.map(d=>d.date.slice(5)),
-          datasets:[
-            {
-              label:'Your Portfolio',
-              data: chartData.map(d=>d.portfolio_return),
-              borderColor:'#00c8ff',
-              backgroundColor:'rgba(0,200,255,0.05)',
-              borderWidth:2,pointRadius:0,tension:0.3,fill:true
-            },
-            {
-              label:'S&P 500',
-              data: chartData.map(d=>d.spy_return),
-              borderColor:'#00e676',
-              backgroundColor:'rgba(0,230,118,0.05)',
-              borderWidth:2,pointRadius:0,tension:0.3,fill:true,
-              borderDash:[5,5]
-            }
-          ]
-        },
-        options:{
-          responsive:true,maintainAspectRatio:false,
-          plugins:{
-            legend:{labels:{color:'#c0cce0',font:{size:11}}},
-            tooltip:{mode:'index',intersect:false,callbacks:{label:c=>c.dataset.label+': '+(c.raw>=0?'+':'')+c.raw.toFixed(2)+'%'}}
-          },
-          scales:{
-            x:{ticks:{color:'#58697a',maxTicksLimit:8,font:{size:10}},grid:{color:'rgba(28,28,48,0.3)'}},
-            y:{ticks:{color:'#58697a',callback:v=>v.toFixed(1)+'%'},grid:{color:'rgba(28,28,48,0.3)'}}
-          },
-          interaction:{mode:'index',intersect:false}
-        }
-      });
-    }, 100);
-
-  } catch(e){
-    el.innerHTML = '<div style="color:var(--t3);padding:20px;text-align:center;">Error loading benchmark. Make sure you have holdings added.</div>';
-  }
-}
-
 // ─── CHART ALERT HELPERS ───────────────────────────────────
 function setQuickAlert(pct){
   const px = document.getElementById('fs-px');

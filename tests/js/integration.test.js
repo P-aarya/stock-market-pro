@@ -10,7 +10,7 @@ const functions = [...script.matchAll(/^(?:async\s+)?function\s+([A-Za-z_$][\w$]
 
 (async () => {
   await t('everything Abheek built is on the page', () => {
-    for (const id of ['page-ipos', 'ipo-mini', 'ntab-ipos', 'fss-peers', 'sent-card', 'pf-perf-card', 'tx-form-card', 'pf-form-card', 'pf-ai-result', 'period-bar', 'pred-period-view',
+    for (const id of ['page-ipos', 'ntab-ipos', 'fss-peers', 'sent-card', 'pf-perf-card', 'tx-form-card', 'pf-form-card', 'pf-ai-result', 'period-bar', 'pred-period-view',
                       'bounty-btn', 'bounty-win', 'tb-wl', 'wl-add-input'])
       assert(ids.has(id) || new RegExp(`id=\\\\?["']${id}`).test(script), `missing #${id}`);
     for (const fn of ['loadIPOs', 'loadPeers', 'loadNewsSentiment', 'loadPortfolioPerformance', 'applyPeriod', 'sendBounty', 'initWatchlist', 'addAdminLink', 'adoptLegacyBounty'])
@@ -18,10 +18,10 @@ const functions = [...script.matchAll(/^(?:async\s+)?function\s+([A-Za-z_$][\w$]
   });
 
   await t('everything Aarya built is on the page', () => {
-    for (const id of ['nt-bell', 'nt-panel', 'nt-badge', 'nt-list', 'alert-modal', 'alerts-list', 'benchmark-card', 'benchmark-content', 'news-grid', 'news-modal', 'eco-controls',
+    for (const id of ['nt-bell', 'nt-panel', 'nt-badge', 'nt-list', 'alert-modal', 'alerts-list', 'news-grid', 'news-modal', 'eco-controls',
                       'eco-calendar-body', 'btn-eco-cal', 'btn-earn-cal', 'fss-dividends', 'fs-dividends-content', 'pred-sent-strip'])
       assert(ids.has(id) || new RegExp(`id=\\\\?["']${id}`).test(script), `missing #${id}`);
-    for (const fn of ['loadBenchmark', 'loadWorldNews', 'loadEcoCalendar', 'switchCalTab', 'loadDividends', 'loadSentimentPanel', 'loadSpikeExplorer', 'ntToggleBell', 'saveAlert', 'openNewsModal', 'timeAgo'])
+    for (const fn of ['loadWorldNews', 'loadEcoCalendar', 'switchCalTab', 'loadDividends', 'loadSentimentPanel', 'loadSpikeExplorer', 'ntToggleBell', 'saveAlert', 'openNewsModal', 'timeAgo'])
       assert(functions.includes(fn), `missing function ${fn}`);
   });
 

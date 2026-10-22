@@ -56,6 +56,7 @@ GET /api/portfolio/benchmark
 GET /api/stocks/{ticker}/dividends
 GET /api/stocks/{ticker}/news-sentiment
 GET /api/stocks/{ticker}/price-spikes
+GET /api/stocks/{ticker}/period-spikes
 POST /api/alerts/create
 POST /api/portfolio/add
 POST /api/transactions/add

@@ -130,9 +130,9 @@ const tablet = mediaBlock('max-width:960px'), phone = mediaBlock('max-width:700p
     const scrolled = [];
     const a = make({ scrollTo: (x, y) => scrolled.push([x, y]) });
     a.ctx.showPage('portfolio', mk0());
-    assert.deepStrictEqual(scrolled, [[0, 0]]); assert.deepStrictEqual(a.calls, ['pf', 'bench']);   // the Portfolio tab loads your holdings and Aarya's S&P 500 comparison
+    assert.deepStrictEqual(scrolled, [[0, 0]]); assert.deepStrictEqual(a.calls, ['pf']);   // the Portfolio tab loads your holdings (its S&P 500 chart is part of them)
     const b = make(null);                                        // no window at all: must not throw
-    b.ctx.showPage('portfolio', mk0()); assert.deepStrictEqual(b.calls, ['pf', 'bench']);
+    b.ctx.showPage('portfolio', mk0()); assert.deepStrictEqual(b.calls, ['pf']);
     function mk0() { return { classList: { add() {}, remove() {} } }; }
   });
 

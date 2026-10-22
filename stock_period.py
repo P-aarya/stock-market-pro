@@ -125,6 +125,60 @@ def compute_period(closes: pd.Series, benchmark, start: date, end: date) -> dict
     }
 
 
+def spike_driver(change_pct, market_pct):
+    """Plain-English line: was this a market-wide move or something about the company?"""
+    if market_pct is None:
+        return ""
+    c, m = change_pct, market_pct
+    if (m > 0) != (c > 0) and abs(m) >= 0.5:
+        return f"Stock-specific - it moved against the market (S&P 500 {m:+.1f}% that day)"
+    if abs(m) >= 1.5 and abs(m) >= 0.5 * abs(c):
+        return f"Market-wide move - the S&P 500 was {m:+.1f}% that day"
+    if abs(c) - abs(m) >= 2:
+        return f"Mostly stock-specific (S&P 500 only {m:+.1f}% that day)"
+    return f"Mixed - market (S&P 500 {m:+.1f}%) and company news both played a part"
+
+
+def find_spikes(closes: pd.Series, benchmark, start: date, end: date, limit: int = 12) -> list:
+    """
+    The biggest one-day moves between start and end, oldest first. Each move is measured from the previous
+    trading day's close (even if that day is before `start`). A move counts as a spike when it is at least
+    2.5x the stock's normal daily swing in the period, clamped to 1.5%..3%, so calm stocks still show their
+    big days and very volatile stocks only show the largest ones. At most `limit` are returned.
+    """
+    s = pd.Timestamp(start); e = pd.Timestamp(end)
+    daily = (closes.pct_change() * 100).dropna()
+    seg = daily[(daily.index >= s) & (daily.index <= e)]
+    if seg.empty:
+        return []
+    swing = float(seg.std(ddof=1)) if len(seg) >= 5 else 2.0
+    threshold = min(3.0, max(1.5, 2.5 * swing))
+    big = seg[seg.abs() >= threshold]
+    if big.empty:
+        return []
+    top = big.abs().sort_values(ascending=False).index[:limit]
+    mkt = None
+    if benchmark is not None:
+        mkt = (benchmark.pct_change() * 100)
+    out = []
+    for d in sorted(top):
+        chg = float(seg.loc[d])
+        pos = closes.index.get_loc(d)
+        m = None
+        if mkt is not None and d in mkt.index and not pd.isna(mkt.loc[d]):
+            m = round(float(mkt.loc[d]), 2)
+        out.append({
+            "date": d.strftime("%Y-%m-%d"),
+            "price": round(float(closes.iloc[pos]), 2),
+            "prev_price": round(float(closes.iloc[pos - 1]), 2),
+            "change_pct": round(chg, 2),
+            "direction": "up" if chg > 0 else "down",
+            "market_change_pct": m,
+            "driver": spike_driver(chg, m),
+        })
+    return out
+
+
 def validate_dates(start: date, end: date, today: date = None) -> tuple:
     """Returns (start, end) with `end` capped at today. Raises PeriodError for dates that make no sense."""
     today = today or date.today()
