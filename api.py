@@ -383,25 +383,80 @@ def get_stocks(sector: Optional[str]=None, search: Optional[str]=None, limit: in
     return query(sql, params)
 
 # Must be declared before /api/stocks/{ticker}, otherwise that route captures 'search'.
+# Well-known brand names that differ from the company's official name or ticker
+_SEARCH_ALIASES = {
+    "google": "GOOGL", "youtube": "GOOGL", "alphabet": "GOOGL", "facebook": "META", "instagram": "META",
+    "whatsapp": "META", "chase": "JPM", "jp morgan": "JPM", "jpmorgan": "JPM", "coke": "KO", "coca cola": "KO",
+    "cocacola": "KO", "mcdonalds": "MCD", "berkshire": "BRK-B", "warren buffett": "BRK-B", "att": "T", "at&t": "T",
+    "general motors": "GM", "johnson and johnson": "JNJ", "j&j": "JNJ", "procter": "PG", "p&g": "PG",
+    "home depot": "HD", "exxon": "XOM", "mobil": "XOM", "tsmc": "TSM", "taiwan semi": "TSM", "aws": "AMZN",
+    "hewlett": "HPQ", "pepsi": "PEP", "starbucks": "SBUX", "snapchat": "SNAP",
+}
+_SEARCH_PLAIN_NAME = ("REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LOWER(company_name), '''', ''), '.', ''), "
+                      "'&', ''), ' ', ''), '-', '')")
+
+
+def _like_escape(text):
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 @app.get("/api/stocks/search")
 def search_stocks(q: str = "", limit: int = 10):
-    """Search stocks by ticker or company name for autocomplete."""
+    """
+    Search stocks by ticker or company name for the search boxes. One letter is enough.
+    Order: exact ticker, tickers starting with it, names starting with it, then any name containing it
+    (punctuation ignored, so "mcdonalds" finds McDonald's), biggest companies first. Brand names such as
+    "google" or "facebook" find their company, and a ticker typed one letter too long ("GOOGLE") finds GOOGL.
+    """
+    q = (q or "").strip()
     if not q:
         return []
     try:
-        results = query("""
-            SELECT ticker, company_name, sector, current_price, price_change_pct
-            FROM stocks_live
-            WHERE (ticker LIKE %s OR LOWER(company_name) LIKE LOWER(%s))
-            AND current_price IS NOT NULL AND last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)
-            ORDER BY
-                CASE WHEN ticker LIKE %s THEN 0 ELSE 1 END,
-                market_cap DESC
+        limit = max(1, min(int(limit or 10), 20))
+    except (TypeError, ValueError):
+        limit = 10
+    up, low = q.upper(), q.lower()
+    key = re.sub(r"[^a-z0-9]", "", low)
+    fresh = ("AND current_price IS NOT NULL "
+             "AND last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)")
+    cols = "ticker, company_name, sector, current_price, price_change_pct"
+    try:
+        rows = query(f"""
+            SELECT {cols} FROM stocks_live
+            WHERE (ticker LIKE %s OR LOWER(company_name) LIKE %s OR ({_SEARCH_PLAIN_NAME} LIKE %s AND %s <> ''))
+            {fresh}
+            ORDER BY CASE WHEN ticker = %s THEN 0 WHEN ticker LIKE %s THEN 1 WHEN LOWER(company_name) LIKE %s THEN 2 ELSE 3 END,
+                     market_cap DESC
             LIMIT %s
-        """, (f"{q.upper()}%", f"%{q}%", f"{q.upper()}%", limit))
-        return results or []
-    except:
-        return []
+        """, (_like_escape(up) + "%", "%" + _like_escape(low) + "%", "%" + _like_escape(key) + "%", key,
+              up, _like_escape(up) + "%", _like_escape(low) + "%", limit)) or []
+        if not rows and len(up) >= 4:
+            rows = query(f"SELECT {cols} FROM stocks_live WHERE ticker LIKE %s {fresh} ORDER BY market_cap DESC LIMIT %s",
+                         (_like_escape(up[:-1]) + "%", limit)) or []
+        brands = []
+        if len(low) >= 3:
+            for name, tk in _SEARCH_ALIASES.items():
+                if (name.startswith(low) or low.startswith(name)) and tk not in brands:
+                    brands.append(tk)
+        if brands:
+            have = {r["ticker"] for r in rows}
+            ph = ",".join(["%s"] * len(brands))
+            extra = query(f"SELECT {cols} FROM stocks_live WHERE ticker IN ({ph}) {fresh}", brands) or []
+            extra = [dict(r, match="brand") for r in extra if r["ticker"] not in have]
+            rows = extra + rows
+        return rows[:limit]
+    except Exception:
+        log.exception("Stock search failed - using the simple search instead")
+        try:                                             # the plain ticker / name search always works
+            return query(f"""
+                SELECT {cols} FROM stocks_live
+                WHERE (ticker LIKE %s OR LOWER(company_name) LIKE %s) {fresh}
+                ORDER BY CASE WHEN ticker LIKE %s THEN 0 ELSE 1 END, market_cap DESC LIMIT %s
+            """, (up + "%", "%" + low + "%", up + "%", limit)) or []
+        except Exception:
+            log.exception("Simple stock search failed too")
+            return []
+
 
 @app.get("/api/stocks/{ticker}")
 def get_stock(ticker: str):
@@ -1239,6 +1294,53 @@ def get_predictions(sector: Optional[str]=None, limit: int=1000):
     sql+=" ORDER BY p.confidence_pct DESC,l.market_cap DESC LIMIT %s"; params.append(limit)
     return query(sql,params)
 
+@app.get("/api/predictions/top")
+def get_top_predictions(limit: int = 5):
+    """
+    The model's best stocks for the next 3 months (the Market tab's Top 5 table).
+    Ranked by expected gain x chance of going up, so a likely +15% beats an unlikely +40%.
+    Only stocks with a prediction from the latest run, a Buy / Strong Buy signal, a market cap of at
+    least $2B and normal daily volume of at least 300K shares (no tiny or rarely traded stocks).
+    """
+    limit = max(1, min(int(limit or 5), 20))
+    rows = query("""
+        SELECT p.ticker, p.buy_signal, p.target_3m, p.prob_up_3m, p.run_date,
+               l.company_name, l.current_price, l.market_cap, l.avg_volume, l.volume
+        FROM stocks_predictions p
+        JOIN stocks_live l ON p.ticker = l.ticker
+        WHERE l.current_price IS NOT NULL AND l.current_price > 0 AND p.target_3m IS NOT NULL
+          AND l.last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)
+          AND p.run_date >= DATE_SUB((SELECT MAX(run_date) FROM stocks_predictions), INTERVAL 10 DAY)
+          AND UPPER(p.buy_signal) IN ('BUY', 'STRONG BUY')
+          AND (l.sector != 'Indices' OR l.sector IS NULL)
+          AND p.ticker NOT LIKE '%%=F' AND p.ticker NOT LIKE '^%%'
+          AND l.market_cap >= 2000000000
+          AND COALESCE(l.avg_volume, l.volume, 0) >= 300000
+    """) or []
+    out = []
+    for r in rows:
+        try:
+            price, target = float(r["current_price"]), float(r["target_3m"])
+        except (TypeError, ValueError):
+            continue
+        upside = (target / price - 1) * 100
+        prob = r.get("prob_up_3m")
+        prob = float(prob) if prob is not None else None
+        if upside <= 0 or (prob is not None and prob < 50):
+            continue
+        out.append({
+            "ticker": r["ticker"], "company_name": r.get("company_name"),
+            "price": round(price, 2), "target_3m": round(target, 2), "upside_pct": round(upside, 2),
+            "prob_up_3m": round(prob, 1) if prob is not None else None,
+            "signal": r.get("buy_signal"), "run_date": r.get("run_date"),
+            "_score": upside * ((prob if prob is not None else 50) / 100),
+        })
+    out.sort(key=lambda x: x["_score"], reverse=True)
+    for x in out:
+        x.pop("_score", None)
+    return out[:limit]
+
+
 @app.get("/api/ai-predictions/{ticker}")
 def get_prediction(ticker: str):
     r = query("""
@@ -1281,8 +1383,23 @@ def get_earnings(limit: int=500):
         ORDER BY e.next_earnings_date ASC,l.market_cap DESC LIMIT %s
     """, [limit])
 
+def _json_safe(v):
+    """NaN and infinity are not valid JSON (Yahoo sends them for some stocks): turn them into None."""
+    if isinstance(v, float):
+        return v if v == v and v not in (float("inf"), float("-inf")) else None
+    if isinstance(v, dict):
+        return {k: _json_safe(x) for k, x in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [_json_safe(x) for x in v]
+    return v
+
+
 @app.get("/api/earnings/{ticker}")
 def get_stock_earnings(ticker: str):
+    return _json_safe(_stock_earnings(ticker))
+
+
+def _stock_earnings(ticker: str):
     try:
         stock = yf.Ticker(ticker.upper())
         info  = stock.info

@@ -101,5 +101,13 @@ const FORM = (e, t, q, p, d, notes = '') => Object.assign(e.els['a-tick'], { val
     e = env({ holdings: [], summary: S(), onFetch: () => ok({ status: 'error', message: 'The AI service is busy. Please try again in a minute.' }, 429) }); e.els['pf-tickers'].value = 'AAPL'; await e.run("runPfReview('list')"); assert(e.els['pf-ai-result-text'].textContent.includes('busy'));
     e = env({ holdings: [], summary: S(), onFetch: () => { throw new TypeError('Failed to fetch'); } }); e.els['pf-tickers'].value = 'AAPL'; await e.run("runPfReview('list')"); assert(e.els['pf-ai-result-text'].textContent.includes("Couldn't reach the server") && !e.els['pf-ai-btn'].disabled);
   });
+  await t('The review box clear button empties the box and the result, and a late answer never comes back', async () => {
+    let release; const gate = new Promise(r => { release = r; });
+    const e = env({ holdings: [], summary: S(), onFetch: async () => { await gate; return ok({ status: 'success', review: 'LATE REVIEW' }); } });
+    e.els['pf-tickers'].value = 'AAPL, MSFT'; const running = e.run("runPfReview('list')");
+    e.run('clearPfReview()'); release(); await running;
+    assert.equal(e.els['pf-tickers'].value, ''); assert(!e.els['pf-ai-result-text'].innerHTML.includes('LATE'));
+    assert(!e.els['pf-ai-btn'].disabled && !e.els['pf-hold-btn'].disabled);
+  });
   done();
 })();

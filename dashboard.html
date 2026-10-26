@@ -399,7 +399,18 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   </div>
 </nav>
 
+<!-- Search under the header, on the left (Market and Commodities tabs only): pick a stock to open it, or a commodity to show its card -->
+<div class="msearch" id="gsearch">
+  <div class="msearch-in-row"><div class="ssug-wrap">
+    <svg class="msearch-ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
+    <input class="srch msearch-in" id="mkt-search" placeholder="Search stocks by ticker or name, e.g. NVDA or Nvidia" autocomplete="off" aria-label="Search stocks"/>
+    <button class="inp-x" id="mkt-search-x" title="Clear" onclick="clearMarketSearch()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+  </div></div>
+</div>
+
 <div class="tape"><div class="tape-inner" id="tape"><span class="ti"><span class="ti-s">Loading live data...</span></span></div></div>
+
+
 
 <!-- ═══════════ MARKET PAGE ═══════════ -->
 <div class="page on" id="page-market">
@@ -443,7 +454,10 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       </div>
     </div>
     <div class="ai-input-row">
-      <input class="ai-input" id="ai-query" placeholder="e.g. find me small cap stocks with strong growth and low debt..." onkeydown="if(event.key==='Enter')runAI()"/>
+      <div class="ssug-wrap ai-in-wrap">
+        <input class="ai-input" id="ai-query" placeholder="e.g. find me small cap stocks with strong growth and low debt..." autocomplete="off"/>
+        <button class="inp-x" id="ai-query-x" title="Clear" onclick="clearAIFinder()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+      </div>
       <button class="ai-btn" id="ai-btn" onclick="runAI()">Ask AI</button>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
@@ -455,6 +469,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     </div>
     <div class="ai-loading" id="ai-loading"><div class="spin"></div>AI is analysing stocks — this takes about 10 seconds...</div>
     <div class="ai-result" id="ai-result">
+      <button class="ai-close" title="Clear the results" onclick="clearAIFinder()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
       <div class="ai-result-title">AI Recommendation</div>
       <div class="ai-result-text" id="ai-result-text"></div>
       <div class="ai-meta" id="ai-meta"></div>
@@ -472,6 +487,16 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- The prediction model's top 5 for the next 3 months -->
+  <div class="card" id="top5-card" style="margin-bottom:16px">
+    <div class="chdr"><div class="ctitle">Top 5 Predicted Stocks — Next 3 Months</div><span class="t5-sub">Ranked by expected gain × chance of going up</span></div>
+    <div class="tw"><table class="t5">
+      <thead><tr><th>#</th><th>Ticker</th><th>Company</th><th>Price</th><th>3M Target</th><th>Upside</th><th>Chance Up</th><th>Signal</th></tr></thead>
+      <tbody id="tb-top5"><tr><td colspan="8"><div class="load"><div class="spin"></div>Loading...</div></td></tr></tbody>
+    </table></div>
+    <div class="t5-note">Based on our prediction model, not financial advice. Only stocks with a fresh prediction, a Buy or Strong Buy signal, a market value over $2B and active trading.</div>
   </div>
 
   <!-- Charts: 3 per row (2 on smaller screens, 1 on a phone) -->
@@ -743,7 +768,10 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       </div>
     </div>
     <div class="ai-input-row">
-      <input class="ai-input" id="pf-tickers" placeholder="e.g. Apple, Tesla, Nvidia  or  AAPL, TSLA, NVDA" onkeydown="if(event.key==='Enter')runPfReview('list')"/>
+      <div class="ssug-wrap ai-in-wrap">
+        <input class="ai-input" id="pf-tickers" placeholder="e.g. Apple, Tesla, Nvidia  or  AAPL, TSLA, NVDA" autocomplete="off"/>
+        <button class="inp-x" id="pf-tickers-x" title="Clear" onclick="clearPfReview()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+      </div>
       <button class="ai-btn" id="pf-ai-btn" onclick="runPfReview('list')">Review these stocks</button>
     </div>
     <div style="margin-bottom:8px;display:flex;gap:18px;flex-wrap:wrap">
@@ -752,6 +780,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     </div>
     <div class="ai-loading" id="pf-ai-loading"><div class="spin"></div>AI is reviewing — this takes about 10 seconds...</div>
     <div class="ai-result" id="pf-ai-result">
+      <button class="ai-close" title="Clear the review" onclick="clearPfReview()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
       <div class="ai-result-title">Portfolio Review</div>
       <div class="ai-result-text" id="pf-ai-result-text"></div>
     </div>
@@ -1314,6 +1343,8 @@ function showPage(n,btn){
   document.getElementById('page-'+n).classList.add('on');
   btn.classList.add('on');
   if(typeof window!=='undefined'&&window.scrollTo)window.scrollTo(0,0);   // a new tab starts at the top, not where the last one was scrolled
+  const gs=document.getElementById('gsearch');if(gs&&gs.style)gs.style.display=(n==='market'||n==='commodities')?'':'none';   // search only where it is useful
+  if(typeof mktSuggest!=='undefined'&&mktSuggest)mktSuggest.reset();
   if(n==='portfolio')loadPortfolio();
   if(n==='transactions')loadTx();
   if(n==='commodities'){loadCommodities();loadMacro();loadComCo();}
@@ -3534,21 +3565,31 @@ function setPredPer(days, btn){
   if(curPredData) renderPredChart(curPredData, days);
 }
 
+/** The model's targets in time order, each with its horizon in days (1W=7 ... 1Y=365). */
+const PRED_HORIZONS = {'1W':7,'1M':30,'3M':90,'6M':180,'1Y':365};
+function predPoints(d){
+  return (d.predicted_path||[]).filter(p=>p && p.predicted && p.price!=null && p.date)
+    .map(p=>({...p, days: PRED_HORIZONS[p.label] ?? Math.round((new Date(p.date)-new Date())/86400000)}))
+    .sort((a,b)=>a.days-b.days);
+}
+/** Only offer the range buttons this stock has a prediction for (some pipelines stop at 3 months). */
+function syncPredButtons(d){
+  const have = new Set(predPoints(d).map(p=>p.days));
+  document.querySelectorAll('#pred-per-btns .fbtn').forEach(b=>{
+    const days = Number((b.getAttribute('onclick')||'').match(/setPredPer\((\d+)/)?.[1]);
+    b.style.display = (!days || have.has(days) || days===7) ? '' : 'none';
+  });
+}
 function renderPredChart(d, futureDays){
   const hist = d.price_history||[];
   const path = d.predicted_path||[];
   if(!hist.length||!path.length) return;
 
-  // Match predicted point by label so 6M/1Y work correctly regardless of when predict.py ran
-  const labelMap = {7:'1W', 30:'1M', 90:'3M', 180:'6M', 365:'1Y'};
-  const wantLabel = labelMap[futureDays] || '1M';
-  const targetPt = path.filter(p => p.predicted).find(p => p.label === wantLabel)
-    || path.filter(p => p.predicted).reduce((best, p) => {
-      const pDays = (new Date(p.date) - new Date()) / (1000*60*60*24);
-      const bestDays = best ? (new Date(best.date) - new Date()) / (1000*60*60*24) : Infinity;
-      return Math.abs(pDays - futureDays) < Math.abs(bestDays - futureDays) ? p : best;
-    }, null);
-  const filteredPath = targetPt ? [targetPt] : [];
+  // Every predicted point up to the chosen range (1W, 1M, 3M, 6M, 1Y), so the line can rise and then fall
+  const preds = predPoints(d);
+  let shown = preds.filter(p => p.days <= futureDays);
+  if(!shown.length && preds.length) shown = [preds.reduce((a,b)=>Math.abs(b.days-futureDays)<Math.abs(a.days-futureDays)?b:a)];
+  const targetPt = shown.length ? shown[shown.length-1] : null;
 
   // Filter history — show more history for longer periods
   const histDays = futureDays <= 7 ? 30 : futureDays <= 30 ? 60 : futureDays <= 90 ? 180 : 365;
@@ -3564,30 +3605,22 @@ function renderPredChart(d, futureDays){
   const lastHistPrice = filteredHist[filteredHist.length-1]?.price;
   const todayIdx = histLabels.length - 1;
 
-  // allLabels = history dates + the one target date (if we have one)
-  const allLabels = targetPt ? [...histLabels, targetPt.date] : histLabels;
-  const targetIdx = allLabels.length - 1;
+  // x-axis as before: the history dates, then only the target dates themselves (no extra dates in between)
+  const lastHistDate = histLabels[todayIdx] || '';
+  const futureLabels = [...new Set(shown.map(p=>p.date).filter(x=>x>lastHistDate))].sort();
+  const allLabels = [...histLabels, ...futureLabels];
+  const ptAt = {};                                   // chart index -> predicted point
+  shown.forEach(p => { const i = allLabels.indexOf(p.date); if(i > todayIdx) ptAt[i] = p; });
+  const targetIdx = targetPt ? allLabels.indexOf(targetPt.date) : todayIdx;
 
   const histData = allLabels.map((_,i) => i <= todayIdx ? filteredHist[i]?.price ?? null : null);
-
-  const predData = allLabels.map((_,i)=>{
+  const along = key => allLabels.map((_,i)=>{
     if(i < todayIdx) return null;
     if(i === todayIdx) return lastHistPrice ?? null;
-    if(i === targetIdx && targetPt) return targetPt.price;
-    return null;
+    const p = ptAt[i]; return p ? (p[key] ?? p.price) : null;
   });
-  const upperData = allLabels.map((_,i)=>{
-    if(i < todayIdx) return null;
-    if(i === todayIdx) return lastHistPrice ?? null;
-    if(i === targetIdx && targetPt) return targetPt.upper ?? targetPt.price;
-    return null;
-  });
-  const lowerData = allLabels.map((_,i)=>{
-    if(i < todayIdx) return null;
-    if(i === todayIdx) return lastHistPrice ?? null;
-    if(i === targetIdx && targetPt) return targetPt.lower ?? targetPt.price;
-    return null;
-  });
+  const predData = along('price'), upperData = along('upper'), lowerData = along('lower');
+  const predRadius = allLabels.map((_,i)=> ptAt[i] ? 4 : 0);
 
   // Colour by the period being viewed (not always the 1M target)
   const trendUp = targetPt ? (targetPt.price >= (lastHistPrice ?? d.current_price ?? 0)) : ((d.target_1m||0) > (d.current_price||0));
@@ -3606,9 +3639,9 @@ function renderPredChart(d, futureDays){
     labels:allLabels,
     datasets:[
       {label:'Historical Price (Real)',data:histData,borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,0.05)',borderWidth:2,pointRadius:0,tension:0.05,fill:true,order:3},
-      {label:'Confidence Range',data:upperData,borderColor:'transparent',backgroundColor:trendUp?'rgba(0,230,118,0.1)':'rgba(255,68,68,0.1)',borderWidth:0,pointRadius:0,fill:'+1',order:1},
-      {label:'Lower Bound',data:lowerData,borderColor:'transparent',backgroundColor:'transparent',borderWidth:0,pointRadius:0,fill:false,order:2},
-      {label:'Predicted Price',data:predData,borderColor:predColor,backgroundColor:'transparent',borderWidth:2,pointRadius:4,borderDash:[6,4],tension:0.1,fill:false,order:0},
+      {label:'Confidence Range',data:upperData,borderColor:'transparent',backgroundColor:trendUp?'rgba(0,230,118,0.1)':'rgba(255,68,68,0.1)',borderWidth:0,pointRadius:0,fill:'+1',spanGaps:true,order:1},
+      {label:'Lower Bound',data:lowerData,borderColor:'transparent',backgroundColor:'transparent',borderWidth:0,pointRadius:0,fill:false,spanGaps:true,order:2},
+      {label:'Predicted Price',data:predData,borderColor:predColor,backgroundColor:predColor,borderWidth:2,pointRadius:predRadius,pointHoverRadius:predRadius.map(r=>r?6:0),borderDash:[6,4],tension:0.15,fill:false,spanGaps:true,order:0},
       {label:'Big Move \u26A1 (hover for cause)',data:spikeData,showLine:false,pointStyle:spikeStyles,rotation:spikeRot,
        pointRadius:hasSpikes?7:0,pointHoverRadius:9,pointBackgroundColor:spikeColors,pointBorderColor:'#0a0a14',pointBorderWidth:1,
        borderColor:'#ffc800',backgroundColor:'#ffc800',order:-1,hidden:!hasSpikes}
@@ -3619,7 +3652,7 @@ function renderPredChart(d, futureDays){
         filter: item => item.text !== 'Lower Bound' && !(item.text.startsWith('Big Move') && !hasSpikes)
       }},
       tooltip:{mode:'index',intersect:false,
-        filter: item => item.raw != null && item.dataset.label !== 'Lower Bound',
+        filter: item => item.raw != null && item.dataset.label !== 'Lower Bound' && item.dataset.label !== 'Confidence Range' && !(item.dataset.label === 'Predicted Price' && !ptAt[item.dataIndex]),
         callbacks:{
           label:c=>{
             if(c.dataset.label.startsWith('Big Move')){
@@ -3628,6 +3661,13 @@ function renderPredChart(d, futureDays){
                 + (sp.market_change_pct!=null ? `  (S&P 500 ${sp.market_change_pct>=0?'+':''}${Number(sp.market_change_pct).toFixed(1)}%)` : '')];
               if(sp.reason) wrapText('News: '+sp.reason+(sp.reason_source?' ('+sp.reason_source+')':''), 60).forEach(l=>lines.push(l));
               else lines.push('No matching headline found for this date');
+              return lines;
+            }
+            if(c.dataset.label === 'Predicted Price'){
+              const p = ptAt[c.dataIndex]; if(!p) return '';
+              const chg = lastHistPrice ? (p.price/lastHistPrice-1)*100 : null;
+              const lines = [`${p.label} target: $${Number(p.price).toFixed(2)}`+(chg==null?'':`  (${chg>=0?'+':''}${chg.toFixed(1)}% from today)`)];
+              if(p.lower!=null && p.upper!=null && (p.lower!==p.price || p.upper!==p.price)) lines.push(`Likely range: $${Number(p.lower).toFixed(2)} – $${Number(p.upper).toFixed(2)}`);
               return lines;
             }
             return `${c.dataset.label}: $${(c.raw||0).toFixed(2)}`;
@@ -3929,6 +3969,7 @@ async function loadPrediction(){
   }
 
   curPredData = d;
+  syncPredButtons(d);
   document.getElementById('model-badge').textContent='Model: '+(d.model_used||'XGBoost+Prophet');
   initPeriodBar(curTick);                       // the period filter appears under the chart once there is a prediction
 
@@ -4328,12 +4369,190 @@ async function checkConn(){
   else{el.textContent='● Connected';el.style.color='var(--green)';}
 }
 
+// ─── STOCK SUGGESTIONS (Market search, AI Stock Finder, Portfolio Review) ───
+/*
+  mode 'whole': the whole box is one stock (Market search); the first match is highlighted, Enter opens it.
+  mode 'list' : comma-separated stocks (Portfolio Review); suggestions are for the stock being typed after the last comma.
+  mode 'token': a free question (AI Stock Finder); suggestions only when the last word(s) look like a stock name.
+  Enter without a highlighted suggestion runs onEnter (Ask AI / Review / open the first match).
+*/
+function stockSuggest(inputId, opts){
+  // Everything is looked up by id each time and the key/typing events are caught at document level,
+  // so the box keeps working even if the page re-draws it.
+  const getInput = () => document.getElementById(inputId);
+  if(!getInput()) return null;
+  const getBox = () => {
+    const input = getInput(); if(!input) return null;
+    let box = document.getElementById(inputId+'-sug');
+    if(!box){ box = document.createElement('div'); box.id = inputId+'-sug'; box.className = 'ssug'; box.setAttribute('role','listbox'); input.parentElement.appendChild(box); }
+    return box;
+  };
+  let items = [], active = -1, seq = 0, timer = null, part = null;
+  const esc = t => (typeof escapeHtml === 'function' ? escapeHtml(String(t ?? '')) : String(t ?? ''));
+  const reEsc = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const syncX = () => { const x = opts.clearBtn ? document.getElementById(opts.clearBtn) : null, i = getInput(); if(x && i) x.classList.toggle('show', !!i.value); };
+  const close = () => { const box = getBox(); if(box){ box.classList.remove('show'); box.innerHTML=''; } items=[]; active=-1; };
+  const note = (text) => { const box = getBox(); if(!box) return; items=[]; active=-1; box.innerHTML = `<div class="ssug-note">${esc(text)}</div>`; box.classList.add('show'); };
+  const paint = () => { const box = getBox(); if(box) [...box.querySelectorAll('.ssug-item')].forEach((el,i)=>el.classList.toggle('on', i===active)); };
+  // what to look up: [{text, start}] — start is where that text begins in the box, so a pick can replace it
+  const queries = () => {
+    const v = getInput()?.value || '';
+    if(opts.mode === 'whole'){ const t = v.trim(); return t ? [{text:t, start:v.indexOf(t)}] : []; }
+    const cut = Math.max(v.lastIndexOf(','), v.lastIndexOf(';'), v.lastIndexOf('\n'));
+    const frag = v.slice(cut+1), lead = frag.length - frag.trimStart().length, t = frag.trim();
+    if(!t || /\s$/.test(v)) return [];
+    const fragStart = cut + 1 + lead;
+    if(opts.mode === 'list') return [{text:t, start:fragStart}];
+    const words = t.split(/\s+/), last = words[words.length-1];
+    if(words.length === 1) return [{text:t, start:fragStart}];          // one word: suggest from the first letter
+    const out = [];
+    if(words.length <= 3) out.push({text:t, start:fragStart});
+    if(last.length >= 2) out.push({text:last, start:v.length - last.length});
+    return out;
+  };
+  const fits = (s, q) => {           // free questions: only stocks whose ticker or a word of the name starts with what was typed
+    if(opts.mode !== 'token' || s.match === 'brand' || s._com) return true;
+    const u = q.toUpperCase();
+    return (s.ticker||'').toUpperCase().startsWith(u) || new RegExp('(^|[^a-z0-9])'+reEsc(q.toLowerCase())).test((s.company_name||'').toLowerCase());
+  };
+  const show = (list) => {
+    const box = getBox(); if(!box) return;
+    items = list; active = opts.mode === 'whole' ? 0 : -1;
+    box.innerHTML = list.map((s,i)=>{
+      const c = Number(s.price_change_pct), cls = c>=0 ? 'g' : 'r';
+      return `<div class="ssug-item" role="option" data-i="${i}"><span class="ssug-t">${esc(s.ticker)}</span><span class="ssug-n">${esc(s.company_name||'')}</span>`
+        + (s._com ? '<span class="ssug-kind">Commodity</span>' : '')
+        + (s.current_price!=null ? `<span class="ssug-p">$${Number(s.current_price).toFixed(2)}</span>` : '')
+        + (s.price_change_pct!=null ? `<span class="ssug-c ${cls}">${c>=0?'+':''}${c.toFixed(2)}%</span>` : '')
+        + '</div>';
+    }).join('');
+    box.classList.toggle('show', list.length > 0); paint();
+  };
+  const pick = (i) => {
+    const s = items[i], input = getInput(); if(!s || !part || !input) return;
+    const v = input.value;
+    if(opts.mode === 'whole') input.value = '';
+    else if(s._com) input.value = v.slice(0, part.start) + s.company_name + (opts.mode === 'list' ? ', ' : ' ');
+    else if(opts.mode === 'list') input.value = v.slice(0, part.start) + s.ticker + ', ';
+    else input.value = v.slice(0, part.start) + s.ticker + ' ';
+    close(); syncX(); input.focus();
+    if(opts.onPick) opts.onPick(s);
+  };
+  // `loud`: the whole-box search shows "Searching..." and "No matches" so it never looks dead
+  const lookup = async (loud) => {
+    const my = ++seq, qs = queries();
+    if(!qs.length){ close(); return []; }
+    if(loud) note('Searching...');
+    let failed = false;
+    for(const q of qs){
+      const local = opts.extra ? opts.extra(q.text) : [];
+      let data = null;
+      try{
+        const r = await fetch(API+'/api/stocks/search?q='+encodeURIComponent(q.text)+'&limit=10');
+        if(typeof signedOut === 'function' && signedOut(r)) return [];
+        data = r.ok ? await r.json() : null; if(!r.ok) failed = true;
+      }catch(e){ failed = true; console.error('Stock search:', e); }
+      if(my !== seq) return [];                                      // the user kept typing
+      const list = [...local, ...(Array.isArray(data) ? data : []).filter(x=>x && x.ticker && fits(x, q.text))].slice(0, opts.max || 10);
+      if(list.length){ part = q; show(list); return list; }
+    }
+    if(loud) note(failed ? "Search isn't available right now. Please try again." : 'No stocks match "'+qs[0].text+'"');
+    else close();
+    return [];
+  };
+  const onTyping = () => { syncX(); clearTimeout(timer); timer = setTimeout(()=>lookup(opts.mode === 'whole'), 200); };
+  const onKey = async (e) => {
+    const box = getBox(), open = box && box.classList.contains('show') && items.length;
+    if(e.key === 'ArrowDown' && open){ e.preventDefault(); active = (active+1) % items.length; paint(); return; }
+    if(e.key === 'ArrowUp' && open){ e.preventDefault(); active = (active-1+items.length) % items.length; paint(); return; }
+    if(e.key === 'Escape'){ if(box && box.classList.contains('show')){ e.preventDefault(); close(); } return; }
+    if(e.key === 'Enter'){
+      e.preventDefault();
+      if(open && active >= 0){ pick(active); return; }
+      clearTimeout(timer);
+      if(opts.mode === 'whole'){                                    // Enter searches straight away and opens the best match
+        const list = await lookup(true);
+        if(list.length){ active = 0; pick(0); }
+        return;
+      }
+      close(); seq++;
+      if(opts.onEnter) opts.onEnter();
+    }
+  };
+  document.addEventListener('input', e => { if(e.target && e.target.id === inputId) onTyping(); }, true);
+  document.addEventListener('keydown', e => { if(e.target && e.target.id === inputId) onKey(e); }, true);
+  document.addEventListener('mousedown', e => {
+    const el = e.target.closest && e.target.closest('#'+inputId+'-sug .ssug-item');
+    if(el){ e.preventDefault(); pick(Number(el.dataset.i)); }
+  }, true);
+  document.addEventListener('focusout', e => { if(e.target && e.target.id === inputId) setTimeout(close, 150); }, true);
+  document.addEventListener('focusin', e => { if(e.target && e.target.id === inputId && e.target.value.trim()){ clearTimeout(timer); timer = setTimeout(()=>lookup(false), 50); } }, true);
+  getBox();
+  return { close, syncX, reset(){ seq++; clearTimeout(timer); close(); syncX(); } };
+}
+
+let mktSuggest = null, aiSuggest = null, pfSuggest = null;
+function initStockSuggest(){
+  mktSuggest = stockSuggest('mkt-search', { mode:'whole', max:10, clearBtn:'mkt-search-x',
+    extra: q => onCommoditiesPage() ? commodityMatches(q) : [],   // on the Commodities tab, commodities come first
+    onPick: s => s._com ? showCommodity(s) : openFS(s.ticker),
+    onEnter: () => {} });
+  aiSuggest = stockSuggest('ai-query', { mode:'token', clearBtn:'ai-query-x', onEnter: () => runAI() });
+  pfSuggest = stockSuggest('pf-tickers', { mode:'list', clearBtn:'pf-tickers-x', onEnter: () => runPfReview('list') });
+}
+function onCommoditiesPage(){ return !!document.getElementById('page-commodities')?.classList.contains('on'); }
+/** Commodities whose name, symbol or group matches (the list loaded on the Commodities tab). */
+function commodityMatches(q){
+  if(typeof comData === 'undefined' || !Array.isArray(comData) || !q) return [];
+  const low = q.toLowerCase(), seen = new Set();
+  const hit = c => (c.ticker||'').toLowerCase().startsWith(low) || new RegExp('(^|[^a-z0-9])'+low.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).test((c.name||'').toLowerCase());
+  return comData.filter(c => c && hit(c) && !seen.has(c.name) && seen.add(c.name)).slice(0, 5)
+    .map(c => ({ ticker:c.ticker, company_name:c.name, current_price:c.price, price_change_pct:c.change_pct, category:c.category, _com:true }));
+}
+/** Shows a commodity's card: its group in the filter, the page it is on, scrolled into view and outlined for a moment. */
+function showCommodity(s){
+  if(typeof comData === 'undefined' || !Array.isArray(comData)) return;
+  comFilter = s.category || 'all'; comFilterCategories = [];
+  const sel = document.getElementById('com-filter-select'); if(sel) sel.value = comFilter;
+  const list = comData.filter(c => c.category === comFilter);
+  const idx = Math.max(0, list.findIndex(c => c.name === s.company_name));
+  comShowAll = false; comPg = Math.floor(idx / 10) + 1;
+  renderCommodities();
+  const card = [...document.querySelectorAll('#com-kpi-grid [data-com]')].find(el => el.dataset.com === s.company_name);
+  if(card){ card.classList.add('com-hit'); card.scrollIntoView({behavior:'smooth', block:'center'}); setTimeout(()=>card.classList.remove('com-hit'), 2600); }
+}
+function clearMarketSearch(){
+  const i = document.getElementById('mkt-search'); if(i) i.value = '';
+  if(mktSuggest) mktSuggest.reset(); if(i) i.focus();
+}
+
+// ─── TOP 5 PREDICTED STOCKS (Market tab) ───
+async function loadTop5(){
+  const tb = document.getElementById('tb-top5'); if(!tb) return;
+  const d = await api('/api/predictions/top?limit=5');
+  if(!Array.isArray(d)){ tb.innerHTML = '<tr><td colspan="8" class="empty">Top picks are unavailable right now.</td></tr>'; return; }
+  if(!d.length){ tb.innerHTML = '<tr><td colspan="8" class="empty">No stock meets the criteria right now. Run the weekly prediction script to refresh predictions.</td></tr>'; return; }
+  const money = v => v==null ? '--' : '$'+Number(v).toFixed(2);
+  tb.innerHTML = d.map((r,i)=>`<tr>
+      <td class="t5-rank">${i+1}</td>
+      <td class="t5-tk">${escapeHtml(r.ticker)}</td>
+      <td>${escapeHtml(r.company_name||'')}</td>
+      <td class="num">${money(r.price)}</td>
+      <td class="num">${money(r.target_3m)}</td>
+      <td class="num g">+${Number(r.upside_pct).toFixed(1)}%</td>
+      <td class="num">${r.prob_up_3m==null ? '--' : Number(r.prob_up_3m).toFixed(0)+'%'}</td>
+      <td>${escapeHtml(r.signal||'')}</td>
+    </tr>`).join('');
+}
+
 async function init(){
   loadIPOs(); // independent of the rest of the page
   ecoInitMonth(); // Set current month for economic calendar
+  loadTop5(); // the model's top 5 for the next 3 months
   await Promise.all([loadSummary(),loadIndices(),loadSentiment(),loadSectors(),loadGL(),loadEarnings(),loadMarketNews(),loadStocks(),loadCurrencies()]);   // loadPredictions() fed the Market Intelligence grid, which the compact layout replaced
 }
 
+initStockSuggest();
 init();
 checkConn();
 setInterval(()=>{loadSummary();loadIndices();loadSentiment();loadCurrencies();},30000);
@@ -4708,7 +4927,7 @@ function renderCommodities(){
     const chg = c.change_pct||0;
     const chgStr = (chg>=0?'+':'')+chg.toFixed(2)+'%';
     const price = c.price!=null?(c.price>100?'$'+c.price.toFixed(2):'$'+c.price.toFixed(4)):'--';
-    return `<div style="background:var(--bg3);border:1px solid var(--b2);border-radius:10px;padding:12px 14px;cursor:default;transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--cyan)'" onmouseout="this.style.borderColor='var(--b2)'">
+    return `<div data-com="${escapeHtml(c.name||'')}" style="background:var(--bg3);border:1px solid var(--b2);border-radius:10px;padding:12px 14px;cursor:default;transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--cyan)'" onmouseout="this.style.borderColor='var(--b2)'">
       <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">${c.category.replace(/_/g,' ')}</div>
       <div style="font-size:13px;font-weight:800;color:var(--t1);margin-bottom:6px;">${c.name}</div>
       <div style="font-size:18px;font-weight:900;color:var(--cyan);font-family:monospace;margin-bottom:4px;">${price}</div>
@@ -4992,6 +5211,8 @@ async function runAI() {
   if (!query) { alert('Please type what you are looking for'); return; }
 
   aiLastQuery = query;
+  if(aiSuggest) aiSuggest.reset();
+  const seq = ++aiSeq;
   const btn = document.getElementById('ai-btn');
   const loading = document.getElementById('ai-loading');
   const result = document.getElementById('ai-result');
@@ -5007,6 +5228,7 @@ async function runAI() {
       body: JSON.stringify({ query })
     });
     const data = await res.json();
+    if (seq !== aiSeq) return;                         // cleared, or a newer question was asked
 
     if (!res.ok || data.status === 'error') throw new Error(data.message || 'Please try again with a shorter question.');
 
@@ -5060,6 +5282,7 @@ async function runAI() {
 
     result.classList.add('show');
   } catch (e) {
+    if (seq !== aiSeq) return;
     document.getElementById('ai-result-text').textContent = 'Error: ' + e.message;
     document.getElementById('ai-meta').innerHTML = '';
     document.getElementById('ai-stocks-grid').innerHTML = '';
@@ -5068,6 +5291,24 @@ async function runAI() {
 
   btn.disabled = false;
   loading.classList.remove('show');
+}
+
+/** The AI Stock Finder's ✕: removes the answer, the stock cards, the explorer and the typed question. */
+let aiSeq = 0;
+function clearAIFinder(){
+  aiSeq++;
+  const q = document.getElementById('ai-query'); if(q) q.value = '';
+  if(aiSuggest) aiSuggest.reset();
+  document.getElementById('ai-result')?.classList.remove('show');
+  document.getElementById('ai-loading')?.classList.remove('show');
+  document.getElementById('explain-loading')?.classList.remove('show');
+  ['ai-result-text','ai-meta','ai-stocks-grid','explain-result-text'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='';});
+  const ex = document.getElementById('ai-explorer'); if(ex) ex.style.display = 'none';
+  const er = document.getElementById('explain-result'); if(er) er.style.display = 'none';
+  const sel = document.getElementById('ai-stock-select'); if(sel) sel.innerHTML = '<option value="">Select a company...</option>';
+  const btn = document.getElementById('ai-btn'); if(btn) btn.disabled = false;
+  if(typeof aiMatchedStocks !== 'undefined') aiMatchedStocks = [];
+  if(q) q.focus();
 }
 
 async function explainSelectedStock() {
@@ -5081,6 +5322,7 @@ async function explainSelectedStock() {
 
   loading.classList.add('show');
   result.style.display = 'none';
+  const seq = aiSeq;
 
   try {
     const res = await fetch(`${API}/agent/explain-stock`, {
@@ -5089,10 +5331,12 @@ async function explainSelectedStock() {
       body: JSON.stringify({ ticker, query: aiLastQuery })
     });
     const data = await res.json();
+    if (seq !== aiSeq) return;
     if (!res.ok || data.status === 'error') throw new Error(data.message || 'Please try again with a shorter question.');
     resultText.innerHTML = renderMarkdown(data.explanation);
     result.style.display = 'block';
   } catch (e) {
+    if (seq !== aiSeq) return;
     resultText.textContent = 'Error: ' + e.message;
     result.style.display = 'block';
   }
@@ -5116,6 +5360,7 @@ async function runPfReview(mode) {
   btns.forEach(b => b.disabled = true);
   loading.classList.add('show');
   result.classList.remove('show');
+  const seq = ++pfReviewSeq;
 
   try {
     const res = await fetch(`${API}/agent/portfolio-review`, {
@@ -5125,14 +5370,29 @@ async function runPfReview(mode) {
     });
     let data = null;
     try { data = await res.json(); } catch (e) {}
+    if (seq !== pfReviewSeq) return;                   // cleared while the AI was working
     if (!res.ok || !data || data.status === 'error') throw new Error(apiMessage(data, res));
     text.innerHTML = renderMarkdown(data.review);
   } catch (e) {
+    if (seq !== pfReviewSeq) return;
     text.textContent = e.message && e.message !== 'Failed to fetch' ? e.message : "Couldn't reach the server. Please try again.";
   }
   result.classList.add('show');
   btns.forEach(b => b.disabled = false);
   loading.classList.remove('show');
+}
+
+/** Portfolio Review's ✕: removes the review and the typed stocks (saved holdings are not touched). */
+let pfReviewSeq = 0;
+function clearPfReview() {
+  pfReviewSeq++;
+  const input = document.getElementById('pf-tickers'); if (input) input.value = '';
+  if (typeof pfSuggest !== 'undefined' && pfSuggest) pfSuggest.reset();
+  document.getElementById('pf-ai-result')?.classList.remove('show');
+  const text = document.getElementById('pf-ai-result-text'); if (text) text.innerHTML = '';
+  document.getElementById('pf-ai-loading')?.classList.remove('show');
+  ['pf-ai-btn', 'pf-hold-btn'].forEach(id => { const b = document.getElementById(id); if (b) b.disabled = false; });
+  if (input) input.focus();
 }
 
 function loadPortfolioTickers() {
@@ -5147,6 +5407,7 @@ function loadPortfolioTickers() {
     return;
   }
   document.getElementById('pf-tickers').value = tickers.join(', ');
+  if (typeof pfSuggest !== 'undefined' && pfSuggest) pfSuggest.syncX();
 }
 
 </script>
@@ -5322,6 +5583,47 @@ function loadPortfolioTickers() {
 .b-stock-item .bsi-left .bsi-name{font-size:11px;color:var(--t3);}
 .b-stock-item .bsi-right .bsi-price{font-size:12px;font-weight:700;color:var(--t1);text-align:right;}
 .b-stock-item .bsi-right .bsi-chg{font-size:11px;font-weight:600;text-align:right;}
+/* ── Stock suggestions (Market search, AI Stock Finder, Portfolio Review) and clear buttons ── */
+.ssug-wrap{position:relative;flex:1;min-width:0;display:flex;align-items:center;}
+.ssug-wrap>input{flex:1;width:100%;min-width:0;padding-right:36px;}
+.ai-in-wrap{min-width:260px;}
+.ai-in-wrap>.ai-input{min-width:0;}
+.inp-x{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:none;align-items:center;justify-content:center;width:24px;height:24px;border:none;border-radius:6px;background:transparent;color:var(--t3);cursor:pointer;padding:0;}
+.inp-x.show{display:flex;}
+.inp-x:hover{color:var(--t1);background:var(--bg2);}
+.ssug{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:80;background:var(--bg2);border:1px solid var(--b2);border-radius:10px;box-shadow:0 14px 34px rgba(0,0,0,0.5);overflow:hidden;display:none;}
+.ssug.show{display:block;}
+.ssug-item{display:flex;align-items:center;gap:12px;padding:9px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--b1);}
+.ssug-item:last-child{border-bottom:none;}
+.ssug-item.on,.ssug-item:hover{background:var(--bg3);}
+.ssug-t{font-family:var(--mono);font-weight:800;color:var(--t1);min-width:64px;}
+.ssug-n{flex:1;min-width:0;color:var(--t2);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ssug-p{font-family:var(--mono);font-weight:700;color:var(--t1);white-space:nowrap;}
+.ssug-c{font-family:var(--mono);font-weight:700;font-size:11px;min-width:58px;text-align:right;white-space:nowrap;}
+.ssug-c.g{color:var(--green);} .ssug-c.r{color:var(--red);}
+.msearch{background:var(--bg1);border-bottom:1px solid var(--b1);padding:8px 28px;position:relative;z-index:190;}
+.msearch-in-row{width:420px;max-width:100%;margin:0;}   /* left side, same left edge as the page content */
+.msearch .ssug-wrap{width:100%;}
+.msearch .msearch-in{border-radius:10px;background:var(--bg2);border:1px solid var(--b2);height:38px;}
+.msearch .msearch-in:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(79,142,247,0.15);}
+.ssug{max-height:min(420px,60vh);overflow-y:auto;}
+.ssug-note{padding:10px 14px;font-size:12px;font-weight:600;color:var(--t3);}
+.ssug-kind{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--t3);border:1px solid var(--b2);border-radius:4px;padding:1px 5px;white-space:nowrap;}
+.msearch-ico{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--t3);pointer-events:none;}
+.msearch .msearch-in{padding:10px 40px;font-size:13px;}
+.ai-result{position:relative;}
+.ai-close{position:absolute;top:10px;right:10px;display:flex;align-items:center;justify-content:center;width:28px;height:28px;border:1px solid var(--b2);border-radius:7px;background:var(--bg2);color:var(--t2);cursor:pointer;padding:0;}
+.ai-close:hover{color:var(--t1);border-color:var(--t3);}
+.t5-sub{font-size:11px;font-weight:600;color:var(--t3);}
+#com-kpi-grid .com-hit{border-color:var(--cyan)!important;box-shadow:0 0 0 3px rgba(0,212,255,0.25);}
+.t5 td{color:var(--t1);}
+.t5 td.t5-rank{color:var(--t3);font-weight:700;width:28px;}
+.t5 td.t5-tk{font-family:var(--mono);font-weight:800;}
+.t5 td.num{font-family:var(--mono);font-weight:700;}
+.t5 tr{cursor:default;}
+.t5-note{font-size:11px;font-weight:600;color:var(--t3);margin-top:10px;}
+@media(max-width:960px){.msearch{padding:8px 14px;}.msearch-in-row{width:100%;}}
+@media(max-width:700px){.t5-sub{display:none;}}
 /* ── Economic events: plain white text and numbers, impact shown only by a small coloured tag ── */
 .eco-legend{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:4px 0 10px;border-bottom:1px solid var(--b2);margin-bottom:12px;}
 .eco-hint{font-size:10px;color:var(--t3);margin-left:auto;}
