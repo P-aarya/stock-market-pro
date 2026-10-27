@@ -2049,14 +2049,21 @@ def _spike_earnings_days(ticker):
 
 
 def _spike_headline(ticker, name, day):
-    """Closest headline to `day` (YYYY-MM-DD) from a Google News search limited to the days around it."""
+    """
+    Closest headline to `day` (YYYY-MM-DD) from a Google News search limited to the days around it.
+    Searches by ticker or company name, 2 days either side first, then 4 days either side if nothing turned up.
+    """
     d0 = datetime.strptime(day, "%Y-%m-%d")
-    after = datetime.fromtimestamp(d0.timestamp() - 2 * 86400).strftime("%Y-%m-%d")
-    before = datetime.fromtimestamp(d0.timestamp() + 2 * 86400).strftime("%Y-%m-%d")
     who = f'({ticker} OR "{name}")' if name and name.upper() != ticker else ticker
-    q = urllib.parse.quote(f"{who} stock after:{after} before:{before}")
-    items = _nu_fetch_feed(f"https://news.google.com/rss/search?q={q}&hl=en-US&gl=US&ceid=US:en",
-                           "Google News", "markets", 8)
+    items = []
+    for span in (2, 4):
+        after = datetime.fromtimestamp(d0.timestamp() - span * 86400).strftime("%Y-%m-%d")
+        before = datetime.fromtimestamp(d0.timestamp() + span * 86400).strftime("%Y-%m-%d")
+        q = urllib.parse.quote(f"{who} stock after:{after} before:{before}")
+        items = _nu_fetch_feed(f"https://news.google.com/rss/search?q={q}&hl=en-US&gl=US&ceid=US:en",
+                               "Google News", "markets", 8)
+        if items:
+            break
     if not items:
         return None
     target = d0.timestamp() + 12 * 3600
@@ -2532,25 +2539,15 @@ def get_price_spikes(ticker: str, threshold_pct: float = 3.0):
             if best:
                 sp["reason"], sp["reason_url"], sp["reason_source"] = best["title"], best.get("url"), best.get("source")
 
-        # 2) older spikes: dated Google News search around the spike day
-        def dated_search(sp):
-            d0 = datetime.strptime(sp["date"], "%Y-%m-%d")
-            after = datetime.fromtimestamp(d0.timestamp() - 2 * 86400).strftime("%Y-%m-%d")
-            before = datetime.fromtimestamp(d0.timestamp() + 2 * 86400).strftime("%Y-%m-%d")
-            q = urllib.parse.quote(f"{t} stock after:{after} before:{before}")
-            items = _nu_fetch_feed(f"https://news.google.com/rss/search?q={q}&hl=en-US&gl=US&ceid=US:en",
-                                   "Google News", "markets", 5)
-            if items:
-                a = items[0]
-                title = _nu_re.sub(r"\s+-\s+[^-]{2,60}$", "", a["title"]).strip() or a["title"]
-                return title, a.get("url"), a.get("source")
-            return None
-        todo = [sp for sp in spikes if not sp["reason"]][:12]
+        # 2) older spikes (Yahoo only keeps about a week of news): a dated Google News search for every spike,
+        #    by ticker or company name, 2 then 4 days either side, closest headline to the day
+        todo = [sp for sp in spikes if not sp["reason"]]
         if todo:
+            name = _spike_company(t)
             with _NuPool(max_workers=6) as pool:
-                for sp, res in zip(todo, pool.map(dated_search, todo)):
+                for sp, res in zip(todo, pool.map(lambda x: _spike_headline(t, name, x["date"]), todo)):
                     if res:
-                        sp["reason"], sp["reason_url"], sp["reason_source"] = res
+                        sp["reason"], sp["reason_url"], sp["reason_source"] = res["reason"], res["reason_url"], res["reason_source"]
 
         # 3) plain-English driver
         for sp in spikes:
