@@ -410,7 +410,7 @@ def review(user_id, entries=None, use_holdings=False):
             facts["flags"].append(f"{sectors[top]} of {len(positions)} stocks are in {top}")
 
     snapshot = snapshot_markdown(facts, with_positions)
-    prompt = f"""You are a professional portfolio analyst at Stock Market Pro.
+    prompt = f"""You are a professional portfolio analyst at Aymetrix.
 
 {snapshot or 'No portfolio-level figures are available.'}
 

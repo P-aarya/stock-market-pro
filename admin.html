@@ -7,7 +7,7 @@
 <meta name="color-scheme" content="dark"/>
 <link rel="icon" type="image/png" href="/icon-192.png"/>
 <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
-<title>User access · Stock Market Pro</title>
+<title>User access · Aymetrix</title>
 <style>
 :root{--bg0:#050508;--bg1:#08080e;--bg2:#0c0c16;--bg3:#10101e;--b1:#1c1c30;--b2:#252540;--blue:#4f8ef7;--cyan:#00d4ff;--green:#00e676;--red:#ff4444;--yellow:#ffc800;
   --t1:#fff;--t2:#c0cce0;--t3:#7d8da3;--mono:'JetBrains Mono',ui-monospace,monospace;--sans:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -107,7 +107,7 @@ code{font-family:var(--mono);background:var(--bg3);border:1px solid var(--b1);bo
 </head>
 <body>
 <header class="top">
-  <div class="brand"><img src="/icon-192.png" alt=""/><div><b>Stock Market <span>Pro</span></b><small>User access</small></div></div>
+  <div class="brand"><img src="/icon-192.png" alt=""/><div><b>Aymetrix</b><small>User access</small></div></div>
   <nav class="nav"><a href="/">← Dashboard</a><span class="me" id="me"></span><a class="out" href="/logout">Sign out</a></nav>
 </header>
 
@@ -190,7 +190,7 @@ function render(){
   }).join('');
   const rows = visibleUsers();
   document.getElementById('list').innerHTML = rows.length ? rows.map(rowHtml).join('') : `<div class="empty">${escapeHtml(emptyMessage())}</div>`;
-  document.title = (c.pending ? `(${c.pending}) ` : '') + 'User access · Stock Market Pro';
+  document.title = (c.pending ? `(${c.pending}) ` : '') + 'User access · Aymetrix';
 }
 
 let toastTimer;

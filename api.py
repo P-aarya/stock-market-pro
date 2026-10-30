@@ -25,7 +25,7 @@ load_dotenv()
 import auth
 import auth_pages
 
-app = FastAPI(title="Stock Market Pro API")
+app = FastAPI(title="Aymetrix API")
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(",") if o.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 
@@ -52,6 +52,9 @@ _APP_ASSETS = {
     "/apple-touch-icon.png": ("apple-touch-icon.png", "image/png"),
     "/icon-192.png": ("icon-192.png", "image/png"),
     "/icon-512.png": ("icon-512.png", "image/png"),
+    "/favicon.png": ("favicon.png", "image/png"),
+    "/favicon.ico": ("favicon.png", "image/png"),
+    "/logo.svg": ("logo.svg", "image/svg+xml"),
 }
 _OPEN_PATHS = {"/login", "/register", "/logout", "/health", "/api/auth/status", "/favicon.ico"} | set(_APP_ASSETS)
 
@@ -392,70 +395,122 @@ _SEARCH_ALIASES = {
     "home depot": "HD", "exxon": "XOM", "mobil": "XOM", "tsmc": "TSM", "taiwan semi": "TSM", "aws": "AMZN",
     "hewlett": "HPQ", "pepsi": "PEP", "starbucks": "SBUX", "snapchat": "SNAP",
 }
-_SEARCH_PLAIN_NAME = ("REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LOWER(company_name), '''', ''), '.', ''), "
-                      "'&', ''), ' ', ''), '-', '')")
+_DIRECTORY_TTL = 60            # seconds the stock list is reused before it is read again
+_directory_cache = {"at": 0.0, "rows": []}
+_directory_lock = __import__("threading").Lock()
 
 
-def _like_escape(text):
-    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+def _plain_name(text):
+    """'McDonald's Corp.' -> 'mcdonaldscorp' (lower case, letters and digits only)."""
+    return __import__("re").sub(r"[^a-z0-9]", "", (text or "").lower())
 
 
-@app.get("/api/stocks/search")
-def search_stocks(q: str = "", limit: int = 10):
+def _stock_directory():
     """
-    Search stocks by ticker or company name for the search boxes. One letter is enough.
-    Order: exact ticker, tickers starting with it, names starting with it, then any name containing it
-    (punctuation ignored, so "mcdonalds" finds McDonald's), biggest companies first. Brand names such as
-    "google" or "facebook" find their company, and a ticker typed one letter too long ("GOOGLE") finds GOOGL.
+    Every live stock (ticker, name, sector, price, change, market cap), biggest first. Read from the database at
+    most once a minute and kept in memory, so searching never waits for a new database connection.
+    """
+    now = time.time()
+    with _directory_lock:
+        if _directory_cache["rows"] and now - _directory_cache["at"] < _DIRECTORY_TTL:
+            return _directory_cache["rows"]
+    try:
+        rows = query("""
+            SELECT ticker, company_name, sector, current_price, price_change_pct, market_cap FROM stocks_live
+            WHERE current_price IS NOT NULL
+              AND last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)
+            ORDER BY market_cap DESC
+        """) or []
+    except Exception:
+        log.exception("Could not load the stock list for search")
+        with _directory_lock:
+            return _directory_cache["rows"]                 # keep the last good list
+    clean = []
+    for r in rows:
+        t = (r.get("ticker") or "").upper()
+        if not t:
+            continue
+        name = r.get("company_name") or ""
+        clean.append({"ticker": t, "company_name": name, "sector": r.get("sector"),
+                      "current_price": r.get("current_price"), "price_change_pct": r.get("price_change_pct"),
+                      "market_cap": r.get("market_cap") or 0, "_low": name.lower(), "_plain": _plain_name(name)})
+    with _directory_lock:
+        _directory_cache.update(at=now, rows=clean)
+    return clean
+
+
+def rank_stock_matches(q, rows, limit=10):
+    """
+    The same matching the dashboard does in the browser, so both always agree. Order: exact ticker, tickers
+    starting with the text, names starting with it, names containing it, names containing it with punctuation and
+    spaces ignored ("mcdonalds" finds McDonald's); biggest companies first within each. Brand names ("google")
+    are put first. If nothing matches, a ticker typed one letter too long ("GOOGLE") finds the real one (GOOGL).
     """
     q = (q or "").strip()
     if not q:
         return []
+    up, low, key = q.upper(), q.lower(), _plain_name(q)
+    short = len(low) <= 2
+    word_start = __import__("re").compile(r"(^|[^a-z0-9])" + __import__("re").escape(low))
+    scored = []
+    for r in rows:
+        t = r["ticker"]
+        if t == up:
+            s = 0
+        elif t.startswith(up):
+            s = 1
+        elif r["_low"].startswith(low):
+            s = 2
+        elif short and word_start.search(r["_low"]):
+            s = 3                                        # one or two letters: only at the start of a word
+        elif not short and low in r["_low"]:
+            s = 3
+        elif not short and key and key in r["_plain"]:
+            s = 4
+        else:
+            continue
+        scored.append((s, -(r["market_cap"] or 0), r))
+    scored.sort(key=lambda x: (x[0], x[1]))
+    found = [x[2] for x in scored]
+    if not found and len(up) >= 4:
+        found = [dict(r, match="near") for r in rows if r["ticker"].startswith(up[:-1])]
+    brands = []
+    if len(low) >= 3:
+        for name, tk in _SEARCH_ALIASES.items():
+            if (name.startswith(low) or low.startswith(name)) and tk not in brands:
+                brands.append(tk)
+    by_ticker = {r["ticker"]: r for r in rows}
+    have = {r["ticker"] for r in found}
+    extra = [dict(by_ticker[t], match="brand") for t in brands if t in by_ticker and t not in have]
+    out = []
+    for r in (extra + found)[:limit]:
+        item = {k: v for k, v in r.items() if not k.startswith("_") and k != "market_cap"}
+        out.append(item)
+    return out
+
+
+@app.get("/api/stocks/directory")
+def stock_directory():
+    """The whole stock list in a compact form, so the dashboard can match as you type without asking the server."""
+    rows = _stock_directory()
+    return {"fields": ["ticker", "company_name", "sector", "current_price", "price_change_pct", "market_cap"],
+            "stocks": [[r["ticker"], r["company_name"], r["sector"], r["current_price"], r["price_change_pct"],
+                        r["market_cap"]] for r in rows],
+            "brands": _SEARCH_ALIASES}
+
+
+@app.get("/api/stocks/search")
+def search_stocks(q: str = "", limit: int = 10):
+    """Search stocks by ticker or company name (one letter is enough), answered from the in-memory stock list."""
     try:
         limit = max(1, min(int(limit or 10), 20))
     except (TypeError, ValueError):
         limit = 10
-    up, low = q.upper(), q.lower()
-    key = re.sub(r"[^a-z0-9]", "", low)
-    fresh = ("AND current_price IS NOT NULL "
-             "AND last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)")
-    cols = "ticker, company_name, sector, current_price, price_change_pct"
     try:
-        rows = query(f"""
-            SELECT {cols} FROM stocks_live
-            WHERE (ticker LIKE %s OR LOWER(company_name) LIKE %s OR ({_SEARCH_PLAIN_NAME} LIKE %s AND %s <> ''))
-            {fresh}
-            ORDER BY CASE WHEN ticker = %s THEN 0 WHEN ticker LIKE %s THEN 1 WHEN LOWER(company_name) LIKE %s THEN 2 ELSE 3 END,
-                     market_cap DESC
-            LIMIT %s
-        """, (_like_escape(up) + "%", "%" + _like_escape(low) + "%", "%" + _like_escape(key) + "%", key,
-              up, _like_escape(up) + "%", _like_escape(low) + "%", limit)) or []
-        if not rows and len(up) >= 4:
-            rows = query(f"SELECT {cols} FROM stocks_live WHERE ticker LIKE %s {fresh} ORDER BY market_cap DESC LIMIT %s",
-                         (_like_escape(up[:-1]) + "%", limit)) or []
-        brands = []
-        if len(low) >= 3:
-            for name, tk in _SEARCH_ALIASES.items():
-                if (name.startswith(low) or low.startswith(name)) and tk not in brands:
-                    brands.append(tk)
-        if brands:
-            have = {r["ticker"] for r in rows}
-            ph = ",".join(["%s"] * len(brands))
-            extra = query(f"SELECT {cols} FROM stocks_live WHERE ticker IN ({ph}) {fresh}", brands) or []
-            extra = [dict(r, match="brand") for r in extra if r["ticker"] not in have]
-            rows = extra + rows
-        return rows[:limit]
+        return rank_stock_matches(q, _stock_directory(), limit)
     except Exception:
-        log.exception("Stock search failed - using the simple search instead")
-        try:                                             # the plain ticker / name search always works
-            return query(f"""
-                SELECT {cols} FROM stocks_live
-                WHERE (ticker LIKE %s OR LOWER(company_name) LIKE %s) {fresh}
-                ORDER BY CASE WHEN ticker LIKE %s THEN 0 ELSE 1 END, market_cap DESC LIMIT %s
-            """, (up + "%", "%" + low + "%", up + "%", limit)) or []
-        except Exception:
-            log.exception("Simple stock search failed too")
-            return []
+        log.exception("Stock search failed")
+        return []
 
 
 @app.get("/api/stocks/{ticker}")

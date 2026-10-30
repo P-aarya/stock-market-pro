@@ -302,7 +302,7 @@ def compare_commodities(user_query: str, commodities: list, chat_history: list =
         msg = "I couldn't get enough price history to compare those right now. Please try again in a moment."
         return {"intent": "compare", "stocks_found": 0, "recommendation": msg, "portfolio_review": None, "top_stocks": [], "all_stocks": []}
 
-    answer = llm_text(with_history(f"""You are a commodities analyst at Stock Market Pro.
+    answer = llm_text(with_history(f"""You are a commodities analyst at Aymetrix.
 
 The user asked: "{user_query}"
 
@@ -375,7 +375,7 @@ def smart_route(user_query: str, chat_history: list = None, reply_to: str = "") 
     if reply_to:
         context_str += f'\n\nThe user is replying to this earlier message: "{reply_to[:300]}"'
 
-    prompt = f"""You are an AI financial assistant router for AYEIM Stock Market Pro — a US stock market and commodities dashboard.
+    prompt = f"""You are an AI financial assistant router for Aymetrix (by AYEIM Ventures) — a US stock market and commodities dashboard.
 {context_str}
 A user typed: "{user_query}"
 
@@ -615,7 +615,7 @@ def generate_recommendation(user_query: str, stocks: list, context: str = "", ch
     except:
         market_context = ""
 
-    prompt = f"""You are Bounty, a friendly and knowledgeable AI finance assistant for AYEIM Stock Market Pro.
+    prompt = f"""You are Bounty, a friendly and knowledgeable AI finance assistant for Aymetrix (by AYEIM Ventures).
 
 The user asked: "{user_query}"
 
@@ -692,7 +692,7 @@ def generate_comparison(user_query: str, snapshots: list, chat_history: list = N
     stock_data = "".join(format_stock(s) for s in snapshots)
     tickers = ", ".join(s["ticker"] for s in snapshots)
 
-    prompt = f"""You are a professional stock analyst at Stock Market Pro.
+    prompt = f"""You are a professional stock analyst at Aymetrix.
 
 The user asked: "{user_query}"
 
@@ -738,7 +738,7 @@ def generate_single_stock_response(ticker: str, user_query: str, chat_history: l
     attach_sentiment([s])
     stock_data = format_stock(s)
 
-    prompt = f"""You are a professional stock analyst at Stock Market Pro.
+    prompt = f"""You are a professional stock analyst at Aymetrix.
 
 The user asked: "{user_query}"
 
@@ -1182,7 +1182,7 @@ Analyst Target: ${s.get('target_mean_price') or 'N/A'} | Rating: {s.get('recomme
     context = f"The user was searching for: '{original_query}'" if original_query else ""
 
     prompt = f"""
-You are a professional stock analyst at Stock Market Pro.
+You are a professional stock analyst at Aymetrix.
 
 The user selected this stock to learn more about:
 {stock_data}
@@ -1251,7 +1251,7 @@ def review_portfolio(tickers: list, user_query: str = "", chat_history: list = N
     stock_data = "".join(format_stock(s) for s in snapshots)
     holdings = holdings_context(tickers)
 
-    prompt = f"""You are a portfolio analyst at Stock Market Pro.
+    prompt = f"""You are a portfolio analyst at Aymetrix.
 
 The user wants a portfolio review.
 {"User's question: " + user_query if user_query else ""}

@@ -12,8 +12,9 @@
 <link rel="manifest" href="/manifest.webmanifest"/>
 <!--SMP_USER-->
 <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
+<link rel="icon" type="image/png" sizes="64x64" href="/favicon.png"/>
 <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png"/>
-<title>Stock Market Pro — AYEIM Ventures</title>
+<title>Aymetrix — by AYEIM Ventures</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
@@ -30,7 +31,8 @@ body{background:var(--bg0);color:var(--t1);font-family:var(--sans);min-height:10
 
 .nav{background:var(--bg1);border-bottom:1px solid var(--b1);padding:0 28px;display:flex;align-items:center;justify-content:space-between;height:62px;position:sticky;top:0;z-index:200;}
 .brand{display:flex;align-items:center;gap:12px;}
-.brand-icon{width:38px;height:38px;background:var(--blue);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;}
+.brand-icon{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.brand-icon svg{width:100%;height:100%;display:block;}
 .brand-title{font-size:20px;font-weight:900;color:var(--t1);letter-spacing:-0.5px;}
 .brand-title span{color:var(--cyan);}
 .brand-sub{font-size:10px;color:var(--t3);letter-spacing:2px;text-transform:uppercase;font-weight:600;}
@@ -377,10 +379,10 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 
 <nav class="nav">
   <div class="brand">
-    <div class="brand-icon"><svg class="lic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></svg></div>
+    <div class="brand-icon"><svg viewBox="0 0 100 100" width="38" height="38" role="img" aria-label="Aymetrix logo"><rect width="100" height="100" rx="22" fill="#000E21"/><polygon points="50,16 82,81 66,71 50,39 34,71 18,81" fill="#FFFFFF"/><polygon points="50,49 69,84 50,75 31,84" fill="#FFFFFF" stroke="#F5A623" stroke-width="2.4" stroke-linejoin="round"/></svg></div>
     <div>
-      <div class="brand-title">Stock Market <span>Pro</span></div>
-      <div class="brand-sub">AYEIM Ventures</div>
+      <div class="brand-title">Aymetrix</div>
+      <div class="brand-sub">by AYEIM Ventures</div>
     </div>
   </div>
   <div class="ntabs">
@@ -4376,6 +4378,51 @@ async function checkConn(){
   mode 'token': a free question (AI Stock Finder); suggestions only when the last word(s) look like a stock name.
   Enter without a highlighted suggestion runs onEnter (Ask AI / Review / open the first match).
 */
+// ─── STOCK LIST FOR INSTANT SEARCH ───
+// The whole live stock list (about 2,200 rows) is loaded once in the background and refreshed every few minutes.
+// Search boxes then match on this computer as you type, with no wait for the server.
+const STOCK_DIR = { rows: [], brands: {}, loaded: false };
+const plainName = t => String(t || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+async function loadStockDirectory(){
+  try{
+    const r = await fetch(API + '/api/stocks/directory');
+    if(typeof signedOut === 'function' && signedOut(r)) return;
+    if(!r.ok) return;
+    const d = await r.json();
+    if(!d || !Array.isArray(d.stocks) || !d.stocks.length) return;
+    STOCK_DIR.rows = d.stocks.map(a => ({ ticker: String(a[0] || '').toUpperCase(), company_name: a[1] || '', sector: a[2] || '',
+      current_price: a[3], price_change_pct: a[4], market_cap: Number(a[5]) || 0, _low: String(a[1] || '').toLowerCase(), _plain: plainName(a[1]) }));
+    STOCK_DIR.brands = d.brands || {};
+    STOCK_DIR.loaded = true;
+  }catch(e){ /* the boxes fall back to asking the server */ }
+}
+/** Same order as the server: exact ticker, ticker start, name start, name contains, name contains ignoring punctuation;
+    brand names ("google") first; a ticker one letter too long ("GOOGLE") still finds the real one. */
+function rankStocks(q, limit){
+  q = String(q || '').trim(); if(!q || !STOCK_DIR.loaded) return [];
+  const up = q.toUpperCase(), low = q.toLowerCase(), key = plainName(q), scored = [];
+  const short = low.length <= 2, wordStart = new RegExp('(^|[^a-z0-9])' + low.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  for(const r of STOCK_DIR.rows){
+    let s;
+    if(r.ticker === up) s = 0;
+    else if(r.ticker.startsWith(up)) s = 1;
+    else if(r._low.startsWith(low)) s = 2;
+    else if(short && wordStart.test(r._low)) s = 3;          // one or two letters: only at the start of a word
+    else if(!short && r._low.includes(low)) s = 3;
+    else if(!short && key && r._plain.includes(key)) s = 4;
+    else continue;
+    scored.push([s, r]);
+  }
+  scored.sort((a, b) => a[0] - b[0] || b[1].market_cap - a[1].market_cap);
+  let found = scored.map(x => x[1]);
+  if(!found.length && up.length >= 4) found = STOCK_DIR.rows.filter(r => r.ticker.startsWith(up.slice(0, -1))).map(r => ({ ...r, match: 'near' }));
+  const brands = [];
+  if(low.length >= 3) for(const [name, tk] of Object.entries(STOCK_DIR.brands)) if((name.startsWith(low) || low.startsWith(name)) && !brands.includes(tk)) brands.push(tk);
+  const have = new Set(found.map(r => r.ticker));
+  const extra = brands.filter(t => !have.has(t)).map(t => STOCK_DIR.rows.find(r => r.ticker === t)).filter(Boolean).map(r => ({ ...r, match: 'brand' }));
+  return [...extra, ...found].slice(0, limit || 10);
+}
+
 function stockSuggest(inputId, opts){
   // Everything is looked up by id each time and the key/typing events are caught at document level,
   // so the box keeps working even if the page re-draws it.
@@ -4411,7 +4458,7 @@ function stockSuggest(inputId, opts){
     return out;
   };
   const fits = (s, q) => {           // free questions: only stocks whose ticker or a word of the name starts with what was typed
-    if(opts.mode !== 'token' || s.match === 'brand' || s._com) return true;
+    if(opts.mode !== 'token' || s.match === 'brand' || s.match === 'near' || s._com) return true;
     const u = q.toUpperCase();
     return (s.ticker||'').toUpperCase().startsWith(u) || new RegExp('(^|[^a-z0-9])'+reEsc(q.toLowerCase())).test((s.company_name||'').toLowerCase());
   };
@@ -4442,6 +4489,15 @@ function stockSuggest(inputId, opts){
   const lookup = async (loud) => {
     const my = ++seq, qs = queries();
     if(!qs.length){ close(); return []; }
+    if(STOCK_DIR.loaded){                                           // instant: matched on this computer
+      for(const q of qs){
+        const local = opts.extra ? opts.extra(q.text) : [];
+        const list = [...local, ...rankStocks(q.text, 10).filter(x => fits(x, q.text))].slice(0, opts.max || 10);
+        if(list.length){ part = q; show(list); return list; }
+      }
+      if(loud) note('No stocks match "' + qs[0].text + '"'); else close();
+      return [];
+    }
     if(loud) note('Searching...');
     let failed = false;
     for(const q of qs){
@@ -4460,7 +4516,7 @@ function stockSuggest(inputId, opts){
     else close();
     return [];
   };
-  const onTyping = () => { syncX(); clearTimeout(timer); timer = setTimeout(()=>lookup(opts.mode === 'whole'), 200); };
+  const onTyping = () => { syncX(); clearTimeout(timer); if(STOCK_DIR.loaded){ lookup(opts.mode === 'whole'); return; } timer = setTimeout(()=>lookup(opts.mode === 'whole'), 200); };
   const onKey = async (e) => {
     const box = getBox(), open = box && box.classList.contains('show') && items.length;
     if(e.key === 'ArrowDown' && open){ e.preventDefault(); active = (active+1) % items.length; paint(); return; }
@@ -4553,6 +4609,8 @@ async function init(){
 }
 
 initStockSuggest();
+loadStockDirectory();                      // the stock list for instant search (in the background)
+setInterval(loadStockDirectory, 5 * 60 * 1000);
 init();
 checkConn();
 setInterval(()=>{loadSummary();loadIndices();loadSentiment();loadCurrencies();},30000);

@@ -184,7 +184,7 @@ def _ask_password(email):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="Stock Market Pro account administration")
+    ap = argparse.ArgumentParser(description="Aymetrix account administration")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("migrate")
     lu = sub.add_parser("list-users")

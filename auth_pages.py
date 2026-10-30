@@ -37,8 +37,8 @@ def _page(title: str, body: str) -> str:
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#08080e"><meta name="color-scheme" content="dark">
 <link rel="icon" type="image/png" href="/icon-192.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/manifest.webmanifest">
-<title>{html.escape(title)} · Stock Market Pro</title><style>{_CSS}</style></head><body>
-<main class="card"><div class="brand"><img src="/icon-192.png" alt=""><div><b>Stock Market <span>Pro</span></b><small>AYEIM Ventures</small></div></div>
+<title>{html.escape(title)} · Aymetrix</title><style>{_CSS}</style></head><body>
+<main class="card"><div class="brand"><img src="/icon-192.png" alt=""><div><b>Aymetrix</b><small>by AYEIM Ventures</small></div></div>
 {body}</main></body></html>"""
 
 
@@ -92,4 +92,4 @@ def pending_page(email: str = "") -> str:
 
 
 def blocked_page() -> str:
-    return notice_page("No access", "This account doesn't have access to Stock Market Pro. If you think that's a mistake, please contact the administrator.")
+    return notice_page("No access", "This account doesn't have access to Aymetrix. If you think that's a mistake, please contact the administrator.")
