@@ -623,7 +623,6 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 
     <!-- Earnings Tab -->
     <div id="earn-tab-content">
-      <div class="info-note">Earnings dates from Yahoo Finance. Run fetch_earnings.py regularly to update. Shows all stocks with any earnings data.</div>
       <div class="tw"><table>
         <thead><tr><th>Ticker</th><th>Company</th><th>Sector</th><th>EPS Est.</th><th>EPS Actual</th><th>Price</th><th>Change</th></tr></thead>
         <tbody id="tb-earn"><tr><td colspan="9"><div class="load"><div class="spin"></div>Loading...</div></td></tr></tbody>
@@ -2048,7 +2047,7 @@ function renderPredictions(){
       </div>
       <div style="font-size:10px;font-weight:600;color:var(--t3);margin-top:6px">Hit rate: <span class="c">${f2(s.confidence_pct,0)}%</span> · ${s.model_used||'Ensemble'}</div>
     </div>`;
-  }).join(''):'<div class="empty">No predictions match filter. Run predict.py to generate predictions.</div>';
+  }).join(''):'<div class="empty">No predictions match this filter.</div>';
 
   const tot=Math.ceil(fPreds.length/PRED_SZ);
   let h=`<span class="pginfo">${fPreds.length} stocks</span>`;
@@ -2081,7 +2080,7 @@ function renderEarnings(){
       <td class="num">${fp(e.current_price)}</td>
       <td class="num ${gc(e.price_change_pct)}">${e.price_change_pct!=null?(e.price_change_pct>=0?'+':'')+f2(e.price_change_pct)+'%':'--'}</td>
     </tr>`;
-  }).join(''):'<tr><td colspan="7" class="empty">No earnings data. Run fetch_earnings.py to populate more data.</td></tr>';
+  }).join(''):'<tr><td colspan="7" class="empty">No earnings data available.</td></tr>';
   // Pagination
   const tot=Math.ceil(fEarn.length/EARN_SZ);
   let h=`<span class="pginfo">${fEarn.length} stocks with earnings data</span>`;
@@ -2753,7 +2752,7 @@ async function loadWorldNews(){
   try {
     const d = await api('/api/news/world');
     if(!Array.isArray(d)){
-      document.getElementById('news-grid').innerHTML='<div class="empty">Could not load live news. Make sure api.py is running, then click Refresh.</div>';
+      document.getElementById('news-grid').innerHTML='<div class="empty">Could not load live news. Please click Refresh to try again.</div>';
       return;
     }
     worldNewsData = d;
@@ -3455,7 +3454,7 @@ async function loadBalanceSheetAndPnL(){
     const yrs = years.map(h=>h.year);
 
     if(!yrs.length){
-      pnlEl.innerHTML='<div style="color:var(--t3);padding:16px;">No historical data available. Run fetch_stocks.py to populate.</div>';
+      pnlEl.innerHTML='<div style="color:var(--t3);padding:16px;">No historical data available.</div>';
       bsEl.innerHTML='<div style="color:var(--t3);padding:16px;">No historical data available.</div>';
       return;
     }
@@ -3966,7 +3965,7 @@ async function loadPrediction(){
   const d=await api('/api/ai-predictions/'+curTick);
 
   if(!d||!d.target_1m){
-    document.getElementById('pred-wrap').innerHTML='<div class="empty">No prediction available for '+curTick+'. Run predict.py to generate predictions for this stock.</div>';
+    document.getElementById('pred-wrap').innerHTML='<div class="empty">No prediction available for '+curTick+' yet.</div>';
     return;
   }
 
@@ -4098,11 +4097,6 @@ function buildAccuracyTracker(d, livePrice){
         <div class="mi"><div class="ml">Actual Price</div><div class="mv">${fp(lo.actual_price)}</div><div style="font-size:10px;color:var(--t3)">${actualDir}</div></div>
         <div class="mi"><div class="ml">Error</div><div class="mv ${hit?'g':'r'}">${f2(Math.abs(lo.actual_price-lo.target_1w)/lo.target_1w*100)}%</div></div>
       </div>
-    </div>`;
-  } else {
-    html += `<div style="color:var(--t3);font-size:12px;font-weight:600;padding:10px;background:var(--bg3);border-radius:7px">
-      No scored prediction yet. Each prediction is scored 7 trading days after it is made (this one was made on ${escapeHtml(String(runDate||'--'))}).
-      Run predict.py regularly to build the accuracy history.
     </div>`;
   }
 
@@ -6189,7 +6183,7 @@ async function ntCreateAlert(ticker, company, price, condition){
     }
     ntToast('Alert not set', d.message || 'Please try again.', 'warn');
   } catch(e){
-    ntToast('Alert not set', 'Could not reach the server. Is api.py running?', 'warn');
+    ntToast('Alert not set', 'Could not reach the server. Please try again.', 'warn');
   }
   return false;
 }
