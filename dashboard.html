@@ -41,9 +41,18 @@ body{background:var(--bg0);color:var(--t1);font-family:var(--sans);min-height:10
 .ntab:hover{color:var(--t1);}
 .ntab.on{background:var(--blue);color:#fff;}
 .nav-r{display:flex;align-items:center;gap:12px;}
-.nuser{font-size:12px;font-weight:600;color:var(--t2);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.nsignout{font-size:12px;font-weight:700;color:var(--t3);text-decoration:none;padding:6px 2px;}
-.nsignout:hover{color:var(--t1);}
+/* Settings (gear) and the profile menu (name, email, Sign out) at the right end of the top bar */
+.nicon{position:relative;display:inline-flex;align-items:center;justify-content:center;width:34px;height:30px;border-radius:20px;background:var(--bg3);border:1px solid var(--b2);color:var(--t1);text-decoration:none;cursor:pointer;padding:0;flex-shrink:0;}
+.nicon:hover{border-color:var(--cyan);}
+.nicon[aria-expanded="true"]{border-color:var(--blue);background:rgba(79,142,247,0.14);}
+.nprof{position:relative;display:inline-flex;}
+.nprof-menu{position:absolute;top:calc(100% + 8px);right:0;width:260px;max-width:calc(100vw - 24px);background:var(--bg2);border:1px solid var(--b2);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,0.6);padding:14px;z-index:100001;display:none;}
+.nprof-menu.open{display:block;}
+.nprof-name{font-size:14px;font-weight:800;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.nprof-email{font-size:12px;font-weight:600;color:var(--t3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px;}
+.nprof-hr{height:1px;background:var(--b1);margin:12px 0;}
+.nsignout{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--t2);text-decoration:none;padding:8px 6px;border-radius:7px;}
+.nsignout:hover{color:var(--t1);background:var(--bg3);}
 .nadmin{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:var(--cyan);text-decoration:none;white-space:nowrap;padding:5px 10px;border:1px solid rgba(0,212,255,0.3);border-radius:7px;}
 .nadmin:hover{background:rgba(0,212,255,0.1);}
 .nbadge{background:var(--yellow);color:#000;font-size:10px;font-weight:900;border-radius:9px;padding:1px 6px;min-width:18px;text-align:center;}
@@ -1252,7 +1261,7 @@ function logoImg(ticker,companyName,size=20){
 // belongs to one host name: reaching the API as "localhost" from a page opened at "127.0.0.1" would arrive signed out.
 const API=(location.protocol==='http:'||location.protocol==='https:')?location.origin:'http://localhost:8000';
 // The signed-in person. The server writes their id and email into <head> when it sends this page.
-const ME=(()=>{const g=n=>document.querySelector('meta[name="'+n+'"]')?.content||'';return{id:g('smp-user-id'),email:g('smp-user-email'),admin:g('smp-user-admin')==='1'};})();
+const ME=(()=>{const g=n=>document.querySelector('meta[name="'+n+'"]')?.content||'';return{id:g('smp-user-id'),email:g('smp-user-email'),name:g('smp-user-name'),admin:g('smp-user-admin')==='1'};})();
 // Market tab charts: neutral grey bars; green only for up/gains, red only for down/losses
 const MK={bar:'rgba(208,213,225,0.80)',up:'rgba(0,230,118,0.75)',down:'rgba(255,68,68,0.75)',tick:'#a3abbd',grid:'rgba(255,255,255,0.06)'};
 const C=['#4f8ef7','#00d4ff','#00e676','#a55eea','#ffc800','#ff4444','#ff4fa3','#ff6b35','#00c8a0','#b8ff5b','#c084fc','#ff8fab','#38d9f5','#57ff8f','#ffe066','#f97316'];
@@ -1318,23 +1327,45 @@ function showSignInProblem(){
   document.body.appendChild(d);
 }
 async function api(url){try{const r=await fetch(API+url);if(signedOut(r))return null;if(!r.ok)throw new Error(r.status);return await r.json();}catch(e){console.error('API:',url,e);return null;}}
-// Administrators get a link to the user-access page, with the number of people waiting for approval
+// Administrators get a link to the Admin Center, with the number of people waiting for approval plus open tickets
 function addAdminLink(nav){
-  const a=document.createElement('a');a.href='/admin';a.className='nadmin';a.title='User access';
+  const a=document.createElement('a');a.href='/admin';a.className='nadmin';a.title='Admin Center';
   a.innerHTML='<span class="na-icon"><svg class="lic" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></span><span class="na-text">Admin</span>';nav.appendChild(a);
   nav.closest('.nav')?.classList.add('has-admin');
   const refresh=async()=>{try{
     const r=await fetch(API+'/api/admin/summary');if(!r.ok)return;const d=await r.json();
     a.querySelector('.nbadge')?.remove();
-    if(d&&d.pending>0){const b=document.createElement('span');b.className='nbadge';b.textContent=d.pending>99?'99+':String(d.pending);a.title=d.pending+' waiting for approval';a.appendChild(b);}else a.title='User access';
+    const p=(d&&d.pending)||0,tk=(d&&d.open_tickets)||0,n=p+tk;
+    if(n>0){const b=document.createElement('span');b.className='nbadge';b.textContent=n>99?'99+':String(n);
+      a.title=[p?p+' waiting for approval':'',tk?tk+' open ticket'+(tk===1?'':'s'):''].filter(Boolean).join(' · ');a.appendChild(b);}else a.title='Admin Center';
   }catch(e){}};
   refresh();setInterval(()=>{if(!document.hidden)refresh();},60000);
 }
-// Who is signed in, and a way to sign out
+// Settings (gear) and the profile menu: who is signed in, and a way to sign out
+function addAccountMenu(nav){
+  const gear=document.createElement('a');gear.href='/settings';gear.className='nicon nsettings';gear.title='Settings';gear.setAttribute('aria-label','Settings');
+  gear.innerHTML='<svg class="lic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+  nav.appendChild(gear);
+  const wrap=document.createElement('div');wrap.className='nprof';
+  const btn=document.createElement('button');btn.type='button';btn.className='nicon nprof-btn';btn.title='Account';btn.setAttribute('aria-label','Account');btn.setAttribute('aria-haspopup','true');btn.setAttribute('aria-expanded','false');
+  btn.innerHTML='<svg class="lic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
+  const menu=document.createElement('div');menu.className='nprof-menu';menu.setAttribute('role','menu');
+  const nm=document.createElement('div');nm.className='nprof-name';nm.textContent=ME.name||'Your account';
+  const em=document.createElement('div');em.className='nprof-email';em.textContent=ME.email;em.title=ME.email;
+  const hr=document.createElement('div');hr.className='nprof-hr';
+  const out=document.createElement('a');out.href='/logout';out.className='nsignout';out.setAttribute('role','menuitem');
+  out.innerHTML='<svg class="lic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Sign out</span>';
+  menu.appendChild(nm);menu.appendChild(em);menu.appendChild(hr);menu.appendChild(out);
+  wrap.appendChild(btn);wrap.appendChild(menu);nav.appendChild(wrap);
+  const setOpen=(open)=>{menu.classList.toggle('open',open);btn.setAttribute('aria-expanded',open?'true':'false');};
+  btn.addEventListener('click',(e)=>{e.stopPropagation();setOpen(!menu.classList.contains('open'));});
+  document.addEventListener('click',(e)=>{if(!wrap.contains(e.target))setOpen(false);});
+  document.addEventListener('keydown',(e)=>{if(e.key==='Escape')setOpen(false);});
+  return {gear,btn,menu};
+}
 (()=>{const nav=document.querySelector('.nav-r');if(!nav)return;
-  if(ME.email){const u=document.createElement('span');u.className='nuser';u.textContent=ME.email;u.title='Signed in as '+ME.email;nav.appendChild(u);}
   if(ME.admin)addAdminLink(nav);
-  const a=document.createElement('a');a.href='/logout';a.className='nsignout';a.textContent='Sign out';if(ME.email)a.title='Signed in as '+ME.email;nav.appendChild(a);})();
+  addAccountMenu(nav);})();
 // A session for an account that has since been removed still passes the cookie check: send that person to the login page
 (async()=>{try{const r=await fetch(API+'/api/auth/status');const d=await r.json();if(d&&d.signed_in===false)location.href='/login';}catch(e){}})();
 
@@ -5773,12 +5804,11 @@ function loadPortfolioTickers() {
 html{-webkit-text-size-adjust:100%;}
 button,select,.ntab,.fstab,.stab,.fbtn,.pgbtn{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
 .ntab .ico{display:none;}
-/* The top bar must never wrap. As the window narrows it drops the least useful items first: "Connected", the email,
-   then the clock, and the tabs tighten; below 960px the tabs move to the bottom bar. */
-.ntab,.brand-title,.nuser,.nsignout,.ntime,#nconn{white-space:nowrap;}
+/* The top bar must never wrap. As the window narrows it drops the least useful items first: "Connected", then the
+   clock, and the tabs tighten; below 960px the tabs move to the bottom bar. Settings and the profile menu always stay. */
+.ntab,.brand-title,.nsignout,.ntime,#nconn{white-space:nowrap;}
 .brand,.nav-r{flex-shrink:0;}
 @media(max-width:1500px){.nav-r #nconn{display:none;}}
-@media(max-width:1400px){.nav-r .nuser{display:none;}}
 @media(max-width:1260px){.nav-r .ntime{display:none;}}
 @media(max-width:1160px){.nav{padding:0 16px;}.ntab{padding:7px 12px;}}
 @media(max-width:1060px){.nav-r .lpill{display:none;}.ntab{padding:7px 8px;}.nav{padding:0 12px;}.nav-r{gap:8px;}}
@@ -5797,8 +5827,8 @@ button,select,.ntab,.fstab,.stab,.fbtn,.pgbtn{touch-action:manipulation;-webkit-
   .brand-title{font-size:16px;white-space:nowrap;}
   .brand-sub{font-size:9px;letter-spacing:1.5px;white-space:nowrap;}
   .nav-r{gap:8px;flex-shrink:0;}
-  .nav-r #nconn,.nav-r .nuser{display:none;}
-  .nsignout{padding:10px 2px;}
+  .nav-r #nconn{display:none;}
+  .nsignout{padding:11px 6px;}
   .nav-r .ntime{font-size:11px;}
   .lpill{padding:3px 9px;font-size:11px;}
   /* the tabs become a bottom bar, in easy reach of a thumb */
@@ -6115,6 +6145,7 @@ function ntDoAction(a){
   try { window.focus(); } catch(e){}
   if(a.type === 'stock' && a.ticker){ try { openStock(a.ticker); } catch(e){} }
   else if(a.type === 'url' && a.url){ window.open(a.url, '_blank', 'noopener'); }
+  else if(a.type === 'page' && typeof a.url === 'string' && /^\/settings(#[\w-]*)?$/.test(a.url)){ location.href = a.url; }
   else if(a.type === 'eco'){
     try {
       const btn = document.querySelector('.ntab');
@@ -6270,6 +6301,24 @@ function ntEventReminders(){
   });
 }
 
+// ─── Help Desk replies (ticket updates waiting for this person) ──────────
+// The server keeps each update until a browser has shown it, so a reply that arrives while you're away is shown next time.
+let ntSupportBusy = false;                                 // one check at a time, so an update is never shown twice
+async function ntPollSupport(){
+  if(ntSupportBusy) return;
+  ntSupportBusy = true;
+  try {
+    let d;
+    try { const r = await fetch(`${API}/api/support/updates`); if(!r.ok) return; d = await r.json(); } catch(e){ return; }
+    const ups = (d && d.updates) || [];
+    if(!ups.length) return;
+    ups.forEach(u => ntNotify('support', u.title, u.body || '', {type:'page', url: u.link || '/settings#help'}, {tag:'support-'+u.id}));
+    try {
+      await fetch(`${API}/api/support/updates/seen`, {method:'POST', headers:{'Content-Type':'application/json','X-Requested-With':'fetch'}, body: JSON.stringify({ids: ups.map(u => u.id)})});
+    } catch(e){}
+  } finally { ntSupportBusy = false; }
+}
+
 // ─── Bell panel ──────────────────────────────────────────
 function ntToggleBell(ev){
   if(ev) ev.stopPropagation();
@@ -6301,7 +6350,7 @@ function ntRenderBell(){
   const list = document.getElementById('nt-list');
   if(!list) return;
   if(!ntHistory.length){
-    list.innerHTML = '<div class="nt-empty">No notifications yet.<br>Price alerts, important market news and economic events will show up here.</div>';
+    list.innerHTML = '<div class="nt-empty">No notifications yet.<br>Price alerts, important market news, economic events and Help Desk replies will show up here.</div>';
     return;
   }
   const ago = ts => { const m = Math.round((Date.now()-ts)/60000); return m < 1 ? 'just now' : m < 60 ? m+'m ago' : m < 1440 ? Math.round(m/60)+'h ago' : Math.round(m/1440)+'d ago'; };
@@ -6373,6 +6422,9 @@ setInterval(checkAlertsForNotifications, 60 * 1000);      // price alerts: every
 setTimeout(ntPollFeed, 6000);
 setInterval(ntPollFeed, 5 * 60 * 1000);                   // news + economic events: every 5 minutes
 setInterval(ntEventReminders, 60 * 1000);                 // 15-minute release reminders
+setTimeout(ntPollSupport, 3000);
+setInterval(() => { if(!document.hidden) ntPollSupport(); }, 20 * 1000);   // Help Desk replies: every 20 seconds ...
+document.addEventListener('visibilitychange', () => { if(!document.hidden) ntPollSupport(); });   // ... and as soon as you come back to the tab
 
 // ─── QUARTERLY RESULTS ─────────────────────────────────────
 async function loadQuarterly(){

@@ -24,6 +24,8 @@ load_dotenv()
 
 import auth
 import auth_pages
+import mailer
+import support
 
 app = FastAPI(title="Aymetrix API")
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(",") if o.strip()]
@@ -43,6 +45,12 @@ SESSION_COOKIE = "smp_session"
 _login_by_client = auth.RateLimiter(5, 300)     # wrong passwords per client in 5 minutes ...
 _login_by_email = auth.RateLimiter(10, 900)     # ... and per account in 15 minutes
 _signups = auth.RateLimiter(5, 3600)            # sign-up attempts per client in an hour
+_resets_by_email = auth.RateLimiter(3, 3600)    # password reset emails per address in an hour ...
+_resets_by_client = auth.RateLimiter(10, 3600)  # ... and per client
+_reset_tries = auth.RateLimiter(20, 3600)       # new-password submissions per client in an hour
+_password_changes = auth.RateLimiter(10, 900)   # wrong current passwords per account in 15 minutes (Settings and admin rights)
+_tickets_by_user = auth.RateLimiter(5, 3600)    # new tickets per account in an hour
+_ticket_replies = auth.RateLimiter(30, 3600)    # replies per account in an hour
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Files a phone fetches for "Add to Home Screen" (app icon + manifest). The browser asks for them without the login
 # cookie, and they hold nothing private, so they stay reachable before sign-in.
@@ -56,19 +64,25 @@ _APP_ASSETS = {
     "/favicon.ico": ("favicon.png", "image/png"),
     "/logo.svg": ("logo.svg", "image/svg+xml"),
 }
-_OPEN_PATHS = {"/login", "/register", "/logout", "/health", "/api/auth/status", "/favicon.ico"} | set(_APP_ASSETS)
+_OPEN_PATHS = {"/login", "/register", "/logout", "/forgot-password", "/reset-password", "/health", "/api/auth/status", "/favicon.ico"} | set(_APP_ASSETS)
 
 
 _SETUP_HINT = "The accounts tables need a database update. Run: python manage_users.py migrate"
 
 
+def _usable(token, user) -> bool:
+    """An approved account, and a cookie made after the account's last password change."""
+    return bool(user) and user["status"] == "approved" and auth.session_current(token, user)
+
+
 async def _approved_user(request: Request):
     """The account behind the session cookie if it still exists and is approved, else None. Uses the short-lived cache."""
-    user_id = auth.read_token(request.cookies.get(SESSION_COOKIE, ""))
+    token = request.cookies.get(SESSION_COOKIE, "")
+    user_id = auth.read_token(token)
     if user_id is None:
         return None
     user = await run_in_threadpool(auth.access_for, user_id)
-    return user if user and user["status"] == "approved" else None
+    return user if _usable(token, user) else None
 
 
 def _unavailable(request: Request, status: int, message: str):
@@ -126,11 +140,14 @@ def _is_https(request: Request) -> bool:
     return request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
 
 
-def _start_session(request: Request, user_id: int) -> RedirectResponse:
-    response = RedirectResponse("/", status_code=303)
+def _set_session_cookie(request: Request, response, user_id: int):
     response.set_cookie(SESSION_COOKIE, auth.make_token(user_id), max_age=auth.SESSION_DAYS * 86400, httponly=True,
                         samesite="lax", secure=_is_https(request))
     return response
+
+
+def _start_session(request: Request, user_id: int) -> RedirectResponse:
+    return _set_session_cookie(request, RedirectResponse("/", status_code=303), user_id)
 
 
 async def _read_form(request: Request) -> dict:
@@ -145,7 +162,7 @@ def login_page(request: Request):
     if user_id is not None:
         try:
             user = auth.access_for(user_id)
-            if user and user["status"] == "approved":
+            if _usable(cookie, user):
                 return RedirectResponse("/", status_code=303)
         except Exception:
             return RedirectResponse("/", status_code=303)      # the database hiccuped: don't sign anyone out for that
@@ -210,6 +227,7 @@ async def register(request: Request):
         return again(e.message, e.status)
     except auth.AccountsNotSetUp:
         return HTMLResponse(auth_pages.notice_page("Accounts aren't set up yet", "The site owner needs to run: python manage_users.py migrate"), status_code=503)
+    auth.record_signup(user)
     if user["status"] == "pending":
         return HTMLResponse(auth_pages.pending_page(user["email"]), status_code=200)      # no session until an administrator approves
     return _start_session(request, user["id"])
@@ -222,16 +240,107 @@ def logout():
     return response
 
 
+# ── Forgot password: an emailed link, valid for auth.RESET_MINUTES and usable once ──
+# The page answers the same way whether or not the email has an account, so it can't be used to find out who is
+# registered. The link carries a random token; only its hash is stored.
+_NO_REFERRER = {"Referrer-Policy": "no-referrer", "Cache-Control": "no-store"}
+
+
+def _email_base(request: Request) -> str:
+    return mailer.app_url(str(request.base_url))
+
+
+def send_reset_email(email: str, request: Request, actor_id=None) -> bool:
+    """Make a reset link for `email` and email it. False when there is no such account (nothing is sent)."""
+    made = auth.start_password_reset(email, actor_id)
+    if not made:
+        return False
+    account, token = made
+    base = _email_base(request)
+    if not base:
+        log.error("Can't email a password reset link: set APP_URL to the dashboard's address (e.g. https://your-app.onrender.com)")
+        return False
+    mailer.password_reset(account["email"], f"{base}/reset-password?token={urllib.parse.quote(token)}", auth.RESET_MINUTES, base,
+                          by_admin=actor_id is not None)
+    return True
+
+
+@app.get("/forgot-password", response_class=HTMLResponse)
+def forgot_password_page():
+    return HTMLResponse(auth_pages.forgot_page(), headers=_NO_REFERRER)
+
+
+@app.post("/forgot-password")
+async def forgot_password(request: Request):
+    form = await _read_form(request)
+    email = auth.normalize_email(form.get("email"))
+    client = _client_id(request)
+    if _resets_by_client.blocked(client):
+        return HTMLResponse(auth_pages.forgot_page("Too many requests from your network. Please wait a while and try again.", email),
+                            status_code=429, headers=_NO_REFERRER)
+    try:
+        auth.check_email(email)
+    except auth.AuthError as e:
+        return HTMLResponse(auth_pages.forgot_page(e.message, email), status_code=400, headers=_NO_REFERRER)
+    _resets_by_client.record(client)
+    if not _resets_by_email.blocked(email):                 # over the limit: say the same thing, just don't send again
+        _resets_by_email.record(email)
+        try:
+            await run_in_threadpool(send_reset_email, email, request)
+        except Exception:
+            log.exception("Password reset request failed")
+            return HTMLResponse(auth_pages.notice_page("Something went wrong", "We couldn't send the email just now. Please try again in a few minutes.",
+                                                       "/forgot-password", "Try again"), status_code=503, headers=_NO_REFERRER)
+    return HTMLResponse(auth_pages.reset_sent_page(email, auth.RESET_MINUTES), headers=_NO_REFERRER)
+
+
+@app.get("/reset-password", response_class=HTMLResponse)
+def reset_password_page(token: str = ""):
+    try:
+        valid = auth.check_reset_token(token) is not None
+    except Exception:
+        log.exception("Checking a reset link failed")
+        return HTMLResponse(auth_pages.notice_page("Something went wrong", "We couldn't check this link just now. Please try again in a few minutes."),
+                            status_code=503, headers=_NO_REFERRER)
+    if not valid:
+        return HTMLResponse(auth_pages.reset_expired_page(), status_code=410, headers=_NO_REFERRER)
+    return HTMLResponse(auth_pages.reset_page(token), headers=_NO_REFERRER)
+
+
+@app.post("/reset-password")
+async def reset_password(request: Request):
+    form = await _read_form(request)
+    token = form.get("token", "")
+    client = _client_id(request)
+    if _reset_tries.blocked(client):
+        return HTMLResponse(auth_pages.reset_page(token, "Too many attempts. Please wait a while and try again."), status_code=429, headers=_NO_REFERRER)
+    _reset_tries.record(client)
+    try:
+        await run_in_threadpool(auth.finish_password_reset, token, form.get("password", ""), form.get("confirm", ""))
+    except auth.AuthError as e:
+        if e.status == 410:
+            return HTMLResponse(auth_pages.reset_expired_page(), status_code=410, headers=_NO_REFERRER)
+        return HTMLResponse(auth_pages.reset_page(token, e.message), status_code=e.status, headers=_NO_REFERRER)
+    except Exception:
+        log.exception("Password reset failed")
+        return HTMLResponse(auth_pages.notice_page("Something went wrong", "Your password wasn't changed. Please try again in a few minutes."),
+                            status_code=503, headers=_NO_REFERRER)
+    response = HTMLResponse(auth_pages.reset_done_page(), headers=_NO_REFERRER)
+    response.delete_cookie(SESSION_COOKIE)
+    return response
+
+
 @app.get("/api/auth/status")
 def auth_status(request: Request):
-    user_id = auth.read_token(request.cookies.get(SESSION_COOKIE, ""))
+    token = request.cookies.get(SESSION_COOKIE, "")
+    user_id = auth.read_token(token)
     if user_id is None:
         return {"enabled": True, "signed_in": False, "user": None, "admin": False}
     try:
         user = auth.access_for(user_id)
     except Exception:
         return {"enabled": True, "signed_in": True, "user": None, "admin": False}   # a database hiccup shouldn't sign anyone out
-    if not user or user["status"] != "approved":
+    if not _usable(token, user):
         return {"enabled": True, "signed_in": False, "user": None, "admin": False}
     return {"enabled": True, "signed_in": True, "user": {"id": user["id"], "email": user["email"]}, "admin": bool(user["is_admin"])}
 
@@ -252,6 +361,7 @@ def _dashboard_response(request: Request):
             user = None
         meta = (f'<meta name="smp-user-id" content="{int(user_id)}">'
                 f'<meta name="smp-user-email" content="{_escape_html((user or {}).get("email", ""), quote=True)}">'
+                f'<meta name="smp-user-name" content="{_escape_html((user or {}).get("full_name") or "", quote=True)}">'
                 f'<meta name="smp-user-admin" content="{1 if getattr(request.state, "is_admin", False) else 0}">')
     # The page is different for every person, so it must never be stored by a browser cache or a shared proxy.
     return HTMLResponse(page.replace("<!--SMP_USER-->", meta, 1), headers={"Cache-Control": "private, no-store"})
@@ -1994,10 +2104,16 @@ def admin_list_users(admin_id: int = Depends(require_admin)):
 @app.get("/api/admin/summary")
 def admin_summary(admin_id: int = Depends(require_admin)):
     try:
-        return {"status": "success", "pending": auth.pending_count()}
+        pending = auth.pending_count()
     except Exception:
         log.exception("Counting pending accounts failed")
         return agent_error(500, "Something went wrong counting the pending accounts.")
+    try:
+        open_tickets = support.open_count()
+    except Exception:
+        log.exception("Counting open tickets failed")
+        open_tickets = 0
+    return {"status": "success", "pending": pending, "open_tickets": open_tickets}
 
 
 @app.post("/api/admin/users/{user_id}/status")
@@ -2010,6 +2126,240 @@ def admin_set_status(user_id: int, body: StatusBody, admin_id: int = Depends(req
     except Exception:
         log.exception("Changing an account's status failed")
         return agent_error(500, "Something went wrong saving that change.")
+
+
+def require_fetch(request: Request, user_id: int = Depends(current_user_id)) -> int:
+    """Changes made from the Settings page carry this header. A page on another site can't add it without the browser
+    first asking this server's permission, which it refuses."""
+    if request.headers.get("x-requested-with") != "fetch":
+        raise HTTPException(status_code=403, detail="This action must be made from the app itself.")
+    return user_id
+
+
+def _account_call(fn, *args):
+    try:
+        return fn(*args)
+    except auth.AuthError as e:
+        return agent_error(e.status, e.message)
+    except support.SupportError as e:
+        return agent_error(e.status, e.message)
+    except Exception:
+        log.exception("Account or Help Desk request failed")
+        return agent_error(500, "Something went wrong. Please try again.")
+
+
+# ── Settings: the signed-in person's own account ──
+@app.get("/settings")
+def settings_page(request: Request):
+    with open(os.path.join(_BASE_DIR, "settings.html"), encoding="utf-8") as f:
+        return HTMLResponse(f.read(), headers={"Cache-Control": "private, no-store"})
+
+
+class NameBody(BaseModel):
+    name: str = Field(default="", max_length=200)
+
+
+class PasswordBody(BaseModel):
+    current: str = Field(max_length=200)
+    new: str = Field(max_length=200)
+    confirm: str = Field(max_length=200)
+
+
+@app.get("/api/account")
+def get_account(user_id: int = Depends(current_user_id)):
+    def work():
+        profile = auth.get_profile(user_id)
+        if not profile:
+            raise auth.AuthError("That account no longer exists.", 404)
+        return {"status": "success", "account": profile}
+    return _account_call(work)
+
+
+@app.put("/api/account/name")
+def set_account_name(body: NameBody, user_id: int = Depends(require_fetch)):
+    return _account_call(lambda: {"status": "success", "name": auth.set_name(user_id, body.name)})
+
+
+@app.post("/api/account/password")
+def change_account_password(request: Request, body: PasswordBody, user_id: int = Depends(require_fetch)):
+    """Change the password. Every other browser signed in to this account is signed out; this one gets a fresh cookie."""
+    key = f"user:{user_id}"
+    if _password_changes.blocked(key):
+        return agent_error(429, "Too many attempts. Please wait 15 minutes and try again.")
+    try:
+        auth.change_password(user_id, body.current, body.new, body.confirm)
+    except auth.AuthError as e:
+        if e.status == 403:
+            _password_changes.record(key)
+        return agent_error(e.status, e.message)
+    except Exception:
+        log.exception("Changing a password failed")
+        return agent_error(500, "Something went wrong. Your password wasn't changed.")
+    _password_changes.clear(key)
+    return _set_session_cookie(request, JSONResponse({"status": "success", "message": "Password changed. Other devices have been signed out."}), user_id)
+
+
+# ── Help Desk for the signed-in person ──
+class TicketBody(BaseModel):
+    category: str = Field(max_length=30)
+    subject: str = Field(max_length=500)
+    message: str = Field(max_length=20000)
+
+
+class MessageBody(BaseModel):
+    message: str = Field(max_length=20000)
+
+
+class SeenBody(BaseModel):
+    ids: List[int] = Field(default_factory=list, max_length=50)
+
+
+def _email_of(user_id):
+    user = auth.access_for(user_id)
+    return (user or {}).get("email", "")
+
+
+@app.get("/api/support/tickets")
+def list_my_tickets(user_id: int = Depends(current_user_id)):
+    return _account_call(lambda: {"status": "success", "tickets": support.my_tickets(user_id), "categories": support.CATEGORIES})
+
+
+@app.post("/api/support/tickets")
+def raise_ticket(request: Request, body: TicketBody, user_id: int = Depends(require_fetch)):
+    key = f"user:{user_id}"
+    if _tickets_by_user.blocked(key):
+        return agent_error(429, "You've raised several tickets in the last hour. Please add to an existing ticket, or try again later.")
+
+    def work():
+        ticket = support.create_ticket(user_id, _email_of(user_id), body.category, body.subject, body.message, _email_base(request))
+        _tickets_by_user.record(key)
+        return {"status": "success", "ticket": ticket}
+    return _account_call(work)
+
+
+@app.get("/api/support/tickets/{ticket_id}")
+def get_my_ticket(ticket_id: int, user_id: int = Depends(current_user_id)):
+    return _account_call(lambda: {"status": "success", "ticket": support.my_ticket(user_id, ticket_id)})
+
+
+@app.post("/api/support/tickets/{ticket_id}/messages")
+def reply_my_ticket(request: Request, ticket_id: int, body: MessageBody, user_id: int = Depends(require_fetch)):
+    key = f"user:{user_id}"
+    if _ticket_replies.blocked(key):
+        return agent_error(429, "You're sending replies too quickly. Please wait a while and try again.")
+
+    def work():
+        ticket = support.reply_as_user(user_id, _email_of(user_id), ticket_id, body.message, _email_base(request))
+        _ticket_replies.record(key)
+        return {"status": "success", "ticket": ticket}
+    return _account_call(work)
+
+
+@app.get("/api/support/updates")
+def my_support_updates(user_id: int = Depends(current_user_id)):
+    """Ticket updates the bell hasn't shown yet."""
+    return _account_call(lambda: {"status": "success", "updates": support.pending_notices(user_id)})
+
+
+@app.post("/api/support/updates/seen")
+def my_support_updates_seen(body: SeenBody, user_id: int = Depends(require_fetch)):
+    return _account_call(lambda: {"status": "success", "marked": support.notices_shown(user_id, body.ids)})
+
+
+# ── Admin Center: overview, help desk, activity, admin rights, password reset emails ──
+class TicketReplyBody(BaseModel):
+    message: str = Field(max_length=20000)
+    status: Optional[Literal["open", "in_progress", "resolved"]] = None
+
+
+class TicketStatusBody(BaseModel):
+    status: Literal["open", "in_progress", "resolved"]
+
+
+class AdminRightsBody(BaseModel):
+    is_admin: bool
+    password: str = Field(max_length=200)
+
+
+@app.get("/api/admin/overview")
+def admin_overview(admin_id: int = Depends(require_admin)):
+    def work():
+        now = int(time.time())
+        users = auth.list_users()["users"]
+        day, week = now - 86400, now - 7 * 86400
+        recent = sorted((u for u in users if u.get("last_login_at")), key=lambda u: -u["last_login_at"])[:8]
+        try:
+            tickets = support.all_tickets()["counts"]
+        except Exception:
+            log.exception("Counting tickets failed")
+            tickets = None
+        return {"status": "success", "now": now,
+                "users": {"total": len(users), "new_this_week": sum(1 for u in users if (u.get("created_at") or 0) >= week),
+                          "signed_in_today": sum(1 for u in users if (u.get("last_login_at") or 0) >= day),
+                          "signed_in_this_week": sum(1 for u in users if (u.get("last_login_at") or 0) >= week),
+                          "pending": sum(1 for u in users if u["status"] == "pending"),
+                          "blocked": sum(1 for u in users if u["status"] == "blocked")},
+                "tickets": tickets,
+                "recent_sign_ins": [{"email": u["email"], "name": u.get("full_name") or "", "at": u["last_login_at"]} for u in recent]}
+    return _account_call(work)
+
+
+@app.get("/api/admin/tickets")
+def admin_tickets(admin_id: int = Depends(require_admin)):
+    return _account_call(lambda: {"status": "success", **support.all_tickets()})
+
+
+@app.get("/api/admin/tickets/{ticket_id}")
+def admin_ticket(ticket_id: int, admin_id: int = Depends(require_admin)):
+    return _account_call(lambda: {"status": "success", "ticket": support.staff_ticket(ticket_id)})
+
+
+@app.post("/api/admin/tickets/{ticket_id}/reply")
+def admin_ticket_reply(request: Request, ticket_id: int, body: TicketReplyBody, admin_id: int = Depends(require_admin_action)):
+    return _account_call(lambda: {"status": "success", "ticket": support.reply_as_staff(admin_id, ticket_id, body.message, body.status, _email_base(request))})
+
+
+@app.post("/api/admin/tickets/{ticket_id}/status")
+def admin_ticket_status(request: Request, ticket_id: int, body: TicketStatusBody, admin_id: int = Depends(require_admin_action)):
+    return _account_call(lambda: {"status": "success", "ticket": support.set_status(admin_id, ticket_id, body.status, _email_base(request))})
+
+
+@app.get("/api/admin/activity")
+def admin_activity(admin_id: int = Depends(require_admin)):
+    return _account_call(lambda: {"status": "success", "events": auth.recent_events(150)})
+
+
+@app.post("/api/admin/users/{user_id}/admin")
+def admin_set_rights(user_id: int, body: AdminRightsBody, admin_id: int = Depends(require_admin_action)):
+    """Give or remove administrator rights. The administrator confirms with their own password."""
+    key = f"user:{admin_id}"
+    if _password_changes.blocked(key):
+        return agent_error(429, "Too many wrong passwords. Please wait 15 minutes and try again.")
+    try:
+        return {"status": "success", "user": auth.set_admin_rights(admin_id, user_id, body.is_admin, body.password)}
+    except auth.AuthError as e:
+        if e.status == 403:
+            _password_changes.record(key)
+        return agent_error(e.status, e.message)
+    except Exception:
+        log.exception("Changing admin rights failed")
+        return agent_error(500, "Something went wrong saving that change.")
+
+
+@app.post("/api/admin/users/{user_id}/send-reset")
+def admin_send_reset(request: Request, user_id: int, admin_id: int = Depends(require_admin_action)):
+    """Email the person a link to set a new password. Their current password keeps working until they use it."""
+    def work():
+        target = auth.get_user(user_id)
+        if not target:
+            raise auth.AuthError("That account no longer exists.", 404)
+        if not mailer.configured():
+            raise auth.AuthError("Email isn't set up yet, so the link can't be sent. See the setup steps for MAIL_WEBHOOK_URL.", 503)
+        if not _email_base(request):
+            raise auth.AuthError("APP_URL isn't set, so the link can't be made.", 503)
+        send_reset_email(target["email"], request, actor_id=admin_id)
+        return {"status": "success", "message": f"A password reset link was emailed to {target['email']}."}
+    return _account_call(work)
 
 
 class WatchlistBody(BaseModel):

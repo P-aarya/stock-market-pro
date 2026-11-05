@@ -8,7 +8,7 @@ Account administration. Run it from the project folder with the virtual environm
     python manage_users.py approve EMAIL            let a pending or blocked account sign in
     python manage_users.py block EMAIL              stop an account signing in
     python manage_users.py claim-legacy EMAIL       give the portfolio, transactions and price alerts saved before accounts existed to EMAIL
-    python manage_users.py set-password EMAIL       reset someone's password (there is no "forgot password" email)
+    python manage_users.py set-password EMAIL       set someone's password (people can also use "Forgot password?" on the sign-in page)
     python manage_users.py list-users [--pending]
     python manage_users.py delete-user EMAIL --yes  delete an account together with its holdings, transactions, price alerts and watchlist
 
@@ -17,8 +17,10 @@ Back the database up before the first `migrate`: it adds a column to the portfol
 import argparse
 import getpass
 import sys
+import time
 
 import auth
+import support
 
 USERS_DDL = """CREATE TABLE IF NOT EXISTS users (
   id INT NOT NULL AUTO_INCREMENT,
@@ -107,6 +109,8 @@ def migrate(conn):
         else:
             done.append(f"{table}: not created yet (the app adds it, with its owner column, the first time it is used)")
     conn.commit()
+    done += auth.ensure_schema(conn)          # profile name, password resets, activity log
+    done += support.ensure_tables(conn)       # Help Desk tickets and bell notifications
     return done
 
 
@@ -127,6 +131,12 @@ def delete_account(conn, user_id):
     try:
         for table in (*owned_tables(cur), "watchlist"):
             cur.execute(f"DELETE FROM {table} WHERE user_id = %s", (user_id,))
+        if _has_table(cur, "support_tickets"):
+            cur.execute("DELETE FROM support_messages WHERE ticket_id IN (SELECT id FROM support_tickets WHERE user_id = %s)", (user_id,))
+            cur.execute("DELETE FROM support_tickets WHERE user_id = %s", (user_id,))
+        for table in ("user_notifications", "password_resets"):
+            if _has_table(cur, table):
+                cur.execute(f"DELETE FROM {table} WHERE user_id = %s", (user_id,))
         cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
         conn.commit()
     except Exception:
@@ -216,10 +226,12 @@ def main(argv=None):
             print("✓ Gave " + " and ".join(f"{n} {t} row{'s' if n != 1 else ''}" for t, n in claimed.items()) + f" to {auth.normalize_email(args.email)}")
         elif args.cmd == "set-password":
             user_id = _user_id(conn, args.email)
+            new_hash = auth.hash_password(_ask_password(auth.normalize_email(args.email)))
+            auth.ensure_schema(conn)
             cur = conn.cursor()
-            cur.execute("UPDATE users SET password_hash = %s WHERE id = %s", (auth.hash_password(_ask_password(auth.normalize_email(args.email))), user_id))
+            cur.execute("UPDATE users SET password_hash = %s, sessions_after = %s WHERE id = %s", (new_hash, int(time.time()), user_id))
             conn.commit()
-            print("✓ Password changed. Any browser that is signed in stays signed in until its session expires.")
+            print("✓ Password changed. Browsers signed in to this account are signed out.")
         elif args.cmd == "list-users":
             cur = conn.cursor()
             cur.execute("SELECT id, email, status, is_admin, created_at, last_login_at FROM users" + (" WHERE status = 'pending'" if args.pending else "") + " ORDER BY id")

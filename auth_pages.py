@@ -23,6 +23,10 @@ button:hover{background:#3d7de0}
 .err{margin:0 0 4px;padding:10px 12px;border:1px solid rgba(255,92,92,.35);background:rgba(255,92,92,.08);border-radius:9px;color:var(--red);font-weight:600;font-size:13px}
 .hint{margin:6px 0 0;color:var(--muted);font-size:12px}
 .alt{margin:20px 0 0;text-align:center;color:var(--muted);font-size:13px}
+.pw-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0 0}
+.pw-row .show{margin:0}
+.forgot{font-size:13px;white-space:nowrap}
+.ok{margin:0 0 4px;padding:10px 12px;border:1px solid rgba(0,230,118,.35);background:rgba(0,230,118,.08);border-radius:9px;color:#5dffa5;font-weight:600;font-size:13px}
 a{color:var(--cyan);font-weight:700;text-decoration:none}a:hover{text-decoration:underline}
 """
 
@@ -55,7 +59,7 @@ def login_page(error: str = "", email: str = "", signup_open: bool = True) -> st
 <input id="email" type="email" name="email" value="{html.escape(email, quote=True)}" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" required {'' if email else 'autofocus'}>
 <label for="password">Password</label>
 <input id="password" type="password" name="password" data-pw autocomplete="current-password" required {'autofocus' if email else ''}>
-<label class="show"><input type="checkbox" id="show"> Show password</label>
+<div class="pw-row"><label class="show"><input type="checkbox" id="show"> Show password</label><a class="forgot" href="/forgot-password">Forgot password?</a></div>
 <button type="submit">Sign in</button></form>{alt}{_SHOW_SCRIPT}""")
 
 
@@ -93,3 +97,49 @@ def pending_page(email: str = "") -> str:
 
 def blocked_page() -> str:
     return notice_page("No access", "This account doesn't have access to Aymetrix. If you think that's a mistake, please contact the administrator.")
+
+
+# ── forgot password ──
+
+def forgot_page(error: str = "", email: str = "") -> str:
+    return _page("Forgot password", f"""<h1>Forgot your password?</h1><p class="sub">Enter the email you signed up with. We'll email you a link to choose a new password.</p>
+{_error(error)}
+<form method="post" action="/forgot-password">
+<label for="email">Email</label>
+<input id="email" type="email" name="email" value="{html.escape(email, quote=True)}" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" required autofocus>
+<button type="submit">Send reset link</button></form>
+<p class="alt"><a href="/login">Back to sign in</a></p>""")
+
+
+def reset_sent_page(email: str, minutes: int) -> str:
+    """The same answer whether or not the email has an account, so nobody can use this page to find out."""
+    return _page("Check your email", f"""<h1>Check your email</h1>
+<p class="sub">If an account exists for <b>{html.escape(email)}</b>, we've sent a link to reset the password. It works for {int(minutes)} minutes and can be used once.</p>
+<p class="sub">Nothing there after a few minutes? Check your spam folder, or <a href="/forgot-password">ask for another link</a>.</p>
+<p class="alt"><a href="/login">Back to sign in</a></p>""")
+
+
+def reset_page(token: str, error: str = "") -> str:
+    return _page("Choose a new password", f"""<h1>Choose a new password</h1><p class="sub">After this, you'll be signed out everywhere and can sign in with the new password.</p>
+{_error(error)}
+<form method="post" action="/reset-password">
+<input type="hidden" name="token" value="{html.escape(token, quote=True)}">
+<label for="password">New password</label>
+<input id="password" type="password" name="password" data-pw autocomplete="new-password" minlength="8" required autofocus>
+<p class="hint">At least 8 characters.</p>
+<label for="confirm">Repeat new password</label>
+<input id="confirm" type="password" name="confirm" data-pw autocomplete="new-password" minlength="8" required>
+<label class="show"><input type="checkbox" id="show"> Show passwords</label>
+<button type="submit">Save new password</button></form>{_SHOW_SCRIPT}""")
+
+
+def reset_expired_page() -> str:
+    return _page("Link expired", """<h1>This link has expired</h1>
+<p class="sub">Reset links work for a limited time and only once. Please ask for a new one.</p>
+<p class="alt"><a href="/forgot-password">Send a new link</a> &nbsp;·&nbsp; <a href="/login">Back to sign in</a></p>""")
+
+
+def reset_done_page() -> str:
+    return _page("Password changed", """<h1>Password changed</h1>
+<p class="ok" role="status">Your new password is saved. You've been signed out everywhere.</p>
+<p class="alt"><a href="/login">Sign in</a></p>""")

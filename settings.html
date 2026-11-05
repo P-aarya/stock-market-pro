@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/>
+<meta name="theme-color" content="#08080e"/>
+<meta name="color-scheme" content="dark"/>
+<link rel="icon" type="image/png" sizes="64x64" href="/favicon.png"/>
+<link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
+<title>Settings · Aymetrix</title>
+<style>
+:root{--bg0:#050508;--bg1:#08080e;--bg2:#0c0c16;--bg3:#10101e;--b1:#1c1c30;--b2:#252540;--blue:#4f8ef7;--cyan:#00d4ff;--green:#00e676;--red:#ff4444;--yellow:#ffc800;--gold:#F5A623;
+  --t1:#fff;--t2:#c0cce0;--t3:#7d8da3;--mono:'JetBrains Mono',ui-monospace,monospace;--sans:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg0);color:var(--t1);font:14px/1.45 var(--sans);min-height:100vh;min-height:100dvh}
+a{color:var(--cyan);text-decoration:none;font-weight:700}a:hover{text-decoration:underline}
+button,input,select,textarea{font-family:inherit}
+button{cursor:pointer;touch-action:manipulation}
+
+.top{background:var(--bg1);border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:calc(10px + env(safe-area-inset-top)) calc(24px + env(safe-area-inset-right)) 10px calc(24px + env(safe-area-inset-left));position:sticky;top:0;z-index:10}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.brand svg{width:36px;height:36px;flex-shrink:0;display:block}
+.brand b{display:block;font-size:17px;font-weight:900;letter-spacing:-.4px;white-space:nowrap}
+.brand small{display:block;color:var(--t3);font-size:10px;letter-spacing:2px;text-transform:uppercase;font-weight:700;white-space:nowrap}
+.top nav{display:flex;align-items:center;gap:16px;font-size:13px;flex-shrink:0}
+
+.wrap{max-width:1000px;margin:0 auto;padding:24px calc(24px + env(safe-area-inset-right)) calc(40px + env(safe-area-inset-bottom)) calc(24px + env(safe-area-inset-left));
+  display:grid;grid-template-columns:200px minmax(0,1fr);gap:24px;align-items:start}
+.side{position:sticky;top:84px;display:flex;flex-direction:column;gap:4px}
+.side h1{font-size:20px;letter-spacing:-.4px;margin:0 0 12px 4px}
+.sec-btn{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:1px solid transparent;background:none;color:var(--t2);font-size:13px;font-weight:700;padding:10px 12px;border-radius:9px}
+.sec-btn svg{width:16px;height:16px;flex-shrink:0}
+.sec-btn:hover{background:var(--bg2);color:var(--t1)}
+.sec-btn.on{background:rgba(79,142,247,.12);border-color:rgba(79,142,247,.35);color:#fff}
+.sec-btn .dot{margin-left:auto;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--gold);color:#1a1000;font-size:10px;font-weight:900;display:none;align-items:center;justify-content:center}
+.sec-btn .dot.show{display:inline-flex}
+
+.section{display:none}.section.on{display:block}
+.card{background:var(--bg2);border:1px solid var(--b1);border-radius:12px;padding:20px;margin-bottom:16px}
+.card h2{font-size:15px;letter-spacing:-.2px;margin-bottom:4px}
+.card .lead{color:var(--t3);font-size:13px;margin-bottom:16px}
+label{display:block;margin:14px 0 6px;color:var(--t3);font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase}
+label:first-of-type{margin-top:0}
+input[type=text],input[type=password],select,textarea{width:100%;padding:11px 12px;border-radius:9px;border:1px solid var(--b2);background:var(--bg3);color:var(--t1);font-size:14px;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--blue)}
+input[readonly]{color:var(--t2);background:var(--bg1)}
+textarea{min-height:120px;resize:vertical;line-height:1.5}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.hint{color:var(--t3);font-size:12px;margin-top:6px}
+.check{display:flex;align-items:center;gap:8px;margin-top:12px;color:var(--t2);font-size:13px;font-weight:600;letter-spacing:0;text-transform:none}
+.check input{width:16px;height:16px}
+.actions{display:flex;align-items:center;gap:10px;margin-top:18px;flex-wrap:wrap}
+.btn{border:1px solid var(--b2);background:var(--bg3);color:var(--t1);font-size:13px;font-weight:800;padding:10px 18px;border-radius:8px;min-height:40px}
+.btn:hover:not(:disabled){border-color:var(--blue)}
+.btn:disabled{opacity:.55;cursor:wait}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}.btn.primary:hover:not(:disabled){background:#3d7de0}
+.msg{font-size:13px;font-weight:700}.msg.ok{color:var(--green)}.msg.err{color:#ff8d8d}
+
+.facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.fact{background:var(--bg3);border:1px solid var(--b1);border-radius:10px;padding:12px 14px;min-width:0}
+.fact .l{font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:1.1px;margin-bottom:4px}
+.fact .v{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.badge{display:inline-block;padding:3px 9px;border-radius:5px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;border:1px solid;white-space:nowrap}
+.s-open{color:var(--yellow);background:rgba(255,200,0,.1);border-color:rgba(255,200,0,.25)}
+.s-in_progress{color:var(--cyan);background:rgba(0,212,255,.1);border-color:rgba(0,212,255,.25)}
+.s-resolved{color:var(--green);background:rgba(0,230,118,.1);border-color:rgba(0,230,118,.25)}
+.b-admin{color:var(--cyan);background:rgba(0,212,255,.1);border-color:rgba(0,212,255,.25)}
+.b-user{color:var(--t2);background:var(--bg3);border-color:var(--b2)}
+
+.hd-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.hd-head h2{margin:0}
+.tickets{display:flex;flex-direction:column}
+.tk{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:14px 4px;border-bottom:1px solid var(--b1);cursor:pointer;text-decoration:none;color:inherit;font-weight:inherit}
+.tk:last-child{border-bottom:0}
+.tk:hover{background:rgba(79,142,247,.05);text-decoration:none}
+.tk .sub{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--t1)}
+.tk .meta{color:var(--t3);font-size:12px}
+.tk .new{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--gold);margin-right:7px;vertical-align:1px}
+.empty{padding:28px 10px;text-align:center;color:var(--t3);font-weight:600}
+
+.back{display:inline-flex;align-items:center;gap:6px;font-size:13px;margin-bottom:12px}
+.thread{display:flex;flex-direction:column;gap:12px;margin:16px 0}
+.bubble{max-width:85%;padding:12px 14px;border-radius:12px;border:1px solid var(--b1);background:var(--bg3);white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere}
+.bubble.me{align-self:flex-end;background:rgba(79,142,247,.12);border-color:rgba(79,142,247,.3)}
+.bubble.team{align-self:flex-start;border-color:rgba(245,166,35,.35);background:rgba(245,166,35,.06)}
+.bubble .who{display:block;font-size:11px;font-weight:800;color:var(--t3);margin-bottom:4px;white-space:normal}
+.bubble.team .who{color:var(--gold)}
+.tk-title{font-size:17px;font-weight:800;letter-spacing:-.3px;overflow-wrap:anywhere}
+.tk-sub{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--t3);font-size:12px;margin-top:6px}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);opacity:0;transition:.2s;pointer-events:none;
+  background:var(--bg3);border:1px solid var(--b2);border-radius:9px;padding:11px 16px;font-weight:700;font-size:13px;max-width:calc(100vw - 32px);z-index:50;box-shadow:0 8px 28px rgba(0,0,0,.5)}
+.toast.show{opacity:1;transform:translateX(-50%)}
+.toast.err{border-color:rgba(255,68,68,.5);color:#ff8d8d}.toast.ok{border-color:rgba(0,230,118,.4)}
+
+@media(max-width:760px){
+  .top{padding-left:calc(16px + env(safe-area-inset-left));padding-right:calc(16px + env(safe-area-inset-right))}
+  .wrap{grid-template-columns:minmax(0,1fr);gap:14px;padding:16px calc(16px + env(safe-area-inset-right)) 32px calc(16px + env(safe-area-inset-left))}
+  .side{position:static;flex-direction:row;gap:4px;background:var(--bg2);border:1px solid var(--b1);border-radius:10px;padding:4px}
+  .side h1{display:none}
+  .sec-btn{justify-content:center;padding:10px 6px;font-size:12px;gap:6px}
+  .sec-btn .dot{margin-left:0}
+  .card{padding:16px}
+  .row2,.facts{grid-template-columns:minmax(0,1fr)}
+  input[type=text],input[type=password],select,textarea{font-size:16px}
+  .actions .btn{flex:1 1 auto}
+  .bubble{max-width:92%}
+}
+@media(max-width:380px){.brand small{display:none}.sec-btn svg{display:none}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="22" fill="#000E21"/><polygon points="50,16 82,81 66,71 50,39 34,71 18,81" fill="#FFFFFF"/><polygon points="50,49 69,84 50,75 31,84" fill="#FFFFFF" stroke="#F5A623" stroke-width="2.4" stroke-linejoin="round"/></svg>
+    <div><b>Aymetrix</b><small>Settings</small></div>
+  </div>
+  <nav><a href="/">← Dashboard</a></nav>
+</header>
+
+<div class="wrap">
+  <aside class="side" role="tablist" aria-label="Settings sections">
+    <h1>Settings</h1>
+    <button class="sec-btn" type="button" data-sec="account" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Account</button>
+    <button class="sec-btn" type="button" data-sec="security" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Security</button>
+    <button class="sec-btn" type="button" data-sec="help" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.9.7c0 1.7-2.4 2.2-2.4 3.8"/><line x1="12" y1="17" x2="12" y2="17.01"/></svg>Help Desk<span class="dot" id="help-dot"></span></button>
+  </aside>
+
+  <main>
+    <!-- ACCOUNT -->
+    <section class="section" id="sec-account" aria-label="Account">
+      <div class="card">
+        <h2>Profile</h2>
+        <p class="lead">Your name is shown at the top of the dashboard.</p>
+        <form id="name-form" autocomplete="off">
+          <div class="row2">
+            <div><label for="name">Name</label><input id="name" type="text" maxlength="80" placeholder="Your name" autocomplete="name"/></div>
+            <div><label for="email">Email</label><input id="email" type="text" readonly/></div>
+          </div>
+          <div class="actions"><button class="btn primary" type="submit" id="name-save">Save</button><span class="msg" id="name-msg" role="status"></span></div>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Account details</h2>
+        <p class="lead">To change your email, raise a ticket in Help Desk.</p>
+        <div class="facts" id="facts"><div class="empty">Loading…</div></div>
+      </div>
+    </section>
+
+    <!-- SECURITY -->
+    <section class="section" id="sec-security" aria-label="Security">
+      <div class="card">
+        <h2>Change password</h2>
+        <p class="lead">You'll stay signed in here. Any other device signed in to your account will be signed out.</p>
+        <form id="pw-form">
+          <input type="text" name="username" id="pw-user" autocomplete="username" hidden/>
+          <label for="pw-current">Current password</label>
+          <input id="pw-current" type="password" data-pw autocomplete="current-password" required maxlength="128"/>
+          <div class="row2" style="margin-top:14px">
+            <div><label for="pw-new">New password</label><input id="pw-new" type="password" data-pw autocomplete="new-password" minlength="8" maxlength="128" required/></div>
+            <div><label for="pw-confirm">Repeat new password</label><input id="pw-confirm" type="password" data-pw autocomplete="new-password" minlength="8" maxlength="128" required/></div>
+          </div>
+          <p class="hint">At least 8 characters.</p>
+          <label class="check"><input type="checkbox" id="pw-show"/> Show passwords</label>
+          <div class="actions"><button class="btn primary" type="submit" id="pw-save">Change password</button><span class="msg" id="pw-msg" role="status"></span></div>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Forgot your password?</h2>
+        <p class="lead" style="margin:0">Sign out and use <b>Forgot password?</b> on the sign-in page. We'll email you a link to set a new one.</p>
+      </div>
+    </section>
+
+    <!-- HELP DESK -->
+    <section class="section" id="sec-help" aria-label="Help Desk">
+      <div id="help-list">
+        <div class="card">
+          <div class="hd-head"><div><h2>Help Desk</h2><p class="lead" style="margin:4px 0 0">Having a problem or a question? Raise a ticket and we'll get back to you here and by email.</p></div>
+            <button class="btn primary" type="button" id="new-ticket-btn">+ Raise a ticket</button></div>
+        </div>
+        <div class="card" id="new-ticket" hidden>
+          <h2>Raise a ticket</h2>
+          <form id="ticket-form">
+            <label for="tk-category">Category</label>
+            <select id="tk-category" required><option value="">Choose a category…</option></select>
+            <label for="tk-subject">Subject</label>
+            <input id="tk-subject" type="text" maxlength="120" required placeholder="A short summary, e.g. Prices not updating"/>
+            <label for="tk-message">Message</label>
+            <textarea id="tk-message" maxlength="4000" required placeholder="What happened, which stock or page, and what you expected to see."></textarea>
+            <div class="actions"><button class="btn primary" type="submit" id="tk-send">Send ticket</button><button class="btn" type="button" id="tk-cancel">Cancel</button><span class="msg" id="tk-msg" role="status"></span></div>
+          </form>
+        </div>
+        <div class="card">
+          <h2>My tickets</h2>
+          <div class="tickets" id="tickets" aria-live="polite"><div class="empty">Loading…</div></div>
+        </div>
+      </div>
+      <div id="help-ticket" hidden>
+        <div class="card">
+          <a class="back" href="#help">← All tickets</a>
+          <div id="tk-view"><div class="empty">Loading…</div></div>
+          <form id="reply-form">
+            <label for="reply">Reply</label>
+            <textarea id="reply" maxlength="4000" required placeholder="Add more details or answer the team…"></textarea>
+            <p class="hint" id="reply-hint"></p>
+            <div class="actions"><button class="btn primary" type="submit" id="reply-send">Send reply</button><span class="msg" id="reply-msg" role="status"></span></div>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const state = { account: null, tickets: [], categories: {}, ticket: null, busy: false };
+
+function escapeHtml(str){
+  return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+// Times arrive as seconds since 1970, so they are right in any time zone.
+function ago(seconds, now = Date.now()){
+  if(!seconds) return null;
+  const s = Math.max(0, Math.round(now / 1000 - seconds));
+  if(s < 60) return 'just now';
+  for(const [name, size] of [['day', 86400], ['hour', 3600], ['minute', 60]]){ const n = Math.floor(s / size); if(n >= 1) return `${n} ${name}${n === 1 ? '' : 's'} ago`; }
+}
+function dateOf(seconds){ return seconds ? new Date(seconds * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '—'; }
+function exact(seconds){ return seconds ? new Date(seconds * 1000).toLocaleString() : ''; }
+
+let toastTimer;
+function toast(message, kind){
+  const el = document.getElementById('toast');
+  el.textContent = message; el.className = 'toast show ' + (kind || '');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.className = 'toast'; }, 3500);
+}
+function setMsg(id, text, kind){ const el = document.getElementById(id); el.textContent = text || ''; el.className = 'msg ' + (kind || ''); }
+
+async function call(path, options = {}){
+  let res;
+  try { res = await fetch(path, { ...options, headers: { 'X-Requested-With': 'fetch', 'Content-Type': 'application/json', ...(options.headers || {}) } }); }
+  catch(e){ throw new Error('Could not reach the server. Check your connection.'); }
+  if(res.status === 401){ location.href = '/login'; throw new Error('Please sign in.'); }
+  let data = {}; try { data = await res.json(); } catch(e){}
+  if(!res.ok) throw new Error(data.message || data.detail || `Something went wrong (${res.status}).`);
+  return data;
+}
+
+// ── sections ──
+let routed = false;
+function route(){
+  const h = (location.hash || '#account').slice(1);
+  const m = h.match(/^ticket-(\d+)$/);
+  const sec = m ? 'help' : (['account', 'security', 'help'].includes(h) ? h : 'account');
+  document.querySelectorAll('.section').forEach(s => s.classList.toggle('on', s.id === 'sec-' + sec));
+  document.querySelectorAll('.sec-btn').forEach(b => { const on = b.dataset.sec === sec; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
+  document.getElementById('help-list').hidden = !!m;
+  document.getElementById('help-ticket').hidden = !m;
+  if(m) openTicket(Number(m[1]));
+  else if(sec === 'help' && routed) loadTickets();         // the first time, the list is already loading
+  routed = true;
+}
+
+// ── account ──
+function renderAccount(){
+  const a = state.account; if(!a) return;
+  document.getElementById('email').value = a.email;
+  document.getElementById('pw-user').value = a.email;
+  const nameEl = document.getElementById('name'); if(document.activeElement !== nameEl) nameEl.value = a.name || '';
+  const role = a.is_admin ? '<span class="badge b-admin">Admin</span>' : '<span class="badge b-user">User</span>';
+  const facts = [['Member since', escapeHtml(dateOf(a.created_at)), exact(a.created_at)],
+                 ['Last sign-in', escapeHtml(ago(a.last_login_at) || '—'), exact(a.last_login_at)],
+                 ['Account type', role, ''],
+                 ['Status', a.status === 'approved' ? '<span class="badge s-resolved">Active</span>' : `<span class="badge s-open">${escapeHtml(a.status)}</span>`, '']];
+  document.getElementById('facts').innerHTML = facts.map(([l, v, t]) => `<div class="fact"${t ? ` title="${escapeHtml(t)}"` : ''}><div class="l">${l}</div><div class="v">${v}</div></div>`).join('');
+}
+async function loadAccount(){
+  try { state.account = (await call('/api/account')).account; renderAccount(); }
+  catch(e){ document.getElementById('facts').innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`; }
+}
+async function saveName(ev){
+  ev.preventDefault();
+  const btn = document.getElementById('name-save'); if(btn.disabled) return;
+  btn.disabled = true; setMsg('name-msg', '');
+  try {
+    const d = await call('/api/account/name', { method: 'PUT', body: JSON.stringify({ name: document.getElementById('name').value }) });
+    if(state.account) state.account.name = d.name;
+    document.getElementById('name').value = d.name;
+    setMsg('name-msg', 'Saved', 'ok');
+  } catch(e){ setMsg('name-msg', e.message, 'err'); }
+  finally { btn.disabled = false; }
+}
+
+// ── security ──
+async function changePassword(ev){
+  ev.preventDefault();
+  const btn = document.getElementById('pw-save'); if(btn.disabled) return;
+  const current = document.getElementById('pw-current').value, next = document.getElementById('pw-new').value, confirm = document.getElementById('pw-confirm').value;
+  if(next !== confirm){ setMsg('pw-msg', "The two new passwords don't match.", 'err'); return; }
+  btn.disabled = true; setMsg('pw-msg', '');
+  try {
+    const d = await call('/api/account/password', { method: 'POST', body: JSON.stringify({ current, new: next, confirm }) });
+    document.getElementById('pw-form').reset();
+    setMsg('pw-msg', d.message || 'Password changed.', 'ok');
+  } catch(e){ setMsg('pw-msg', e.message, 'err'); }
+  finally { btn.disabled = false; }
+}
+
+// ── help desk ──
+function statusBadge(t){ return `<span class="badge s-${escapeHtml(t.status)}">${escapeHtml(t.status_label)}</span>`; }
+function ticketRow(t){
+  return `<a class="tk" href="#ticket-${Number(t.id)}">
+    <span class="sub">${t.unread ? '<span class="new" title="New reply"></span>' : ''}#${Number(t.id)} · ${escapeHtml(t.subject)}</span>
+    <span>${statusBadge(t)}</span>
+    <span class="meta">${escapeHtml(t.category_label)} · updated ${escapeHtml(ago(t.updated_at) || '')}</span>
+  </a>`;
+}
+function renderTickets(){
+  const el = document.getElementById('tickets');
+  el.innerHTML = state.tickets.length ? state.tickets.map(ticketRow).join('') : '<div class="empty">No tickets yet. If something isn\'t right, raise one above.</div>';
+  const unread = state.tickets.filter(t => t.unread).length;
+  const dot = document.getElementById('help-dot'); dot.textContent = unread; dot.classList.toggle('show', unread > 0);
+}
+async function loadTickets(){
+  try {
+    const d = await call('/api/support/tickets');
+    state.tickets = d.tickets; state.categories = d.categories || state.categories;
+    const sel = document.getElementById('tk-category');
+    if(sel.options.length <= 1) Object.entries(state.categories).forEach(([k, v]) => { const o = document.createElement('option'); o.value = k; o.textContent = v; sel.appendChild(o); });
+    renderTickets();
+  } catch(e){ document.getElementById('tickets').innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`; }
+}
+function showNewTicket(show){
+  document.getElementById('new-ticket').hidden = !show;
+  if(show){ setMsg('tk-msg', ''); document.getElementById('tk-category').focus(); }
+}
+async function sendTicket(ev){
+  ev.preventDefault();
+  const btn = document.getElementById('tk-send'); if(btn.disabled) return;
+  btn.disabled = true; setMsg('tk-msg', 'Sending…');
+  try {
+    const body = { category: document.getElementById('tk-category').value, subject: document.getElementById('tk-subject').value, message: document.getElementById('tk-message').value };
+    const d = await call('/api/support/tickets', { method: 'POST', body: JSON.stringify(body) });
+    document.getElementById('ticket-form').reset(); showNewTicket(false);
+    toast(`Ticket #${d.ticket.id} sent. We'll reply here and by email.`, 'ok');
+    state.tickets = [d.ticket, ...state.tickets.filter(x => x.id !== d.ticket.id)]; renderTickets();
+  } catch(e){ setMsg('tk-msg', e.message, 'err'); }
+  finally { btn.disabled = false; }
+}
+function renderTicket(){
+  const t = state.ticket; if(!t) return;
+  const thread = t.messages.map(m => `<div class="bubble ${m.from_staff ? 'team' : 'me'}"${m.sending ? ' style="opacity:.6"' : ''}><span class="who" title="${escapeHtml(exact(m.at))}">${m.from_staff ? 'Aymetrix team' : 'You'} · ${m.sending ? 'sending…' : escapeHtml(ago(m.at) || '')}</span>${escapeHtml(m.body)}</div>`).join('');
+  document.getElementById('tk-view').innerHTML = `<div class="tk-title">#${Number(t.id)} · ${escapeHtml(t.subject)}</div>
+    <div class="tk-sub">${statusBadge(t)}<span>${escapeHtml(t.category_label)}</span><span>· opened ${escapeHtml(dateOf(t.created_at))}</span></div>
+    <div class="thread">${thread}</div>`;
+  document.getElementById('reply-hint').textContent = t.status === 'resolved' ? 'This ticket is resolved. Replying will open it again.' : '';
+}
+async function openTicket(id){
+  document.getElementById('tk-view').innerHTML = '<div class="empty">Loading…</div>'; setMsg('reply-msg', '');
+  try {
+    state.ticket = (await call(`/api/support/tickets/${id}`)).ticket; renderTicket();
+    const listed = state.tickets.find(x => x.id === id); if(listed && listed.unread){ listed.unread = false; renderTickets(); }
+  }
+  catch(e){ state.ticket = null; document.getElementById('tk-view').innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`; }
+}
+// A reply shows at once; it is saved in the background and taken back out if saving fails.
+async function sendReply(ev){
+  ev.preventDefault();
+  const btn = document.getElementById('reply-send'), box = document.getElementById('reply');
+  const t = state.ticket; if(btn.disabled || !t) return;
+  const message = box.value.trim(); if(!message){ setMsg('reply-msg', 'Please write a message.', 'err'); return; }
+  const before = t;
+  state.ticket = { ...t, messages: [...t.messages, { from_staff: false, body: message, at: Math.floor(Date.now() / 1000), sending: true }] };
+  box.value = ''; btn.disabled = true; setMsg('reply-msg', ''); renderTicket();
+  try {
+    const d = await call(`/api/support/tickets/${t.id}/messages`, { method: 'POST', body: JSON.stringify({ message }) });
+    if(state.ticket && state.ticket.id === t.id){ state.ticket = d.ticket; renderTicket(); }
+    const i = state.tickets.findIndex(x => x.id === t.id); if(i >= 0){ state.tickets[i] = { ...state.tickets[i], status: d.ticket.status, status_label: d.ticket.status_label, updated_at: d.ticket.updated_at, unread: false }; renderTickets(); }
+    setMsg('reply-msg', 'Sent', 'ok');
+  } catch(e){
+    if(state.ticket && state.ticket.id === t.id){ state.ticket = before; renderTicket(); box.value = message; }
+    setMsg('reply-msg', e.message + ' Your reply was not sent.', 'err');
+  }
+  finally { btn.disabled = false; }
+}
+
+document.querySelectorAll('.sec-btn').forEach(b => b.addEventListener('click', () => { location.hash = b.dataset.sec; }));
+document.getElementById('name-form').addEventListener('submit', saveName);
+document.getElementById('pw-form').addEventListener('submit', changePassword);
+document.getElementById('pw-show').addEventListener('change', e => document.querySelectorAll('input[data-pw]').forEach(i => { i.type = e.target.checked ? 'text' : 'password'; }));
+document.getElementById('new-ticket-btn').addEventListener('click', () => showNewTicket(true));
+document.getElementById('tk-cancel').addEventListener('click', () => showNewTicket(false));
+document.getElementById('ticket-form').addEventListener('submit', sendTicket);
+document.getElementById('reply-form').addEventListener('submit', sendReply);
+window.addEventListener('hashchange', route);
+setInterval(() => { if(!document.hidden && !document.getElementById('help-ticket').hidden && state.ticket) call(`/api/support/tickets/${state.ticket.id}`).then(d => { const n = d.ticket.messages.length; if(n !== state.ticket.messages.length || d.ticket.status !== state.ticket.status){ state.ticket = d.ticket; renderTicket(); } }).catch(() => {}); }, 30000);
+loadAccount();
+loadTickets();
+route();
+</script>
+</body>
+</html>

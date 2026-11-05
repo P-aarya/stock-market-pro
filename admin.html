@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/>
 <meta name="theme-color" content="#08080e"/>
 <meta name="color-scheme" content="dark"/>
-<link rel="icon" type="image/png" href="/icon-192.png"/>
+<link rel="icon" type="image/png" sizes="64x64" href="/favicon.png"/>
 <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
-<title>User access · Aymetrix</title>
+<title>Admin Center · Aymetrix</title>
 <style>
 :root{--bg0:#050508;--bg1:#08080e;--bg2:#0c0c16;--bg3:#10101e;--b1:#1c1c30;--b2:#252540;--blue:#4f8ef7;--cyan:#00d4ff;--green:#00e676;--red:#ff4444;--yellow:#ffc800;
   --t1:#fff;--t2:#c0cce0;--t3:#7d8da3;--mono:'JetBrains Mono',ui-monospace,monospace;--sans:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -83,6 +83,72 @@ code{font-family:var(--mono);background:var(--bg3);border:1px solid var(--b1);bo
 .toast.show{opacity:1;transform:translateX(-50%)}
 .toast.err{border-color:rgba(255,68,68,.5);color:#ff8d8d}.toast.ok{border-color:rgba(0,230,118,.4)}
 
+/* Admin Center sections */
+.brand svg{width:36px;height:36px;flex-shrink:0;display:block}
+.views{display:flex;gap:4px;background:var(--bg2);border:1px solid var(--b1);border-radius:11px;padding:4px;margin-bottom:20px;overflow-x:auto;scrollbar-width:none}
+.views::-webkit-scrollbar{display:none}
+.view-btn{border:0;background:none;color:var(--t3);font-size:13px;font-weight:800;padding:10px 16px;border-radius:8px;white-space:nowrap;display:inline-flex;align-items:center;gap:7px}
+.view-btn:hover{color:var(--t1)}
+.view-btn.on{background:var(--blue);color:#fff}
+.view-btn .vn{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--yellow);color:#000;font-size:10px;font-weight:900;display:none;align-items:center;justify-content:center}
+.view-btn .vn.show{display:inline-flex}
+.view{display:none}.view.on{display:block}
+.tiles.six{grid-template-columns:repeat(3,1fr)}
+.card{background:var(--bg2);border:1px solid var(--b1);border-radius:12px;padding:18px;margin-bottom:16px}
+.card h2{font-size:15px;margin-bottom:12px}
+.mini{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--b1);font-size:13px}
+.mini:last-child{border-bottom:0}
+.mini .e{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.mini .t{color:var(--t3);white-space:nowrap;font-size:12px}
+.btn.small{font-size:11px;padding:6px 10px;min-height:32px}
+.btn.gold{color:var(--yellow);border-color:rgba(255,200,0,.35);background:rgba(255,200,0,.06)}.btn.gold:hover:not(:disabled){background:rgba(255,200,0,.14)}
+.s-open{color:var(--yellow);background:rgba(255,200,0,.1);border-color:rgba(255,200,0,.25)}
+.s-in_progress{color:var(--cyan);background:rgba(0,212,255,.1);border-color:rgba(0,212,255,.25)}
+.s-resolved{color:var(--green);background:rgba(0,230,118,.1);border-color:rgba(0,230,118,.25)}
+.thead,.trow{display:grid;grid-template-columns:70px minmax(0,2.2fr) minmax(0,1.4fr) 120px 110px;gap:12px;align-items:center;padding:12px 14px}
+.thead{font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:1.1px;border-bottom:1px solid var(--b1)}
+.trow{border-bottom:1px solid rgba(28,28,48,.8);cursor:pointer;color:inherit;font-weight:inherit;text-decoration:none}
+.trow:hover{background:rgba(79,142,247,.04);text-decoration:none}
+.trow .subj{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trow .cat{color:var(--t3);font-size:12px}
+.newdot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--yellow);margin-right:7px;vertical-align:1px}
+.thread{display:flex;flex-direction:column;gap:12px;margin:16px 0}
+.bubble{max-width:85%;padding:12px 14px;border-radius:12px;border:1px solid var(--b1);background:var(--bg3);white-space:pre-wrap;overflow-wrap:anywhere}
+.bubble.user{align-self:flex-start}
+.bubble.team{align-self:flex-end;background:rgba(79,142,247,.12);border-color:rgba(79,142,247,.3)}
+.bubble .who{display:block;font-size:11px;font-weight:800;color:var(--t3);margin-bottom:4px;white-space:normal}
+textarea,select.inp,input.inp{width:100%;padding:11px 12px;border-radius:9px;border:1px solid var(--b2);background:var(--bg3);color:var(--t1);font:14px var(--sans);outline:none}
+textarea{min-height:110px;resize:vertical;line-height:1.5}
+textarea:focus,select.inp:focus,input.inp:focus{border-color:var(--blue)}
+.reply-row{display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.reply-row select{width:auto;min-width:180px}
+.tk-title{font-size:18px;font-weight:800;letter-spacing:-.3px;overflow-wrap:anywhere}
+.tk-sub{display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:var(--t3);font-size:12px;margin-top:6px}
+.ev{display:grid;grid-template-columns:140px minmax(0,1fr);gap:12px;padding:11px 14px;border-bottom:1px solid rgba(28,28,48,.8);font-size:13px}
+.ev:last-child{border-bottom:0}
+.ev .when{color:var(--t3);font-size:12px}
+.ev b{font-weight:700}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:16px;z-index:60}
+.modal.open{display:flex}
+.modal .box{width:100%;max-width:400px;background:var(--bg2);border:1px solid var(--b2);border-radius:12px;padding:20px}
+.modal h3{font-size:16px;margin-bottom:6px}
+.modal p{color:var(--t3);font-size:13px;margin-bottom:14px}
+.modal .row{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;padding:0;border:0}
+.modal .err{color:#ff8d8d;font-size:13px;font-weight:700;margin-top:8px;min-height:1em}
+
+@media(max-width:820px){
+  .view-btn{flex:1 1 auto;justify-content:center;padding:9px 8px;font-size:12px;gap:5px}
+  .tiles.six{grid-template-columns:repeat(2,1fr)}
+  .thead{display:none}
+  .trow{grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;padding:14px}
+  .trow .num{display:none}
+  .trow .subj{grid-column:1}.trow .st{grid-column:2;justify-self:end;grid-row:1}
+  .trow .cat,.trow .upd{grid-column:1 / -1}
+  .ev{grid-template-columns:minmax(0,1fr);gap:2px}
+  textarea,select.inp,input.inp{font-size:16px}
+  .bubble{max-width:92%}
+  .reply-row select{flex:1 1 100%}
+}
 @media(max-width:820px){
   .top{padding-left:calc(14px + env(safe-area-inset-left));padding-right:calc(14px + env(safe-area-inset-right))}
   .nav .me{display:none}
@@ -107,11 +173,26 @@ code{font-family:var(--mono);background:var(--bg3);border:1px solid var(--b1);bo
 </head>
 <body>
 <header class="top">
-  <div class="brand"><img src="/icon-192.png" alt=""/><div><b>Aymetrix</b><small>User access</small></div></div>
+  <div class="brand"><svg viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="22" fill="#000E21"/><polygon points="50,16 82,81 66,71 50,39 34,71 18,81" fill="#FFFFFF"/><polygon points="50,49 69,84 50,75 31,84" fill="#FFFFFF" stroke="#F5A623" stroke-width="2.4" stroke-linejoin="round"/></svg><div><b>Aymetrix</b><small>Admin Center</small></div></div>
   <nav class="nav"><a href="/">← Dashboard</a><span class="me" id="me"></span><a class="out" href="/logout">Sign out</a></nav>
 </header>
 
 <main>
+  <nav class="views" id="views" aria-label="Admin Center sections">
+    <button class="view-btn" type="button" data-view="overview">Overview</button>
+    <button class="view-btn" type="button" data-view="users">Users<span class="vn" id="vn-users"></span></button>
+    <button class="view-btn" type="button" data-view="help">Help Desk<span class="vn" id="vn-help"></span></button>
+    <button class="view-btn" type="button" data-view="activity">Activity</button>
+  </nav>
+
+  <section class="view" id="view-overview" aria-label="Overview">
+    <h1>Overview</h1>
+    <p class="lead">Who is using Aymetrix, and what needs your attention.</p>
+    <section class="tiles six" id="ov-tiles"><div class="empty">Loading…</div></section>
+    <div class="card"><h2>Recent sign-ins</h2><div id="ov-recent"><div class="empty">Loading…</div></div></div>
+  </section>
+
+  <section class="view" id="view-users" aria-label="Users">
   <h1>User access</h1>
   <p class="lead">People who register wait here until you let them in. Approving takes effect on their next sign-in; blocking cuts off a signed-in person within seconds.</p>
 
@@ -121,16 +202,68 @@ code{font-family:var(--mono);background:var(--bg3);border:1px solid var(--b1);bo
     <div class="bar">
       <div class="tabs" id="tabs" role="tablist"></div>
       <span class="spacer"></span>
-      <input class="search" id="search" type="search" placeholder="Search email…" autocomplete="off" aria-label="Search by email"/>
+      <input class="search" id="search" type="search" placeholder="Search email or name…" autocomplete="off" aria-label="Search by email or name"/>
       <button class="refresh" id="refresh" type="button">↻ Refresh</button>
     </div>
     <div class="head"><span>Account</span><span>Status</span><span>Registered</span><span>Last sign-in</span><span></span></div>
     <div id="list" aria-live="polite"><div class="empty">Loading…</div></div>
   </section>
 
-  <p class="note">Administrator rights are granted from the command line, never from this page: <code>python manage_users.py make-admin EMAIL</code>.
-    People are not emailed. Tell someone when you have approved them.</p>
+  <p class="note">Making someone an administrator asks for your own password. People are not emailed when you approve them, so tell them.
+    <b>Send reset link</b> emails a person a link to choose a new password; their current password keeps working until they use it.</p>
+  </section>
+
+  <section class="view" id="view-help" aria-label="Help Desk">
+    <div id="help-list">
+      <h1>Help Desk</h1>
+      <p class="lead">Tickets raised from Settings. Replying or changing the status tells the person in their bell and by email.</p>
+      <section class="panel">
+        <div class="bar">
+          <div class="tabs" id="tk-tabs" role="tablist"></div>
+          <span class="spacer"></span>
+          <input class="search" id="tk-search" type="search" placeholder="Search subject or email…" autocomplete="off" aria-label="Search tickets"/>
+          <button class="refresh" id="tk-refresh" type="button">↻ Refresh</button>
+        </div>
+        <div class="thead"><span>#</span><span>Subject</span><span>From</span><span>Status</span><span>Updated</span></div>
+        <div id="tk-list" aria-live="polite"><div class="empty">Loading…</div></div>
+      </section>
+    </div>
+    <div id="help-ticket" hidden>
+      <div class="card">
+        <a href="#help" style="font-size:13px">← All tickets</a>
+        <div id="tk-view" style="margin-top:12px"><div class="empty">Loading…</div></div>
+        <form id="tk-reply-form">
+          <label for="tk-reply" class="sub" style="display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Reply</label>
+          <textarea id="tk-reply" maxlength="4000" placeholder="Write your reply. The person gets it in their bell and by email."></textarea>
+          <div class="reply-row">
+            <select class="inp" id="tk-reply-status" aria-label="Status after replying">
+              <option value="">Keep the current status</option><option value="in_progress">Set to In progress</option><option value="resolved">Set to Resolved</option><option value="open">Set to Open</option>
+            </select>
+            <button class="btn go" type="submit" id="tk-reply-send">Send reply</button>
+            <span class="spacer"></span>
+            <span id="tk-status-btns"></span>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="view-activity" aria-label="Activity">
+    <h1>Activity</h1>
+    <p class="lead">The latest account and Help Desk events, newest first.</p>
+    <section class="panel"><div id="ev-list"><div class="empty">Loading…</div></div></section>
+  </section>
 </main>
+
+<div class="modal" id="pw-modal" role="dialog" aria-modal="true" aria-labelledby="pw-title">
+  <form class="box" id="pw-modal-form">
+    <h3 id="pw-title">Confirm with your password</h3>
+    <p id="pw-text"></p>
+    <input class="inp" id="pw-modal-input" type="password" autocomplete="current-password" placeholder="Your password" required maxlength="128"/>
+    <div class="err" id="pw-modal-err" role="alert"></div>
+    <div class="row"><button class="btn" type="button" id="pw-modal-cancel">Cancel</button><button class="btn go" type="submit" id="pw-modal-ok">Confirm</button></div>
+  </form>
+</div>
 <div class="toast" id="toast" role="status"></div>
 
 <script>
@@ -153,21 +286,26 @@ function exact(seconds){ return seconds ? new Date(seconds * 1000).toLocaleStrin
 
 function visibleUsers(){
   const q = state.query.trim().toLowerCase();
-  return state.users.filter(u => (state.filter === 'all' || u.status === state.filter) && (!q || u.email.toLowerCase().includes(q)));
+  return state.users.filter(u => (state.filter === 'all' || u.status === state.filter) && (!q || u.email.toLowerCase().includes(q) || (u.full_name || '').toLowerCase().includes(q)));
 }
 
 function actionsFor(u){
-  if(u.is_admin) return '<span class="sub">Administrator</span>';
-  const b = (act, cls, text) => `<button class="btn ${cls}" type="button" data-id="${u.id}" data-act="${act}"${state.busy.has(u.id) ? ' disabled' : ''}>${text}</button>`;
+  const busy = state.busy.has(u.id) ? ' disabled' : '';
+  const more = (what, cls, text) => `<button class="btn small ${cls}" type="button" data-id="${u.id}" data-more="${what}"${busy}>${text}</button>`;
+  if(u.is_admin){
+    if(u.id === state.you) return '<span class="sub">Administrator (you)</span>' + more('reset', 'plain', 'Send reset link');
+    return '<span class="sub">Administrator</span>' + more('admin-off', 'plain', 'Remove admin') + more('reset', 'plain', 'Send reset link');
+  }
+  const b = (act, cls, text) => `<button class="btn ${cls}" type="button" data-id="${u.id}" data-act="${act}"${busy}>${text}</button>`;
   if(u.status === 'pending') return b('approved', 'go', 'Approve') + b('blocked', 'no', 'Decline');
-  if(u.status === 'approved') return b('blocked', 'no', 'Block');
+  if(u.status === 'approved') return b('blocked', 'no', 'Block') + more('admin-on', 'gold', 'Make admin') + more('reset', 'plain', 'Send reset link');
   return b('approved', 'plain', 'Unblock');
 }
 
 function rowHtml(u){
   const reg = ago(u.created_at), last = ago(u.last_login_at);
   return `<div class="row" data-row="${u.id}">
-    <div class="who"><div class="email" title="${escapeHtml(u.email)}">${escapeHtml(u.email)}${u.is_admin ? '<span class="badge b-admin">Admin</span>' : ''}</div></div>
+    <div class="who"><div class="email" title="${escapeHtml(u.email)}">${escapeHtml(u.email)}${u.is_admin ? '<span class="badge b-admin">Admin</span>' : ''}</div>${u.full_name ? `<div class="sub">${escapeHtml(u.full_name)}</div>` : ''}</div>
     <div class="st"><span class="badge b-${escapeHtml(u.status)}">${escapeHtml(u.status)}</span></div>
     <div class="when" title="${escapeHtml(exact(u.created_at))}"><span class="lbl">Registered</span>${reg ? escapeHtml(reg) : '—'}</div>
     <div class="when" title="${escapeHtml(exact(u.last_login_at))}"><span class="lbl">Last sign-in</span>${last ? escapeHtml(last) : '<span class="sub">never</span>'}</div>
@@ -190,7 +328,8 @@ function render(){
   }).join('');
   const rows = visibleUsers();
   document.getElementById('list').innerHTML = rows.length ? rows.map(rowHtml).join('') : `<div class="empty">${escapeHtml(emptyMessage())}</div>`;
-  document.title = (c.pending ? `(${c.pending}) ` : '') + 'User access · Aymetrix';
+  document.title = (c.pending ? `(${c.pending}) ` : '') + 'Admin Center · Aymetrix';
+  const vn = document.getElementById('vn-users'); if(vn){ vn.textContent = c.pending; vn.className = 'vn' + (c.pending ? ' show' : ''); }
 }
 
 let toastTimer;
@@ -246,11 +385,228 @@ document.getElementById('tabs').addEventListener('click', e => {
 document.getElementById('search').addEventListener('input', e => { state.query = e.target.value; render(); });
 document.getElementById('refresh').addEventListener('click', () => load(true));
 
+// ── Admin Center: the other sections ──
+const TK_FILTERS = [['open', 'Open'], ['in_progress', 'In progress'], ['resolved', 'Resolved'], ['all', 'All']];
+const center = { view: null, tickets: [], tkCounts: { open: 0, in_progress: 0, resolved: 0, total: 0 }, tkFilter: 'open', tkQuery: '', ticket: null, sending: false };
+
+function viewFromHash(){
+  const h = (location.hash || '').slice(1);
+  const m = h.match(/^ticket-(\d+)$/);
+  if(m) return { view: 'help', ticket: Number(m[1]) };
+  return { view: ['overview', 'users', 'help', 'activity'].includes(h) ? h : 'overview', ticket: null };
+}
+function route(){
+  const { view, ticket } = viewFromHash();
+  center.view = view;
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === 'view-' + view));
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('on', b.dataset.view === view));
+  document.getElementById('help-list').hidden = !!ticket;
+  document.getElementById('help-ticket').hidden = !ticket;
+  if(view === 'overview') loadOverview();
+  else if(view === 'users') load(true);
+  else if(view === 'help'){ if(ticket) openStaffTicket(ticket); else loadTickets(); }
+  else if(view === 'activity') loadActivity();
+}
+
+function tile(label, value, color){ return `<div class="tile" style="--c:${color}"><div class="l">${escapeHtml(label)}</div><div class="v">${escapeHtml(value ?? '—')}</div></div>`; }
+async function loadOverview(){
+  try {
+    const d = await call('/api/admin/overview');
+    const u = d.users, t = d.tickets;
+    document.getElementById('ov-tiles').innerHTML = [
+      tile('Total users', u.total, 'var(--blue)'), tile('New this week', u.new_this_week, 'var(--cyan)'),
+      tile('Signed in today', u.signed_in_today, 'var(--green)'), tile('Signed in this week', u.signed_in_this_week, 'var(--green)'),
+      tile('Waiting for approval', u.pending, 'var(--yellow)'), tile('Open tickets', t ? t.open : '—', 'var(--yellow)')].join('');
+    document.getElementById('ov-recent').innerHTML = d.recent_sign_ins.length
+      ? d.recent_sign_ins.map(r => `<div class="mini"><span class="e" title="${escapeHtml(r.email)}">${escapeHtml(r.name ? r.name + ' · ' + r.email : r.email)}</span><span class="t" title="${escapeHtml(exact(r.at))}">${escapeHtml(ago(r.at) || '')}</span></div>`).join('')
+      : '<div class="empty">Nobody has signed in yet.</div>';
+    if(t) setHelpCount(t.open);
+  } catch(e){ document.getElementById('ov-tiles').innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`; }
+}
+
+function setHelpCount(n){ const vn = document.getElementById('vn-help'); vn.textContent = n; vn.className = 'vn' + (n ? ' show' : ''); }
+function statusBadge(t){ return `<span class="badge s-${escapeHtml(t.status)}">${escapeHtml(t.status_label)}</span>`; }
+function visibleTickets(){
+  const q = center.tkQuery.trim().toLowerCase();
+  return center.tickets.filter(t => (center.tkFilter === 'all' || t.status === center.tkFilter) &&
+    (!q || t.subject.toLowerCase().includes(q) || (t.user_email || '').toLowerCase().includes(q) || ('#' + t.id) === q || String(t.id) === q));
+}
+function ticketRowHtml(t){
+  return `<a class="trow" href="#ticket-${Number(t.id)}">
+    <span class="num sub">#${Number(t.id)}</span>
+    <span class="subj">${t.unread ? '<span class="newdot" title="New message"></span>' : ''}${escapeHtml(t.subject)}</span>
+    <span class="cat" title="${escapeHtml(t.user_email)}">${escapeHtml(t.user_email)} · ${escapeHtml(t.category_label)}</span>
+    <span class="st">${statusBadge(t)}</span>
+    <span class="upd sub" title="${escapeHtml(exact(t.updated_at))}">${escapeHtml(ago(t.updated_at) || '')}</span>
+  </a>`;
+}
+function renderTickets(){
+  const c = center.tkCounts;
+  document.getElementById('tk-tabs').innerHTML = TK_FILTERS.map(([key, name]) => {
+    const n = key === 'all' ? c.total : c[key];
+    return `<button class="tab${center.tkFilter === key ? ' on' : ''}" type="button" role="tab" data-tkfilter="${key}" aria-selected="${center.tkFilter === key}">${name}<span class="n${key === 'open' && n ? ' alert' : ''}">${n}</span></button>`;
+  }).join('');
+  const rows = visibleTickets();
+  const empty = center.tkQuery.trim() ? 'No tickets match that search.' : { open: 'No open tickets. You are all caught up. ✓', in_progress: 'Nothing in progress.', resolved: 'No resolved tickets yet.', all: 'No tickets yet.' }[center.tkFilter];
+  document.getElementById('tk-list').innerHTML = rows.length ? rows.map(ticketRowHtml).join('') : `<div class="empty">${escapeHtml(empty)}</div>`;
+  setHelpCount(c.open);
+}
+async function loadTickets(quiet){
+  try {
+    const d = await call('/api/admin/tickets');
+    center.tickets = d.tickets; center.tkCounts = d.counts; renderTickets();
+  } catch(e){ if(!quiet) document.getElementById('tk-list').innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`; }
+}
+
+function renderStaffTicket(){
+  const t = center.ticket; if(!t) return;
+  const thread = t.messages.map(m => `<div class="bubble ${m.from_staff ? 'team' : 'user'}"${m.sending ? ' style="opacity:.6"' : ''}><span class="who" title="${escapeHtml(exact(m.at))}">${m.from_staff ? 'Aymetrix team' : escapeHtml(t.user_email)} · ${m.sending ? 'sending…' : escapeHtml(ago(m.at) || '')}</span>${escapeHtml(m.body)}</div>`).join('');
+  document.getElementById('tk-view').innerHTML = `<div class="tk-title">#${Number(t.id)} · ${escapeHtml(t.subject)}</div>
+    <div class="tk-sub">${statusBadge(t)}<span>${escapeHtml(t.category_label)}</span><span>· from ${escapeHtml(t.user_email)}</span><span>· opened ${escapeHtml(exact(t.created_at))}</span></div>
+    <div class="thread">${thread}</div>`;
+  document.getElementById('tk-status-btns').innerHTML = TK_FILTERS.filter(([k]) => k !== 'all' && k !== t.status)
+    .map(([k, name]) => `<button class="btn small plain" type="button" data-setstatus="${k}">Mark ${escapeHtml(name.toLowerCase())}</button>`).join(' ');
+}
+async function openStaffTicket(id){
+  document.getElementById('tk-view').innerHTML = '<div class="empty">Loading…</div>';
+  document.getElementById('tk-status-btns').innerHTML = '';
+  try {
+    center.ticket = (await call(`/api/admin/tickets/${id}`)).ticket; renderStaffTicket();
+    const listed = center.tickets.find(x => x.id === id); if(listed && listed.unread){ listed.unread = false; renderTickets(); }
+  }
+  catch(e){ center.ticket = null; document.getElementById('tk-view').innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`; }
+}
+const STATUS_LABELS = { open: 'Open', in_progress: 'In progress', resolved: 'Resolved' };
+// Keep the ticket list in step with a ticket that was just changed, without asking the server for the whole list again.
+function updateListedTicket(t){
+  const i = center.tickets.findIndex(x => x.id === t.id);
+  const row = { ...(i >= 0 ? center.tickets[i] : {}), ...t, unread: false };
+  delete row.messages;
+  if(i >= 0) center.tickets.splice(i, 1);
+  center.tickets.unshift(row);
+  const counts = { open: 0, in_progress: 0, resolved: 0, total: center.tickets.length };
+  center.tickets.forEach(x => { if(counts[x.status] != null) counts[x.status]++; });
+  center.tkCounts = counts; renderTickets();
+}
+// Replies and status changes show at once; they are saved in the background and undone if saving fails.
+async function sendStaffReply(ev){
+  ev.preventDefault();
+  const t = center.ticket; if(!t || center.sending) return;
+  const box = document.getElementById('tk-reply'), sel = document.getElementById('tk-reply-status');
+  const message = box.value.trim();
+  if(!message){ toast('Write a reply first.', 'err'); return; }
+  const status = sel.value || null;
+  const before = t;
+  center.ticket = { ...t, status: status || t.status, status_label: STATUS_LABELS[status || t.status], messages: [...t.messages, { from_staff: true, body: message, at: Math.floor(Date.now() / 1000), sending: true }] };
+  box.value = ''; sel.value = '';
+  center.sending = true; document.getElementById('tk-reply-send').disabled = true; renderStaffTicket();
+  try {
+    const d = await call(`/api/admin/tickets/${t.id}/reply`, { method: 'POST', body: JSON.stringify({ message, status }) });
+    if(center.ticket && center.ticket.id === t.id){ center.ticket = d.ticket; renderStaffTicket(); }
+    updateListedTicket(d.ticket); toast(`Reply sent to ${t.user_email}.`, 'ok');
+  } catch(e){
+    if(center.ticket && center.ticket.id === t.id){ center.ticket = before; renderStaffTicket(); box.value = message; sel.value = status || ''; }
+    toast(e.message + ' Your reply was not sent.', 'err');
+  }
+  finally { center.sending = false; document.getElementById('tk-reply-send').disabled = false; }
+}
+async function setTicketStatus(status){
+  const t = center.ticket; if(!t || center.sending) return;
+  const before = t;
+  center.ticket = { ...t, status, status_label: STATUS_LABELS[status] };
+  center.sending = true; renderStaffTicket();
+  try {
+    const d = await call(`/api/admin/tickets/${t.id}/status`, { method: 'POST', body: JSON.stringify({ status }) });
+    if(center.ticket && center.ticket.id === t.id){ center.ticket = d.ticket; renderStaffTicket(); }
+    updateListedTicket(d.ticket); toast(`Ticket #${t.id} is now ${d.ticket.status_label.toLowerCase()}. ${t.user_email} has been told.`, 'ok');
+  } catch(e){
+    if(center.ticket && center.ticket.id === t.id){ center.ticket = before; renderStaffTicket(); }
+    toast(e.message, 'err');
+  }
+  finally { center.sending = false; }
+}
+
+async function loadActivity(){
+  try {
+    const d = await call('/api/admin/activity');
+    document.getElementById('ev-list').innerHTML = d.events.length ? d.events.map(e => {
+      const by = e.by_someone_else && e.actor_email ? ` <span class="sub">by ${escapeHtml(e.actor_email)}</span>` : '';
+      const det = e.detail ? ` <span class="sub">· ${escapeHtml(e.detail)}</span>` : '';
+      return `<div class="ev"><span class="when" title="${escapeHtml(exact(e.at))}">${escapeHtml(ago(e.at) || '')}</span><span><b>${escapeHtml(e.label)}</b> · ${escapeHtml(e.user_email || '(deleted account)')}${by}${det}</span></div>`;
+    }).join('') : '<div class="empty">Nothing has happened yet.</div>';
+  } catch(e){ document.getElementById('ev-list').innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`; }
+}
+
+// Make or remove an administrator: confirmed with your own password, typed into a proper password box.
+let pwAction = null;
+function askPassword(text, action){
+  pwAction = action;
+  document.getElementById('pw-text').textContent = text;
+  document.getElementById('pw-modal-input').value = '';
+  document.getElementById('pw-modal-err').textContent = '';
+  document.getElementById('pw-modal').classList.add('open');
+  setTimeout(() => document.getElementById('pw-modal-input').focus(), 30);
+}
+function closePassword(){ document.getElementById('pw-modal').classList.remove('open'); pwAction = null; }
+async function confirmPassword(ev){
+  ev.preventDefault();
+  if(!pwAction) return;
+  const btn = document.getElementById('pw-modal-ok'); if(btn.disabled) return;
+  btn.disabled = true; document.getElementById('pw-modal-err').textContent = '';
+  try { await pwAction(document.getElementById('pw-modal-input').value); closePassword(); }
+  catch(e){ document.getElementById('pw-modal-err').textContent = e.message; }
+  finally { btn.disabled = false; }
+}
+async function moreAction(id, what){
+  const user = state.users.find(u => u.id === id);
+  if(!user || state.busy.has(id)) return;
+  if(what === 'admin-on' || what === 'admin-off'){
+    const make = what === 'admin-on';
+    askPassword(make ? `Make ${user.email} an administrator? They will be able to approve and block people and answer tickets.`
+                     : `Remove administrator rights from ${user.email}?`, async (password) => {
+      await call(`/api/admin/users/${id}/admin`, { method: 'POST', body: JSON.stringify({ is_admin: make, password }) });
+      toast(make ? `${user.email} is now an administrator.` : `${user.email} is no longer an administrator.`, 'ok');
+      await load(true);
+    });
+    return;
+  }
+  if(what === 'reset'){
+    if(!confirm(`Email ${user.email} a link to choose a new password? Their current password keeps working until they use it.`)) return;
+    state.busy.add(id); render();
+    try { const d = await call(`/api/admin/users/${id}/send-reset`, { method: 'POST' }); toast(d.message, 'ok'); }
+    catch(e){ toast(e.message, 'err'); }
+    finally { state.busy.delete(id); render(); }
+  }
+}
+
+document.getElementById('list').addEventListener('click', e => {
+  const b = e.target.closest('button[data-more]');
+  if(b) moreAction(Number(b.dataset.id), b.dataset.more);
+});
+document.getElementById('views').addEventListener('click', e => { const b = e.target.closest('button[data-view]'); if(b) location.hash = b.dataset.view; });
+document.getElementById('tk-tabs').addEventListener('click', e => { const t = e.target.closest('button[data-tkfilter]'); if(t){ center.tkFilter = t.dataset.tkfilter; renderTickets(); } });
+document.getElementById('tk-search').addEventListener('input', e => { center.tkQuery = e.target.value; renderTickets(); });
+document.getElementById('tk-refresh').addEventListener('click', () => loadTickets(false));
+document.getElementById('tk-reply-form').addEventListener('submit', sendStaffReply);
+document.getElementById('tk-status-btns').addEventListener('click', e => { const b = e.target.closest('button[data-setstatus]'); if(b) setTicketStatus(b.dataset.setstatus); });
+document.getElementById('pw-modal-form').addEventListener('submit', confirmPassword);
+document.getElementById('pw-modal-cancel').addEventListener('click', closePassword);
+document.getElementById('pw-modal').addEventListener('click', e => { if(e.target.id === 'pw-modal') closePassword(); });
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closePassword(); });
+window.addEventListener('hashchange', route);
+setInterval(() => {
+  if(document.hidden) return;
+  if(center.view === 'help' && !center.ticket) loadTickets(true);
+  else if(center.view === 'overview') loadOverview();
+}, 30000);
+
 // Who is signed in, and keep the list fresh while the page is open.
 fetch('/api/auth/status').then(r => r.json()).then(d => { if(d.user) document.getElementById('me').textContent = d.user.email; }).catch(() => {});
 document.addEventListener('visibilitychange', () => { if(!document.hidden) load(true); });
 setInterval(() => { if(!document.hidden) load(true); }, 30000);
 load(false);
+loadTickets(true);
+route();
 </script>
 </body>
 </html>
