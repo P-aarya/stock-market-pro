@@ -2007,6 +2007,13 @@ def get_portfolio_summary(user_id: int = Depends(current_user_id)):
     return portfolio.summarize(portfolio.list_holdings(user_id))
 
 
+@app.get("/api/portfolio/commodities")
+def portfolio_commodity_list(user_id: int = Depends(current_user_id)):
+    """Commodities that can be owned directly (Add Holding / Add Transaction), with their units."""
+    import commodity_groups
+    return {"status": "success", "commodities": commodity_groups.catalogue()}
+
+
 @app.post("/api/portfolio")
 def add_portfolio_holding(body: HoldingIn, user_id: int = Depends(current_user_id)):
     """Add a purchase. Buying more of a stock you already hold merges into one position at the weighted-average cost."""
@@ -2171,8 +2178,80 @@ def get_account(user_id: int = Depends(current_user_id)):
         profile = auth.get_profile(user_id)
         if not profile:
             raise auth.AuthError("That account no longer exists.", 404)
-        return {"status": "success", "account": profile}
+        return {"status": "success", "account": {**profile, **auth.get_details(user_id)},
+                "choices": {"genders": auth.GENDERS, "professions": auth.PROFESSIONS}}
     return _account_call(work)
+
+
+class ProfileBody(BaseModel):
+    name: str = Field(default="", max_length=200)
+    city: str = Field(default="", max_length=200)
+    birth_date: str = Field(default="", max_length=20)
+    gender: str = Field(default="", max_length=20)
+    profession: str = Field(default="", max_length=200)
+
+
+class DeleteBody(BaseModel):
+    password: str = Field(max_length=200)
+    confirm: str = Field(max_length=20)
+
+
+@app.put("/api/account/profile")
+def save_account_profile(body: ProfileBody, user_id: int = Depends(require_fetch)):
+    """Name plus the optional details: region / city, date of birth, gender, profession."""
+    return _account_call(lambda: {"status": "success", "profile": auth.save_profile(user_id, body.name, body.city, body.birth_date, body.gender, body.profession)})
+
+
+@app.get("/api/account/notifications")
+def get_account_notifications(user_id: int = Depends(current_user_id)):
+    """The notification switches (the dashboard's bell reads these)."""
+    return _account_call(lambda: {"status": "success", "notifications": auth.get_details(user_id)["notifications"]})
+
+
+@app.put("/api/account/notifications")
+def save_account_notifications(body: dict = Body(...), user_id: int = Depends(require_fetch)):
+    return _account_call(lambda: {"status": "success", "notifications": auth.save_notifications(user_id, body)})
+
+
+def _xlsx(data: bytes, filename: str):
+    import exports
+    from fastapi.responses import Response
+    return Response(data, media_type=exports.XLSX, headers={"Content-Disposition": f'attachment; filename="{filename}"', "Cache-Control": "no-store"})
+
+
+@app.get("/api/account/export")
+def export_my_data(user_id: int = Depends(current_user_id)):
+    """Your Portfolio and Transactions as one Excel file."""
+    try:
+        import exports
+        user = auth.get_user(user_id)
+        holdings = portfolio.list_holdings(user_id)
+        data = exports.my_data_workbook((user or {}).get("email", ""), holdings, portfolio.summarize(holdings),
+                                        portfolio.list_transactions(user_id), portfolio.transaction_summary(user_id))
+    except Exception:
+        log.exception("Making the Excel download failed")
+        return agent_error(500, "Something went wrong making your file. Please try again.")
+    return _xlsx(data, f"aymetrix-my-data-{datetime.now():%Y-%m-%d}.xlsx")
+
+
+@app.post("/api/account/delete")
+def delete_my_account(body: DeleteBody, user_id: int = Depends(require_fetch)):
+    """Delete your account and everything in it. Needs your password and the word DELETE."""
+    key = f"user:{user_id}"
+    if _password_changes.blocked(key):
+        return agent_error(429, "Too many wrong passwords. Please wait 15 minutes and try again.")
+    try:
+        auth.delete_own_account(user_id, body.password, body.confirm)
+    except auth.AuthError as e:
+        if e.status == 403:
+            _password_changes.record(key)
+        return agent_error(e.status, e.message)
+    except Exception:
+        log.exception("Deleting an account failed")
+        return agent_error(500, "Something went wrong. Your account was not deleted.")
+    response = JSONResponse({"status": "success", "message": "Your account and all its data have been deleted."})
+    response.delete_cookie(SESSION_COOKIE)
+    return response
 
 
 @app.put("/api/account/name")
@@ -2322,6 +2401,18 @@ def admin_ticket_reply(request: Request, ticket_id: int, body: TicketReplyBody, 
 @app.post("/api/admin/tickets/{ticket_id}/status")
 def admin_ticket_status(request: Request, ticket_id: int, body: TicketStatusBody, admin_id: int = Depends(require_admin_action)):
     return _account_call(lambda: {"status": "success", "ticket": support.set_status(admin_id, ticket_id, body.status, _email_base(request))})
+
+
+@app.get("/api/admin/users/export")
+def admin_export_users(admin_id: int = Depends(require_admin)):
+    """Every account with its profile details, plus a summary sheet, as one Excel file."""
+    try:
+        import exports
+        data = exports.users_workbook(auth.list_users()["users"], auth.store.all_details(), auth.GENDERS, auth.age_on)
+    except Exception:
+        log.exception("Making the users download failed")
+        return agent_error(500, "Something went wrong making the file. Please try again.")
+    return _xlsx(data, f"aymetrix-users-{datetime.now():%Y-%m-%d}.xlsx")
 
 
 @app.get("/api/admin/activity")

@@ -15,6 +15,7 @@ hash of each one is stored.
 """
 import base64
 import hashlib
+import json
 import hmac
 import os
 import re
@@ -246,6 +247,16 @@ EXTRA_TABLES = {
   UNIQUE KEY uq_password_resets_token (token_hash),
   KEY idx_password_resets_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
+    "user_profiles": """CREATE TABLE IF NOT EXISTS user_profiles (
+  user_id INT NOT NULL,
+  city VARCHAR(80) NULL DEFAULT NULL,
+  birth_date DATE NULL DEFAULT NULL,
+  gender VARCHAR(20) NULL DEFAULT NULL,
+  profession VARCHAR(60) NULL DEFAULT NULL,
+  notify_prefs TEXT NULL,
+  updated_at INT NOT NULL,
+  PRIMARY KEY (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
     "account_events": """CREATE TABLE IF NOT EXISTS account_events (
   id INT NOT NULL AUTO_INCREMENT,
   at INT NOT NULL,
@@ -459,6 +470,50 @@ class MySQLStore:
             conn.commit()
         return self._run(work)
 
+    def details(self, user_id):
+        """The optional profile details and notification choices (None when never saved)."""
+        if not self._extras():
+            return None
+
+        def work(conn):
+            cur = conn.cursor(dictionary=True)
+            cur.execute("SELECT city, birth_date, gender, profession, notify_prefs FROM user_profiles WHERE user_id = %s", (user_id,))
+            return cur.fetchone()
+        return self._run(work)
+
+    def all_details(self):
+        """Profile details of every account that has saved any (for the admin's download)."""
+        if not self._extras():
+            return {}
+
+        def work(conn):
+            cur = conn.cursor(dictionary=True)
+            cur.execute("SELECT user_id, city, birth_date, gender, profession FROM user_profiles")
+            return {r["user_id"]: r for r in cur.fetchall()}
+        return self._run(work)
+
+    def save_details(self, user_id, fields, now):
+        """Insert or update some of: city, birth_date, gender, profession, notify_prefs."""
+        if not self._extras():
+            raise AuthError("Your details can't be saved just now. Please try again in a minute.", 503)
+        allowed = ("city", "birth_date", "gender", "profession", "notify_prefs")
+        cols = [c for c in allowed if c in fields]
+
+        def work(conn):
+            cur = conn.cursor()
+            sets = ", ".join(f"{c} = VALUES({c})" for c in cols) + ", updated_at = VALUES(updated_at)"
+            cur.execute(f"INSERT INTO user_profiles (user_id, {', '.join(cols)}, updated_at) VALUES (%s, {', '.join(['%s'] * len(cols))}, %s) "
+                        f"ON DUPLICATE KEY UPDATE {sets}", (user_id, *[fields[c] for c in cols], now))
+            conn.commit()
+        return self._run(work)
+
+    def delete_account(self, user_id):
+        """Remove the account and all of its data in one go (the same steps as `manage_users.py delete-user`)."""
+        def work(conn):
+            import manage_users
+            manage_users.delete_account(conn, user_id)
+        return self._run(work)
+
     def list_events(self, limit):
         if not self._extras():
             return []
@@ -655,6 +710,7 @@ EVENT_KINDS = {
     "reset_sent": "Password reset email sent",
     "ticket_opened": "Raised a ticket",
     "ticket_status": "Ticket status changed",
+    "account_deleted": "Deleted their own account",
 }
 
 
@@ -772,4 +828,136 @@ def finish_password_reset(token, new, confirm, now=None):
     store.set_password(rec["user_id"], hash_password(new), now)
     access_cache.invalidate(rec["user_id"])
     log_event("password_reset", rec["user_id"], rec["user_id"])
+    return user["email"]
+
+
+# ── optional profile details (Settings) ──
+
+GENDERS = {"male": "Male", "female": "Female", "other": "Other", "prefer_not": "Prefer not to say"}
+PROFESSIONS = ["Student", "Salaried", "Self-employed / Business", "Finance professional", "Retired"]
+MAX_CITY, MAX_PROFESSION = 80, 60
+
+# Notification choices. Everything is on until someone turns it off.
+NOTIFY_DEFAULTS = {
+    "email_ticket_replies": True,    # email when the Aymetrix team replies to a ticket or changes its status
+    "bell_price_alerts": True,       # bell: a price alert was reached
+    "bell_news": True,               # bell: important market news
+    "bell_events": True,             # bell: economic events and their results
+    "bell_support": True,            # bell: Help Desk replies
+    "desktop": True,                 # pop-ups outside the browser (when the browser allows them)
+}
+
+
+def age_on(birth, today=None):
+    """Whole years from `birth` (a date) to today."""
+    import datetime as _dt
+    today = today or _dt.date.today()
+    return today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))
+
+
+def _clean_text(raw, most, what):
+    text = " ".join("".join(ch if ch.isprintable() else " " for ch in str(raw or "")).split())
+    if len(text) > most:
+        raise AuthError(f"{what} can be at most {most} characters.")
+    return text
+
+
+def clean_birth_date(raw, today=None):
+    """'' for none, else a date in the past (after 1900). Accepts YYYY-MM-DD, which is what the date box sends."""
+    import datetime as _dt
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    try:
+        d = _dt.date.fromisoformat(text)
+    except ValueError:
+        raise AuthError("Please enter your date of birth as a date (day, month and year).")
+    today = today or _dt.date.today()
+    if d >= today:
+        raise AuthError("Your date of birth must be in the past.")
+    if d.year < 1900:
+        raise AuthError("Please check the year of your date of birth.")
+    return d
+
+
+def clean_profession(raw):
+    text = _clean_text(raw, MAX_PROFESSION, "Profession")
+    for p in PROFESSIONS:                          # keep the standard spelling for the standard choices
+        if text.lower() == p.lower():
+            return p
+    return text
+
+
+def _prefs_from(raw):
+    prefs = dict(NOTIFY_DEFAULTS)
+    if raw:
+        try:
+            saved = json.loads(raw)
+            prefs.update({k: bool(v) for k, v in saved.items() if k in NOTIFY_DEFAULTS})
+        except (ValueError, TypeError, AttributeError):
+            pass
+    return prefs
+
+
+def get_details(user_id, today=None):
+    """City, date of birth (and the age from it), gender, profession and notification choices."""
+    row = store.details(user_id) or {}
+    birth = row.get("birth_date")
+    return {"city": row.get("city") or "", "birth_date": birth.isoformat() if birth else "",
+            "age": age_on(birth, today) if birth else None, "gender": row.get("gender") or "",
+            "profession": row.get("profession") or "", "notifications": _prefs_from(row.get("notify_prefs"))}
+
+
+def save_profile(user_id, name, city, birth_date, gender, profession, now=None):
+    """Save the Profile card: name plus the optional details. Empty means 'not given'."""
+    now = int(time.time() if now is None else now)
+    name = clean_name(name)
+    city = _clean_text(city, MAX_CITY, "Region / city")
+    birth = clean_birth_date(birth_date)
+    gender = str(gender or "").strip()
+    if gender and gender not in GENDERS:
+        raise AuthError("Please choose a gender from the list.")
+    profession = clean_profession(profession)
+    store.set_name(user_id, name)
+    store.save_details(user_id, {"city": city or None, "birth_date": birth, "gender": gender or None, "profession": profession or None}, now)
+    access_cache.invalidate(user_id)
+    return {"name": name, **{k: v for k, v in get_details(user_id).items() if k != "notifications"}}
+
+
+def save_notifications(user_id, choices, now=None):
+    """Save the notification switches. Unknown keys are ignored; missing ones keep their current value."""
+    now = int(time.time() if now is None else now)
+    prefs = get_details(user_id)["notifications"]
+    for k, v in (choices or {}).items():
+        if k in NOTIFY_DEFAULTS and isinstance(v, bool):
+            prefs[k] = v
+    store.save_details(user_id, {"notify_prefs": json.dumps(prefs, sort_keys=True)}, now)
+    return prefs
+
+
+def wants(user_id, key) -> bool:
+    """Whether this person wants a kind of notification. If their choices can't be read, the default (on) is used."""
+    try:
+        return bool(get_details(user_id)["notifications"].get(key, NOTIFY_DEFAULTS.get(key, True)))
+    except Exception:                                        # noqa: BLE001
+        return NOTIFY_DEFAULTS.get(key, True)
+
+
+# ── deleting your own account ──
+
+def delete_own_account(user_id, password, confirm_word):
+    """Delete the account and everything that belongs to it, after the person types their password and DELETE.
+    The last administrator can't delete their own account, so the app is never left without one."""
+    if str(confirm_word or "").strip() != "DELETE":
+        raise AuthError('Please type DELETE in capital letters to confirm.')
+    if not verify_password(password or "", store.password_hash(user_id) or ""):
+        raise AuthError("That isn't your password. Nothing was deleted.", 403)
+    user = store.get(user_id)
+    if not user:
+        raise AuthError("That account no longer exists.", 404)
+    if user.get("is_admin") and not any(u["is_admin"] and u["status"] == "approved" and u["id"] != user_id for u in store.list_users()):
+        raise AuthError("You're the only administrator, so this account can't be deleted. Make someone else an administrator first.", 409)
+    store.delete_account(user_id)
+    access_cache.invalidate(user_id)
+    log_event("account_deleted", None, None, user["email"])
     return user["email"]

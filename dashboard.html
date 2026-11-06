@@ -808,35 +808,49 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   </div>
 
   <div class="g2">
-    <div class="card"><div class="chdr"><div class="ctitle">Allocation</div></div><div style="height:220px"><canvas id="alloc-c"></canvas></div></div>
-    <div class="card chartcard"><div class="chdr"><div class="ctitle">Sector Breakdown</div></div><div id="sec-alloc"><div class="load"><div class="spin"></div></div></div></div>
+    <div class="card" id="alloc-card"><div class="chdr"><div class="ctitle">Allocation</div>
+      <div class="kseg alloc-phone" role="group" aria-label="Show"><button class="kseg-b on" type="button" data-show="stock" onclick="setAllocShow('stock')">Stocks</button><button class="kseg-b" type="button" data-show="commodity" onclick="setAllocShow('commodity')">Commodities</button></div></div>
+      <div class="alloc2">
+        <div class="alloc-pane on" data-pane="stock"><div class="alloc-h">Stocks <span id="alloc-st-v"></span></div><div class="alloc-box"><canvas id="alloc-c"></canvas><div class="alloc-empty" id="alloc-st-empty" hidden>No stocks yet.</div></div></div>
+        <div class="alloc-pane" data-pane="commodity"><div class="alloc-h">Commodities <span id="alloc-co-v"></span></div><div class="alloc-box"><canvas id="alloc-c2"></canvas><div class="alloc-empty" id="alloc-co-empty" hidden>No commodities yet. Add gold, oil and others with "Commodity" in Add Holding below.</div></div></div>
+      </div></div>
+    <div class="card chartcard"><div class="chdr"><div class="ctitle" id="sec-alloc-title">Sector Breakdown</div>
+      <div class="kseg" role="group" aria-label="Break down by"><button class="kseg-b on" type="button" data-by="sector" onclick="setAllocBy('sector')">By sector</button><button class="kseg-b" type="button" data-by="type" onclick="setAllocBy('type')">By type</button></div></div>
+      <div id="sec-alloc"><div class="load"><div class="spin"></div></div></div></div>
   </div>
   <div class="card" style="margin-bottom:16px">
-    <div class="chdr"><div class="ctitle">P&L Per Holding</div></div>
+    <div class="chdr"><div class="ctitle">P&L Per Holding</div><div class="pnl-key"><span class="pk-st"></span>Stocks<span class="pk-co"></span>Commodities</div></div>
     <div style="height:190px"><canvas id="pnl-c"></canvas></div>
   </div>
   <div class="card" style="margin-bottom:16px">
     <div class="stitle">Holdings</div>
+    <div class="toolbar" id="pf-kinds">
+      <button class="fbtn on" type="button" data-kind="all" onclick="setPfKind('all')">All <span class="kn" id="pf-kn-all">0</span></button>
+      <button class="fbtn" type="button" data-kind="stock" onclick="setPfKind('stock')">Stocks <span class="kn" id="pf-kn-stock">0</span></button>
+      <button class="fbtn" type="button" data-kind="commodity" onclick="setPfKind('commodity')">Commodities <span class="kn" id="pf-kn-commodity">0</span></button>
+    </div>
     <div class="tw"><table>
-      <thead><tr><th>Ticker</th><th>Company</th><th>Sector</th><th>Qty</th><th>Avg Buy</th><th>Current</th><th>Invested</th><th>Value</th><th>P&L $</th><th>P&L %</th><th>Day %</th><th>Analyst</th><th>Target</th><th></th></tr></thead>
-      <tbody id="tb-pf"><tr><td colspan="14"><div class="load"><div class="spin"></div></div></td></tr></tbody>
+      <thead><tr><th>Ticker</th><th>Company</th><th>Type</th><th>Sector</th><th>Qty</th><th>Avg Buy</th><th>Current</th><th>Invested</th><th>Value</th><th>P&L $</th><th>P&L %</th><th>Day %</th><th>Analyst</th><th>Target</th><th></th></tr></thead>
+      <tbody id="tb-pf"><tr><td colspan="15"><div class="load"><div class="spin"></div></div></td></tr></tbody>
     </table></div>
   </div>
   <div class="card" id="pf-form-card">
     <div class="stitle" id="pf-form-title">Add Holding</div>
+    <div class="kseg form-kind" id="a-kind" role="group" aria-label="What are you adding?"><button class="kseg-b on" type="button" data-k="stock" onclick="setFormKind('a','stock')">Stock</button><button class="kseg-b" type="button" data-k="commodity" onclick="setFormKind('a','commodity')">Commodity</button></div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;align-items:end">
-      <div><label class="flbl">Ticker</label><input class="finp" id="a-tick" placeholder="AAPL"/></div>
-      <div><label class="flbl">Quantity</label><input class="finp" type="number" id="a-qty" min="0" step="any" placeholder="100"/></div>
-      <div><label class="flbl">Avg Buy ($)</label><input class="finp" type="number" id="a-px" min="0" step="any" placeholder="150"/></div>
+      <div style="position:relative" id="a-tick-wrap"><label class="flbl" for="a-tick">Stock</label><input class="finp" id="a-tick" placeholder="Ticker or company, e.g. Newmont" autocomplete="off"/></div>
+      <div id="a-com-wrap" hidden><label class="flbl" for="a-com">Commodity</label><select class="finp" id="a-com" onchange="updateUnitLabels('a')"><option value="">Choose a commodity…</option></select></div>
+      <div><label class="flbl" id="a-qty-l" for="a-qty">Quantity</label><input class="finp" type="number" id="a-qty" min="0" step="any" placeholder="100"/></div>
+      <div><label class="flbl" id="a-px-l" for="a-px">Avg Buy ($)</label><input class="finp" type="number" id="a-px" min="0" step="any" placeholder="150"/></div>
       <div><label class="flbl">Buy Date</label><input class="finp" type="date" id="a-dt"/></div>
       <div><label class="flbl">Notes (optional)</label><input class="finp" id="a-notes" maxlength="200" placeholder="Why you bought it"/></div>
       <div style="display:flex;gap:8px">
-        <button class="btn btns" id="pf-save-btn" onclick="saveHolding()">Add Stock</button>
+        <button class="btn btns" id="pf-save-btn" onclick="saveHolding()">Add Holding</button>
         <button class="btn" id="pf-cancel-btn" style="display:none" onclick="cancelHoldingEdit()">Cancel</button>
       </div>
     </div>
     <div id="pf-msg" style="margin-top:10px;font-size:12px;font-weight:700;min-height:16px"></div>
-    <div class="peer-legend">Buying more of a stock you already hold adds to that position at the weighted-average cost.</div>
+    <div class="peer-legend">Buying more of something you already hold adds to that position at the weighted-average cost. Choose <b>Commodity</b> for gold, oil and other commodities you own directly; shares of commodity companies (gold miners, oil producers) are stocks and are labelled "Commodity company" automatically.</div>
   </div>
 
 </div>
@@ -867,25 +881,31 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <button class="fbtn" onclick="setTxF('BUY',this)">Buy</button>
       <button class="fbtn" onclick="setTxF('SELL',this)">Sell</button>
       <button class="fbtn" onclick="setTxF('DIVIDEND',this)">Dividend</button>
+      <span class="tsep" aria-hidden="true"></span>
+      <button class="fbtn on" type="button" data-kind="all" onclick="setTxKind('all')">All types</button>
+      <button class="fbtn" type="button" data-kind="stock" onclick="setTxKind('stock')">Stocks</button>
+      <button class="fbtn" type="button" data-kind="commodity" onclick="setTxKind('commodity')">Commodities</button>
     </div>
     <div class="tw"><table>
-      <thead><tr><th>Date</th><th>Ticker</th><th>Company</th><th>Type</th><th>Qty</th><th>Price</th><th>Total</th><th>Notes</th><th></th></tr></thead>
-      <tbody id="tb-tx"><tr><td colspan="9"><div class="load"><div class="spin"></div></div></td></tr></tbody>
+      <thead><tr><th>Date</th><th>Ticker</th><th>Company</th><th>Stock / commodity</th><th>Type</th><th>Qty</th><th>Price</th><th>Total</th><th>Notes</th><th></th></tr></thead>
+      <tbody id="tb-tx"><tr><td colspan="10"><div class="load"><div class="spin"></div></div></td></tr></tbody>
     </table></div>
   </div>
   <div class="card" id="tx-form-card">
     <div class="stitle" id="tx-form-title">Add Transaction</div>
+    <div class="kseg form-kind" id="tx-kind" role="group" aria-label="Stock or commodity?"><button class="kseg-b on" type="button" data-k="stock" onclick="setFormKind('tx','stock')">Stock</button><button class="kseg-b" type="button" data-k="commodity" onclick="setFormKind('tx','commodity')">Commodity</button></div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;align-items:end">
-      <div><label class="flbl">Ticker</label><input class="finp" id="tx-tick" placeholder="AAPL"/></div>
+      <div style="position:relative" id="tx-tick-wrap"><label class="flbl" for="tx-tick">Stock</label><input class="finp" id="tx-tick" placeholder="Ticker or company" autocomplete="off"/></div>
+      <div id="tx-com-wrap" hidden><label class="flbl" for="tx-com">Commodity</label><select class="finp" id="tx-com" onchange="updateUnitLabels('tx')"><option value="">Choose a commodity…</option></select></div>
       <div><label class="flbl">Type</label><select class="finp" id="tx-type"><option>BUY</option><option>SELL</option><option>DIVIDEND</option></select></div>
-      <div><label class="flbl">Qty (shares)</label><input class="finp" type="number" id="tx-qty" min="0" step="any" placeholder="100"/></div>
-      <div><label class="flbl">Price / dividend per share ($)</label><input class="finp" type="number" id="tx-px" min="0" step="any" placeholder="150"/></div>
+      <div><label class="flbl" id="tx-qty-l" for="tx-qty">Qty (shares)</label><input class="finp" type="number" id="tx-qty" min="0" step="any" placeholder="100"/></div>
+      <div><label class="flbl" id="tx-px-l" for="tx-px">Price / dividend per share ($)</label><input class="finp" type="number" id="tx-px" min="0" step="any" placeholder="150"/></div>
       <div><label class="flbl">Date</label><input class="finp" type="date" id="tx-dt"/></div>
       <div><label class="flbl">Notes (optional)</label><input class="finp" id="tx-notes" maxlength="200" placeholder=""/></div>
       <div style="display:flex;gap:8px"><button class="btn btnp" id="tx-save-btn" onclick="saveTx()">Add</button><button class="btn" id="tx-cancel-btn" style="display:none" onclick="cancelTxEdit()">Cancel</button></div>
     </div>
     <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12px;font-weight:600;color:var(--t2);cursor:pointer" id="tx-apply-wrap">
-      <input type="checkbox" id="tx-apply"/> Also update my Holdings (a buy adds shares at the average cost, a sale removes them)
+      <input type="checkbox" id="tx-apply"/> Also update my Holdings (a buy adds to the holding at the average cost, a sale removes from it)
     </label>
     <div id="tx-msg" style="margin-top:10px;font-size:12px;font-weight:700;min-height:16px"></div>
     <div class="peer-legend">Editing or deleting a past transaction does not change your Holdings.</div>
@@ -1269,7 +1289,7 @@ let aStocks=[],fStocks=[],pg=1,SZ=10,sortK='market_cap',sortA=false;
 let aIntel=[],fIntel=[],miPg=1,MI_SZ=24;
 let aPreds=[],fPreds=[],predPg=1,PRED_SZ=24;
 let aEarn=[],fEarn=[],earnPg=1,EARN_SZ=10;
-let aTx=[],txF='all';
+let aTx=[],txF='all',txKind='all';
 let charts={};
 let curTick=null,curPer='3mo';
 let newsTimer=null;
@@ -4139,7 +4159,58 @@ function closeFS(){document.getElementById('fsm').classList.remove('open');docum
 
 
 // Portfolio
-let pfRows=[],pfEditId=null;
+let pfRows=[],pfEditId=null,pfKind='all',allocBy='sector';
+function setPfKind(k){
+  pfKind=k;
+  document.querySelectorAll('#pf-kinds .fbtn').forEach(b=>b.classList.toggle('on',b.dataset.kind===k));
+  renderHoldings();
+}
+function setAllocBy(by){
+  allocBy=by;
+  document.querySelectorAll('.kseg-b').forEach(b=>b.classList.toggle('on',b.dataset.by===by));
+  document.getElementById('sec-alloc-title').textContent=by==='type'?'Stocks and Commodities':'Sector Breakdown';
+  renderAllocList();
+}
+// The holdings table, filtered to All / Stocks / Commodities. The cards above always show the whole portfolio.
+function renderHoldings(){
+  const h=pfRows||[];
+  const n={all:h.length,stock:h.filter(x=>!isCommodity(x)).length,commodity:h.filter(isCommodity).length};
+  Object.entries(n).forEach(([k,v])=>{const el=document.getElementById('pf-kn-'+k);if(el)el.textContent=v;});
+  const rows=pfKind==='all'?h:h.filter(x=>(isCommodity(x)?'commodity':'stock')===pfKind);
+  if(!h.length){document.getElementById('tb-pf').innerHTML='<tr><td colspan="15" class="empty">No holdings yet. Add below!</td></tr>';return;}
+  if(!rows.length){document.getElementById('tb-pf').innerHTML=`<tr><td colspan="15" class="empty">No ${pfKind==='commodity'?'commodities':'stocks'} in your holdings.</td></tr>`;return;}
+  document.getElementById('tb-pf').innerHTML=rows.map(x=>`<tr data-t="${escapeHtml(x.ticker)}"${isCommodity(x)?' style="cursor:default"':' onclick="openStock(this.dataset.t)"'}>
+    <td class="sym">${escapeHtml(holdingName(x))}</td><td style="color:var(--t2);font-weight:600">${isCommodity(x)?escapeHtml('per '+(x.unit||'unit')):escapeHtml(x.company_name||'--')}</td>
+    <td>${kindCell(x)}</td>
+    <td style="font-size:10px;color:var(--t3);font-weight:700">${escapeHtml(x.sector||'--')}</td>
+    <td class="num">${escapeHtml(qtyText(x))}</td><td class="num">${fp(x.avg_buy_price)}</td><td class="num">${x.current_price!=null?fp(x.current_price):'<span class="badge by" title="No live price">no price</span>'}</td>
+    <td style="color:var(--t2);font-weight:600">${fb(x.invested_value)}</td>
+    <td class="num c">${x.current_value!=null?fb(x.current_value):'--'}</td>
+    <td class="num ${gc(x.unrealized_pnl)}">${x.unrealized_pnl!=null?(x.unrealized_pnl>=0?'+':'')+fb(x.unrealized_pnl):'--'}</td>
+    <td class="num ${gc(x.pnl_pct)}">${x.pnl_pct!=null?(x.pnl_pct>=0?'+':'')+f2(x.pnl_pct)+'%':'--'}</td>
+    <td class="num ${gc(x.day_change_pct)}">${x.day_change_pct!=null?(x.day_change_pct>=0?'+':'')+f2(x.day_change_pct)+'%':'--'}</td>
+    <td>${mkRat(x.analyst_rating)}</td>
+    <td class="num">${x.target_price?fp(x.target_price):'--'}</td>
+    <td style="white-space:nowrap" onclick="event.stopPropagation()">
+      <button class="bm-act" data-id="${x.id}" onclick="editHolding(this.dataset.id)">Edit</button>
+      <button class="bm-act" data-id="${x.id}" onclick="deleteHolding(this.dataset.id)">Remove</button>
+    </td>
+  </tr>`).join('');
+}
+// Sector Breakdown card: by sector, or by type (Stocks, then each commodity: Gold, Oil...).
+function renderAllocList(){
+  const h=pfRows||[],el=document.getElementById('sec-alloc');if(!el)return;
+  const total=h.reduce((s,x)=>s+(x.current_value||0),0);
+  if(!h.length){el.innerHTML='<div class="empty">No holdings yet.</div>';return;}
+  const sm={};
+  h.forEach(x=>{const k=allocBy==='type'?(isCommodity(x)?'Commodities':'Stocks'):isCommodity(x)?'Commodities':(x.sector_group||x.sector||'Other');sm[k]=(sm[k]||0)+(x.current_value||0);});
+  const sa=Object.entries(sm).filter(([,v])=>allocBy!=='type'||v>0).sort((a,b)=>b[1]-a[1]);
+  el.innerHTML=total>0&&sa.length?sa.map(([n,v],i)=>`<div class="allocrow">
+    <div class="allocdot" style="background:${C[i%C.length]}"></div><div class="allocname">${escapeHtml(n)}</div>
+    <div class="allocbarbg"><div class="allocbar" style="width:${v/sa[0][1]*100}%;background:${C[i%C.length]}"></div></div>
+    <div class="allocpct">${f2(v/total*100)}%</div><div class="allocval">${fb(v)}</div>
+  </div>`).join(''):'<div class="empty">No priced holdings yet.</div>';
+}
 function apiMessage(data,res){
   if(data&&data.message)return data.message;
   if(data&&Array.isArray(data.detail)&&data.detail[0])return data.detail[0].msg||'Please check the form.';
@@ -4162,51 +4233,48 @@ async function loadPortfolio(){
     else warn.style.display='none';
   }
   if(!Array.isArray(h)){
-    document.getElementById('tb-pf').innerHTML='<tr><td colspan="14" class="empty">Could not load your holdings. <button class="linkbtn" onclick="loadPortfolio()">Retry</button></td></tr>';
+    document.getElementById('tb-pf').innerHTML='<tr><td colspan="15" class="empty">Could not load your holdings. <button class="linkbtn" onclick="loadPortfolio()">Retry</button></td></tr>';
     return;
   }
   pfRows=h;
   loadPortfolioPerformance();
+  renderHoldings();renderAllocList();
   if(!h.length){
-    document.getElementById('tb-pf').innerHTML='<tr><td colspan="14" class="empty">No holdings yet. Add below!</td></tr>';
-    document.getElementById('sec-alloc').innerHTML='<div class="empty">No holdings yet.</div>';
-    dc('alloc-c');dc('pnl-c');
+    drawAllocDonut('alloc-c','alloc-st-empty','alloc-st-v',[]);drawAllocDonut('alloc-c2','alloc-co-empty','alloc-co-v',[]);dc('pnl-c');
     return;
   }
-  document.getElementById('tb-pf').innerHTML=h.map(x=>`<tr data-t="${escapeHtml(x.ticker)}" onclick="openStock(this.dataset.t)">
-    <td class="sym">${escapeHtml(x.ticker)}</td><td style="color:var(--t2);font-weight:600">${escapeHtml(x.company_name||'--')}</td>
-    <td style="font-size:10px;color:var(--t3);font-weight:700">${escapeHtml(x.sector||'--')}</td>
-    <td class="num">${x.quantity}</td><td class="num">${fp(x.avg_buy_price)}</td><td class="num">${x.current_price!=null?fp(x.current_price):'<span class="badge by" title="No live price">no price</span>'}</td>
-    <td style="color:var(--t2);font-weight:600">${fb(x.invested_value)}</td>
-    <td class="num c">${x.current_value!=null?fb(x.current_value):'--'}</td>
-    <td class="num ${gc(x.unrealized_pnl)}">${x.unrealized_pnl!=null?(x.unrealized_pnl>=0?'+':'')+fb(x.unrealized_pnl):'--'}</td>
-    <td class="num ${gc(x.pnl_pct)}">${x.pnl_pct!=null?(x.pnl_pct>=0?'+':'')+f2(x.pnl_pct)+'%':'--'}</td>
-    <td class="num ${gc(x.day_change_pct)}">${x.day_change_pct!=null?(x.day_change_pct>=0?'+':'')+f2(x.day_change_pct)+'%':'--'}</td>
-    <td>${mkRat(x.analyst_rating)}</td>
-    <td class="num">${x.target_price?fp(x.target_price):'--'}</td>
-    <td style="white-space:nowrap" onclick="event.stopPropagation()">
-      <button class="bm-act" data-id="${x.id}" onclick="editHolding(this.dataset.id)">Edit</button>
-      <button class="bm-act" data-id="${x.id}" onclick="deleteHolding(this.dataset.id)">Remove</button>
-    </td>
-  </tr>`).join('');
-  const total=h.reduce((s,x)=>s+(x.current_value||0),0);
-  const ranked=[...h].filter(x=>x.current_value).sort((a,b)=>(b.current_value||0)-(a.current_value||0));
-  const top=ranked.slice(0,8),otherValue=ranked.slice(8).reduce((sum,x)=>sum+x.current_value,0);
-  const slices=top.map(x=>({label:x.ticker,value:x.current_value||0})).concat(otherValue>0?[{label:`Other (${ranked.length-8})`,value:otherValue}]:[]);
-  dc('alloc-c');const ctx=document.getElementById('alloc-c')?.getContext('2d');
-  if(ctx)charts['alloc-c']=new Chart(ctx,{type:'doughnut',data:{labels:slices.map(x=>x.label),datasets:[{data:slices.map(x=>x.value),backgroundColor:slices.map((x,i)=>x.label.startsWith('Other')?'#58697a':C[i%C.length]),borderWidth:0,hoverOffset:6}]},
-    options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'right',labels:{color:'#c0cce0',font:{size:11,weight:'700'},padding:8}},tooltip:{callbacks:{label:c=>c.label+': '+fb(c.raw)+' ('+f2(c.raw/total*100)+'%)'}}}}});
+  // Allocation: one donut for Stocks (commodity companies included) and one for Commodities owned directly
+  drawAllocDonut('alloc-c','alloc-st-empty','alloc-st-v',h.filter(x=>!isCommodity(x)));
+  drawAllocDonut('alloc-c2','alloc-co-empty','alloc-co-v',h.filter(isCommodity));
+  // P&L per holding: Stocks first, a gap, then Commodities (gold outline). Green = profit, red = loss.
   dc('pnl-c');const ctx2=document.getElementById('pnl-c')?.getContext('2d');
-  const sorted=[...h].sort((a,b)=>(b.unrealized_pnl||0)-(a.unrealized_pnl||0));
-  if(ctx2)charts['pnl-c']=new Chart(ctx2,{type:'bar',data:{labels:sorted.map(x=>x.ticker),datasets:[{data:sorted.map(x=>x.unrealized_pnl||0),backgroundColor:sorted.map(x=>(x.unrealized_pnl||0)>=0?'rgba(0,230,118,0.7)':'rgba(255,68,68,0.7)'),borderRadius:4,borderWidth:0}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#c0cce0',font:{size:10,weight:'600'}},grid:{display:false}},y:{ticks:{color:'#58697a',callback:v=>fb(v)},grid:{color:'rgba(28,28,48,0.5)'}}}}});
-  const sm={};h.forEach(x=>{const s=x.sector_group||x.sector||'Other';sm[s]=(sm[s]||0)+(x.current_value||0);});
-  const sa=Object.entries(sm).sort((a,b)=>b[1]-a[1]);
-  document.getElementById('sec-alloc').innerHTML=total>0?sa.map(([n,v],i)=>`<div class="allocrow">
-    <div class="allocdot" style="background:${C[i%C.length]}"></div><div class="allocname">${escapeHtml(n)}</div>
-    <div class="allocbarbg"><div class="allocbar" style="width:${v/sa[0][1]*100}%;background:${C[i%C.length]}"></div></div>
-    <div class="allocpct">${f2(v/total*100)}%</div><div class="allocval">${fb(v)}</div>
-  </div>`).join(''):'<div class="empty">No priced holdings yet.</div>';
+  const byPnl=(a,b)=>(b.unrealized_pnl||0)-(a.unrealized_pnl||0);
+  const st=h.filter(x=>!isCommodity(x)).sort(byPnl),co=h.filter(isCommodity).sort(byPnl);
+  const bars=st.concat(st.length&&co.length?[null]:[]).concat(co);           // null = the gap between the two groups
+  if(ctx2)charts['pnl-c']=new Chart(ctx2,{type:'bar',data:{labels:bars.map(x=>x?holdingName(x):''),datasets:[{data:bars.map(x=>x?(x.unrealized_pnl||0):null),
+      backgroundColor:bars.map(x=>!x?'transparent':(x.unrealized_pnl||0)>=0?'rgba(0,230,118,0.7)':'rgba(255,68,68,0.7)'),
+      borderColor:bars.map(x=>x&&isCommodity(x)?'#F5A623':'transparent'),borderWidth:bars.map(x=>x&&isCommodity(x)?2:0),borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{filter:i=>bars[i.dataIndex]!=null,callbacks:{label:c=>{const x=bars[c.dataIndex];return x?`${kindLabel(x)}: ${(c.raw>=0?'+':'')+fb(c.raw)}`:'';}}}},
+      scales:{x:{ticks:{color:'#c0cce0',font:{size:10,weight:'600'}},grid:{display:false}},y:{ticks:{color:'#58697a',callback:v=>fb(v)},grid:{color:'rgba(28,28,48,0.5)'}}}}});
+}
+function drawAllocDonut(id,emptyId,valueId,items){
+  dc(id);
+  const ranked=items.filter(x=>x.current_value).sort((a,b)=>(b.current_value||0)-(a.current_value||0));
+  const total=ranked.reduce((s,x)=>s+x.current_value,0);
+  const empty=document.getElementById(emptyId),val=document.getElementById(valueId);
+  if(val)val.textContent=total>0?fb(total):'';
+  if(empty)empty.hidden=ranked.length>0;
+  if(!ranked.length)return;
+  const top=ranked.slice(0,8),otherValue=ranked.slice(8).reduce((sum,x)=>sum+x.current_value,0);
+  const slices=top.map(x=>({label:holdingName(x),value:x.current_value})).concat(otherValue>0?[{label:`Other (${ranked.length-8})`,value:otherValue}]:[]);
+  const ctx=document.getElementById(id)?.getContext('2d');
+  if(ctx)charts[id]=new Chart(ctx,{type:'doughnut',data:{labels:slices.map(x=>x.label),datasets:[{data:slices.map(x=>x.value),backgroundColor:slices.map((x,i)=>x.label.startsWith('Other')?'#58697a':C[i%C.length]),borderWidth:0,hoverOffset:6}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'right',labels:{color:'#c0cce0',font:{size:11,weight:'700'},padding:8}},tooltip:{callbacks:{label:c=>c.label+': '+fb(c.raw)+' ('+f2(c.raw/total*100)+'%)'}}}}});
+}
+function setAllocShow(k){
+  document.querySelectorAll('#alloc-card .alloc-pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===k));
+  document.querySelectorAll('#alloc-card .kseg-b').forEach(b=>b.classList.toggle('on',b.dataset.show===k));
+  const c=charts[k==='commodity'?'alloc-c2':'alloc-c'];if(c&&c.resize)c.resize();
 }
 let pfPerfSeq=0;
 async function loadPortfolioPerformance(){
@@ -4248,8 +4316,10 @@ function resetHoldingForm(){
   pfEditId=null;
   ['a-tick','a-qty','a-px','a-dt','a-notes'].forEach(id=>{const el=document.getElementById(id);el.value='';});
   document.getElementById('a-tick').readOnly=false;
+  const com=document.getElementById('a-com');if(com){com.value='';com.disabled=false;}
+  lockFormKind('a',false);updateUnitLabels('a');
   document.getElementById('pf-form-title').textContent='Add Holding';
-  document.getElementById('pf-save-btn').textContent='Add Stock';
+  document.getElementById('pf-save-btn').textContent='Add Holding';
   document.getElementById('pf-cancel-btn').style.display='none';
 }
 function cancelHoldingEdit(){resetHoldingForm();pfSay('');}
@@ -4257,20 +4327,24 @@ function editHolding(id){
   const h=pfRows.find(x=>String(x.id)===String(id));
   if(!h)return;
   pfEditId=h.id;
-  document.getElementById('a-tick').value=h.ticker;document.getElementById('a-tick').readOnly=true;
+  setFormKind('a',isCommodity(h)?'commodity':'stock');lockFormKind('a',true);
+  if(isCommodity(h)){loadComs().then(()=>{const com=document.getElementById('a-com');com.value=h.ticker;com.disabled=true;updateUnitLabels('a');});}
+  document.getElementById('a-tick').value=isCommodity(h)?'':h.ticker;document.getElementById('a-tick').readOnly=true;
   document.getElementById('a-qty').value=h.quantity;document.getElementById('a-px').value=h.avg_buy_price;
   document.getElementById('a-dt').value=String(h.buy_date||'').slice(0,10);document.getElementById('a-notes').value=h.notes||'';
-  document.getElementById('pf-form-title').textContent='Edit '+h.ticker;
+  document.getElementById('pf-form-title').textContent='Edit '+holdingName(h);
   document.getElementById('pf-save-btn').textContent='Save Changes';
   document.getElementById('pf-cancel-btn').style.display='inline-block';
   pfSay('');
   document.getElementById('pf-form-card').scrollIntoView({behavior:'smooth',block:'center'});
 }
 async function saveHolding(){
-  const t=document.getElementById('a-tick').value.trim().toUpperCase();
+  const editing0=pfEditId!=null,com=formKind.a==='commodity';
+  const t=editing0?String((pfRows.find(x=>x.id===pfEditId)||{}).ticker||document.getElementById('a-tick').value).trim().toUpperCase()
+    :com?document.getElementById('a-com').value:resolveTicker(document.getElementById('a-tick').value);
   const q=Number(document.getElementById('a-qty').value),p=Number(document.getElementById('a-px').value);
   const d=document.getElementById('a-dt').value,notes=document.getElementById('a-notes').value.trim();
-  if(!t||!document.getElementById('a-qty').value||!document.getElementById('a-px').value||!d){pfSay('Please fill in ticker, quantity, average buy price and buy date.',false);return;}
+  if(!t||!document.getElementById('a-qty').value||!document.getElementById('a-px').value||!d){pfSay(com?'Please choose a commodity and fill in quantity, buy price and buy date.':'Please fill in ticker, quantity, average buy price and buy date.',false);return;}
   if(!(q>0)){pfSay('Quantity must be greater than zero.',false);return;}
   if(!(p>0)){pfSay('Average buy price must be greater than zero.',false);return;}
   if(d>new Date().toISOString().slice(0,10)){pfSay("Buy date can't be in the future.",false);return;}
@@ -4289,7 +4363,7 @@ async function saveHolding(){
 }
 async function deleteHolding(id){
   const h=pfRows.find(x=>String(x.id)===String(id));
-  if(!h||!confirm(`Remove ${h.ticker} (${h.quantity} shares) from your portfolio?`))return;
+  if(!h||!confirm(`Remove ${holdingName(h)} (${isCommodity(h)?qtyText(h):h.quantity+' shares'}) from your portfolio?`))return;
   try{
     const res=await fetch(`${API}/api/portfolio/${encodeURIComponent(h.id)}`,{method:'DELETE'});
     let data=null;try{data=await res.json();}catch(e){}
@@ -4311,20 +4385,21 @@ async function loadTx(){
     document.getElementById('tx-sold').textContent=fb(s.total_sold);document.getElementById('tx-big').textContent=fb(s.largest_trade);
     const re=document.getElementById('tx-real');re.textContent=(s.realized_pnl>=0?'+':'')+fb(s.realized_pnl);re.className='sc-v '+(s.realized_pnl>=0?'g':'r');
     document.getElementById('tx-div').textContent=fb(s.dividends);
-    document.getElementById('tx-real-list').innerHTML=(s.realized_by_ticker||[]).length?s.realized_by_ticker.slice(0,6).map(r=>`<div class="allocrow"><div class="allocname" style="min-width:60px">${escapeHtml(r.ticker)}</div><div class="allocval ${gc(r.realized)}" style="margin-left:auto">${(r.realized>=0?'+':'')+fb(r.realized)}</div></div>`).join(''):'<div class="empty">No sales recorded yet.</div>';
+    document.getElementById('tx-real-list').innerHTML=(s.realized_by_ticker||[]).length?s.realized_by_ticker.slice(0,6).map(r=>`<div class="allocrow"><div class="allocname" style="min-width:60px">${escapeHtml(holdingName(r))}</div>${isCommodity(r)||r.commodity_company?kindCell(r):''}<div class="allocval ${gc(r.realized)}" style="margin-left:auto">${(r.realized>=0?'+':'')+fb(r.realized)}</div></div>`).join(''):'<div class="empty">No sales recorded yet.</div>';
     const warn=document.getElementById('tx-warn');
     if((s.unmatched_sells||[]).length){warn.style.display='block';warn.textContent='Some sales are larger than the shares your transactions show you bought ('+s.unmatched_sells.map(u=>`${u.ticker}: ${u.quantity}`).join(', ')+'), so their profit cannot be worked out and is left out of Realized P&L.';}
     else warn.style.display='none';
   }
   aTx=Array.isArray(t)?t:[];renderTx();buildTxCharts();
 }
-function setTxF(f,btn){txF=f;document.querySelectorAll('#page-transactions .toolbar .fbtn').forEach(b=>b.classList.remove('on'));btn.classList.add('on');renderTx();}
+function setTxF(f,btn){txF=f;document.querySelectorAll('#page-transactions .toolbar .fbtn:not([data-kind])').forEach(b=>b.classList.remove('on'));btn.classList.add('on');renderTx();}
+function setTxKind(k){txKind=k;document.querySelectorAll('#page-transactions .toolbar .fbtn[data-kind]').forEach(b=>b.classList.toggle('on',b.dataset.kind===k));renderTx();}
 function renderTx(){
   const q=document.getElementById('tx-srch').value.toLowerCase();
-  const f=aTx.filter(t=>{const mf=txF==='all'||t.transaction_type===txF;const mq=!q||t.ticker?.toLowerCase().includes(q)||t.company_name?.toLowerCase().includes(q);return mf&&mq;});
+  const f=aTx.filter(t=>{const mf=txF==='all'||t.transaction_type===txF;const mk=txKind==='all'||(isCommodity(t)?'commodity':'stock')===txKind;const mq=!q||t.ticker?.toLowerCase().includes(q)||t.company_name?.toLowerCase().includes(q);return mf&&mk&&mq;});
   const badge={BUY:'bg',SELL:'br',DIVIDEND:'bc'};
-  document.getElementById('tb-tx').innerHTML=f.length?f.map(t=>`<tr><td style="color:var(--t2);font-weight:600">${escapeHtml(String(t.transaction_date||'--').slice(0,10))}</td><td class="sym">${escapeHtml(t.ticker)}</td><td style="color:var(--t2);font-weight:600">${escapeHtml(t.company_name||'--')}</td><td><span class="badge ${badge[t.transaction_type]||'bb'}">${escapeHtml(t.transaction_type)}</span></td><td class="num">${t.quantity}</td><td class="num">${fp(t.price)}</td><td class="num c">${fb(t.total_value)}</td><td style="color:var(--t3);font-size:12px">${escapeHtml(t.notes||'--')}</td>
-    <td style="white-space:nowrap"><button class="bm-act" data-id="${t.id}" onclick="editTx(this.dataset.id)">Edit</button> <button class="bm-act" data-id="${t.id}" onclick="deleteTx(this.dataset.id)">Remove</button></td></tr>`).join(''):'<tr><td colspan="9" class="empty">No transactions yet.</td></tr>';
+  document.getElementById('tb-tx').innerHTML=f.length?f.map(t=>`<tr><td style="color:var(--t2);font-weight:600">${escapeHtml(String(t.transaction_date||'--').slice(0,10))}</td><td class="sym">${escapeHtml(holdingName(t))}</td><td style="color:var(--t2);font-weight:600">${isCommodity(t)?escapeHtml('per '+(t.unit||'unit')):escapeHtml(t.company_name||'--')}</td><td>${kindCell(t)}</td><td><span class="badge ${badge[t.transaction_type]||'bb'}">${escapeHtml(t.transaction_type)}</span></td><td class="num">${escapeHtml(qtyText(t))}</td><td class="num">${fp(t.price)}</td><td class="num c">${fb(t.total_value)}</td><td style="color:var(--t3);font-size:12px">${escapeHtml(t.notes||'--')}</td>
+    <td style="white-space:nowrap"><button class="bm-act" data-id="${t.id}" onclick="editTx(this.dataset.id)">Edit</button> <button class="bm-act" data-id="${t.id}" onclick="deleteTx(this.dataset.id)">Remove</button></td></tr>`).join(''):`<tr><td colspan="10" class="empty">${aTx.length?'No transactions match these filters.':'No transactions yet.'}</td></tr>`;
 }
 function buildTxCharts(){
   const buys=aTx.filter(t=>t.transaction_type==='BUY').reduce((s,t)=>s+(t.total_value||0),0);
@@ -4340,6 +4415,8 @@ function resetTxForm(){
   txEditId=null;
   ['tx-tick','tx-qty','tx-px','tx-dt','tx-notes'].forEach(id=>{document.getElementById(id).value='';});
   document.getElementById('tx-tick').readOnly=false;document.getElementById('tx-type').disabled=false;document.getElementById('tx-apply').checked=false;
+  const txc=document.getElementById('tx-com');if(txc){txc.value='';txc.disabled=false;}
+  lockFormKind('tx',false);updateUnitLabels('tx');
   document.getElementById('tx-apply-wrap').style.display='flex';
   document.getElementById('tx-form-title').textContent='Add Transaction';document.getElementById('tx-save-btn').textContent='Add';document.getElementById('tx-cancel-btn').style.display='none';
 }
@@ -4347,19 +4424,23 @@ function cancelTxEdit(){resetTxForm();txSay('');}
 function editTx(id){
   const t=aTx.find(x=>String(x.id)===String(id));if(!t)return;
   txEditId=t.id;
-  document.getElementById('tx-tick').value=t.ticker;document.getElementById('tx-tick').readOnly=true;
+  setFormKind('tx',isCommodity(t)?'commodity':'stock');lockFormKind('tx',true);
+  if(isCommodity(t)){loadComs().then(()=>{const c=document.getElementById('tx-com');c.value=t.ticker;c.disabled=true;updateUnitLabels('tx');});}
+  document.getElementById('tx-tick').value=isCommodity(t)?'':t.ticker;document.getElementById('tx-tick').readOnly=true;
   document.getElementById('tx-type').value=t.transaction_type;document.getElementById('tx-type').disabled=true;
   document.getElementById('tx-qty').value=t.quantity;document.getElementById('tx-px').value=t.price;
   document.getElementById('tx-dt').value=String(t.transaction_date||'').slice(0,10);document.getElementById('tx-notes').value=t.notes||'';
   document.getElementById('tx-apply-wrap').style.display='none';
-  document.getElementById('tx-form-title').textContent='Edit '+t.transaction_type+' '+t.ticker;document.getElementById('tx-save-btn').textContent='Save Changes';document.getElementById('tx-cancel-btn').style.display='inline-block';
+  document.getElementById('tx-form-title').textContent='Edit '+t.transaction_type+' '+holdingName(t);document.getElementById('tx-save-btn').textContent='Save Changes';document.getElementById('tx-cancel-btn').style.display='inline-block';
   txSay('');document.getElementById('tx-form-card').scrollIntoView({behavior:'smooth',block:'center'});
 }
 async function saveTx(){
-  const t=document.getElementById('tx-tick').value.trim().toUpperCase(),type=document.getElementById('tx-type').value;
+  const txCom=formKind.tx==='commodity';
+  const t=txEditId!=null?String((aTx.find(x=>x.id===txEditId)||{}).ticker||document.getElementById('tx-tick').value).trim().toUpperCase()
+    :txCom?document.getElementById('tx-com').value:resolveTicker(document.getElementById('tx-tick').value),type=document.getElementById('tx-type').value;
   const qRaw=document.getElementById('tx-qty').value,pRaw=document.getElementById('tx-px').value,d=document.getElementById('tx-dt').value,notes=document.getElementById('tx-notes').value.trim();
   const q=Number(qRaw),p=Number(pRaw);
-  if(!t||!qRaw||!pRaw||!d){txSay('Please fill in ticker, quantity, price and date.',false);return;}
+  if(!t||!qRaw||!pRaw||!d){txSay(txCom?'Please choose a commodity and fill in quantity, price and date.':'Please fill in ticker, quantity, price and date.',false);return;}
   if(!(q>0)){txSay('Quantity must be greater than zero.',false);return;}
   if(!(p>0)){txSay('Price must be greater than zero.',false);return;}
   if(d>new Date().toISOString().slice(0,10)){txSay("Date can't be in the future.",false);return;}
@@ -4379,7 +4460,7 @@ async function saveTx(){
 }
 async function deleteTx(id){
   const t=aTx.find(x=>String(x.id)===String(id));
-  if(!t||!confirm(`Remove this ${t.transaction_type} of ${t.quantity} ${t.ticker} (${String(t.transaction_date).slice(0,10)})? Your Holdings will not change.`))return;
+  if(!t||!confirm(`Remove this ${t.transaction_type} of ${qtyText(t)} ${holdingName(t)} (${String(t.transaction_date).slice(0,10)})? Your Holdings will not change.`))return;
   try{
     const res=await fetch(`${API}/api/transactions/${encodeURIComponent(t.id)}`,{method:'DELETE'});
     let data=null;try{data=await res.json();}catch(e){}
@@ -4469,7 +4550,7 @@ function stockSuggest(inputId, opts){
   // what to look up: [{text, start}] — start is where that text begins in the box, so a pick can replace it
   const queries = () => {
     const v = getInput()?.value || '';
-    if(opts.mode === 'whole'){ const t = v.trim(); return t ? [{text:t, start:v.indexOf(t)}] : []; }
+    if(opts.mode === 'whole' || opts.mode === 'field'){ const t = v.trim(); return t ? [{text:t, start:v.indexOf(t)}] : []; }
     const cut = Math.max(v.lastIndexOf(','), v.lastIndexOf(';'), v.lastIndexOf('\n'));
     const frag = v.slice(cut+1), lead = frag.length - frag.trimStart().length, t = frag.trim();
     if(!t || /\s$/.test(v)) return [];
@@ -4506,6 +4587,7 @@ function stockSuggest(inputId, opts){
     if(opts.mode === 'whole') input.value = '';
     else if(s._com) input.value = v.slice(0, part.start) + s.company_name + (opts.mode === 'list' ? ', ' : ' ');
     else if(opts.mode === 'list') input.value = v.slice(0, part.start) + s.ticker + ', ';
+    else if(opts.mode === 'field') input.value = s.ticker;                   // a form box: just the ticker
     else input.value = v.slice(0, part.start) + s.ticker + ' ';
     close(); syncX(); input.focus();
     if(opts.onPick) opts.onPick(s);
@@ -4567,12 +4649,12 @@ function stockSuggest(inputId, opts){
     if(el){ e.preventDefault(); pick(Number(el.dataset.i)); }
   }, true);
   document.addEventListener('focusout', e => { if(e.target && e.target.id === inputId) setTimeout(close, 150); }, true);
-  document.addEventListener('focusin', e => { if(e.target && e.target.id === inputId && e.target.value.trim()){ clearTimeout(timer); timer = setTimeout(()=>lookup(false), 50); } }, true);
+  document.addEventListener('focusin', e => { if(e.target && e.target.id === inputId && !e.target.readOnly && e.target.value.trim()){ clearTimeout(timer); timer = setTimeout(()=>lookup(false), 50); } }, true);
   getBox();
   return { close, syncX, reset(){ seq++; clearTimeout(timer); close(); syncX(); } };
 }
 
-let mktSuggest = null, aiSuggest = null, pfSuggest = null;
+let mktSuggest = null, aiSuggest = null, pfSuggest = null, holdSuggest = null, txSuggest = null;
 function initStockSuggest(){
   mktSuggest = stockSuggest('mkt-search', { mode:'whole', max:10, clearBtn:'mkt-search-x',
     extra: q => onCommoditiesPage() ? commodityMatches(q) : [],   // on the Commodities tab, commodities come first
@@ -4580,7 +4662,69 @@ function initStockSuggest(){
     onEnter: () => {} });
   aiSuggest = stockSuggest('ai-query', { mode:'token', clearBtn:'ai-query-x', onEnter: () => runAI() });
   pfSuggest = stockSuggest('pf-tickers', { mode:'list', clearBtn:'pf-tickers-x', onEnter: () => runPfReview('list') });
+  // the "Stock" box when adding a holding or a transaction: type a ticker or a company name, pick from the list
+  holdSuggest = stockSuggest('a-tick', { mode:'field', max:8, onEnter: () => {} });
+  txSuggest = stockSuggest('tx-tick', { mode:'field', max:8, onEnter: () => {} });
 }
+/** What was typed in a "Stock" box, as a ticker: a ticker we know, or the company whose name starts with the text. */
+function resolveTicker(raw){
+  const v = String(raw || '').trim(); if(!v) return '';
+  const up = v.toUpperCase();
+  if(!STOCK_DIR.loaded || STOCK_DIR.rows.some(r => r.ticker === up)) return up;
+  const best = rankStocks(v, 1)[0];
+  return best && best.company_name && best.company_name.toLowerCase().startsWith(v.toLowerCase()) ? best.ticker : up;
+}
+/** The Type of a holding or transaction (worked out on the server, commodity_groups.py):
+ *  "Commodity" (owned directly, e.g. gold), "Commodity company · Gold" (shares, counted as a stock) or "Stock". */
+function isCommodity(x){ return !!x && x.asset_type === 'commodity'; }
+function kindLabel(x){ return isCommodity(x) ? 'Commodity' : (x && x.commodity_company ? 'Commodity company · ' + x.commodity_company : 'Stock'); }
+function kindCell(x){ const cls = isCommodity(x) ? 'k-com' : (x && x.commodity_company ? 'k-cco' : 'k-stock'); return `<span class="kind ${cls}">${escapeHtml(kindLabel(x))}</span>`; }
+/** How a holding is named: "Gold" for a commodity, else the ticker. */
+function holdingName(x){ return isCommodity(x) ? (x.commodity || x.company_name || x.ticker) : x.ticker; }
+/** Quantity with its unit: "2 oz" for a commodity, "10" shares for a stock. */
+function qtyText(x){ return isCommodity(x) && x.unit_short ? `${x.quantity} ${x.unit_short}` : String(x.quantity); }
+
+// ── Add Holding / Add Transaction: Stock or Commodity ──
+let COMS = null;                                   // commodities that can be owned directly (from the server, with units)
+const formKind = { a: 'stock', tx: 'stock' };
+async function loadComs(){
+  if(COMS && COMS.length) return COMS;
+  try { const d = await api('/api/portfolio/commodities'); COMS = (d && d.commodities) || []; } catch(e){ COMS = []; }
+  ['a-com', 'tx-com'].forEach(id => {
+    const sel = document.getElementById(id); if(!sel || !COMS.length || sel.dataset.filled) return;
+    const groups = {}; COMS.forEach(c => { (groups[c.group] = groups[c.group] || []).push(c); });
+    sel.innerHTML = '<option value="">Choose a commodity…</option>' + Object.entries(groups).map(([g, cs]) =>
+      `<optgroup label="${escapeHtml(g)}">${cs.map(c => `<option value="${escapeHtml(c.symbol)}">${escapeHtml(c.name)} (per ${escapeHtml(c.unit)})</option>`).join('')}</optgroup>`).join('');
+    sel.dataset.filled = '1';
+  });
+  return COMS;
+}
+function comOf(symbol){ return (COMS || []).find(c => c.symbol === symbol) || null; }
+function updateUnitLabels(p){
+  const isCom = formKind[p] === 'commodity', c = isCom ? comOf(document.getElementById(p + '-com').value) : null;
+  const q = document.getElementById(p + '-qty-l'), px = document.getElementById(p + '-px-l');
+  if(p === 'a'){
+    if(q) q.textContent = c ? `Quantity (${c.plural})` : 'Quantity';
+    if(px) px.textContent = c ? `Buy price per ${c.unit} ($)` : (isCom ? 'Buy price per unit ($)' : 'Avg Buy ($)');
+  } else {
+    if(q) q.textContent = c ? `Qty (${c.plural})` : (isCom ? 'Quantity' : 'Qty (shares)');
+    if(px) px.textContent = c ? `Price per ${c.unit} ($)` : (isCom ? 'Price per unit ($)' : 'Price / dividend per share ($)');
+  }
+}
+function setFormKind(p, k){
+  formKind[p] = k;
+  const isCom = k === 'commodity';
+  document.querySelectorAll(`#${p}-kind .kseg-b`).forEach(b => b.classList.toggle('on', b.dataset.k === k));
+  const tw = document.getElementById(p + '-tick-wrap'), cw = document.getElementById(p + '-com-wrap');
+  if(tw) tw.hidden = isCom; if(cw) cw.hidden = !isCom;
+  if(p === 'tx'){                                   // commodities don't pay dividends
+    const type = document.getElementById('tx-type');
+    if(type){ [...type.options].forEach(o => { if(o.value === 'DIVIDEND' || o.textContent === 'DIVIDEND') o.disabled = isCom; }); if(isCom && type.value === 'DIVIDEND') type.value = 'BUY'; }
+  }
+  if(isCom) loadComs().then(() => updateUnitLabels(p));
+  updateUnitLabels(p);
+}
+function lockFormKind(p, locked){ document.querySelectorAll(`#${p}-kind .kseg-b`).forEach(b => { b.disabled = locked; }); }
 function onCommoditiesPage(){ return !!document.getElementById('page-commodities')?.classList.contains('on'); }
 /** Commodities whose name, symbol or group matches (the list loaded on the Commodities tab). */
 function commodityMatches(q){
@@ -5668,6 +5812,38 @@ function loadPortfolioTickers() {
 .b-stock-item .bsi-right .bsi-chg{font-size:11px;font-weight:600;text-align:right;}
 /* ── Stock suggestions (Market search, AI Stock Finder, Portfolio Review) and clear buttons ── */
 .ssug-wrap{position:relative;flex:1;min-width:0;display:flex;align-items:center;}
+/* Stock / commodity labels: plain coloured text */
+.kind{font-size:11px;font-weight:700;white-space:nowrap;}
+.kind.k-stock{color:var(--t3);}
+.kind.k-com{color:var(--yellow);}
+.allocrow .kind{margin-left:8px;}
+.fbtn .kn{margin-left:4px;color:var(--t3);font-weight:700;}
+.fbtn.on .kn{color:inherit;opacity:.8;}
+.tsep{width:1px;align-self:stretch;background:var(--b2);margin:0 4px;}
+.kseg{display:inline-flex;gap:2px;background:var(--bg3);border:1px solid var(--b1);border-radius:7px;padding:2px;}
+.kseg-b{border:0;background:none;color:var(--t3);font-size:11px;font-weight:700;padding:4px 9px;border-radius:5px;cursor:pointer;}
+.kseg-b.on{background:var(--b2);color:var(--t1);}
+.kseg-b:disabled{opacity:.5;cursor:not-allowed;}
+.kind.k-cco{color:#c9a24a;font-weight:600;}
+.form-kind{margin:0 0 12px;}
+/* Allocation: Stocks and Commodities side by side; on a phone one at a time with a switch */
+.alloc2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.alloc-h{font-size:11px;font-weight:800;color:var(--t2);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
+.alloc-h span{color:var(--t3);font-weight:700;margin-left:6px;text-transform:none;letter-spacing:0;}
+.alloc-box{position:relative;height:200px;}
+.alloc-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--t3);font-size:12px;font-weight:600;padding:0 12px;}
+.alloc-empty[hidden]{display:none;}
+.alloc-phone{display:none;}
+.pnl-key{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--t3);}
+.pnl-key span{display:inline-block;width:10px;height:10px;border-radius:2px;margin-left:8px;}
+.pnl-key .pk-st{background:rgba(0,230,118,0.7);}
+.pnl-key .pk-co{background:rgba(0,230,118,0.7);outline:2px solid #F5A623;outline-offset:-2px;}
+@media(max-width:760px){
+  .alloc2{grid-template-columns:1fr;}
+  .alloc-pane{display:none;}
+  .alloc-pane.on{display:block;}
+  .alloc-phone{display:inline-flex;}
+}
 .ssug-wrap>input{flex:1;width:100%;min-width:0;padding-right:36px;}
 .ai-in-wrap{min-width:260px;}
 .ai-in-wrap>.ai-input{min-width:0;}
@@ -6158,8 +6334,17 @@ function ntDoAction(a){
 }
 
 // The one function every notification goes through
+// The person's notification choices (Settings → Notifications). Until they arrive, everything is on, as before.
+let ntPrefs = null;
+const NT_PREF_FOR = {alert_hit:'bell_price_alerts', news:'bell_news', event:'bell_events', result:'bell_events', support:'bell_support'};
+async function ntLoadPrefs(){
+  try { const r = await fetch(`${API}/api/account/notifications`); if(r.ok){ const d = await r.json(); if(d && d.notifications) ntPrefs = d.notifications; } } catch(e){}
+}
+function ntAllowed(kind){ const key = NT_PREF_FOR[kind]; return !key || !ntPrefs || ntPrefs[key] !== false; }
+
 function ntNotify(kind, title, body, action, opts){
   opts = opts || {};
+  if(!ntAllowed(kind)) return;                             // turned off in Settings
   const item = {id: Date.now() + '-' + Math.random().toString(36).slice(2,7), kind, title, body: body||'', action: action||null, ts: Date.now(), read: false};
   ntHistory.unshift(item);
   ntHistory = ntHistory.slice(0, 20);
@@ -6167,7 +6352,7 @@ function ntNotify(kind, title, body, action, opts){
   ntRenderBell();
 
   let shownOnDesktop = false;
-  if(ntPermission() === 'granted'){
+  if(ntPermission() === 'granted' && !(ntPrefs && ntPrefs.desktop === false)){
     try {
       const n = new Notification(title, {body: body||'', tag: opts.tag || item.id, requireInteraction: !!opts.sticky, icon: opts.icon});
       n.onclick = () => { ntDoAction(action); n.close(); };
@@ -6417,6 +6602,8 @@ document.addEventListener('click', e => {
 
 // ─── Timers ─────────────────────────────────────────────────
 ntRenderBell();
+ntLoadPrefs();
+document.addEventListener('visibilitychange', () => { if(!document.hidden) ntLoadPrefs(); });   // pick up changes made in Settings
 setTimeout(checkAlertsForNotifications, 4000);
 setInterval(checkAlertsForNotifications, 60 * 1000);      // price alerts: every minute
 setTimeout(ntPollFeed, 6000);

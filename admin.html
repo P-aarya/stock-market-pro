@@ -69,11 +69,13 @@ h1{font-size:22px;letter-spacing:-.4px}
 .b-blocked{color:var(--red);background:rgba(255,68,68,.1);border-color:rgba(255,68,68,.25)}
 .b-admin{color:var(--cyan);background:rgba(0,212,255,.1);border-color:rgba(0,212,255,.25);margin-left:6px;vertical-align:1px}
 
-.btn{border:1px solid var(--b2);background:var(--bg3);color:var(--t1);font-size:12px;font-weight:800;padding:8px 14px;border-radius:7px;min-height:36px}
+/* Plain buttons: an outline and coloured text, no filled or glowing background. Green = allow, red = refuse/remove,
+   yellow = admin rights, grey = everything else. */
+.btn{border:1px solid var(--b2);background:transparent;color:var(--t2);font-size:12px;font-weight:800;padding:8px 14px;border-radius:7px;min-height:36px}
+.btn:hover:not(:disabled){border-color:var(--t3);color:var(--t1)}
 .btn:disabled{opacity:.5;cursor:wait}
-.btn.go{background:var(--green);border-color:var(--green);color:#04120a}.btn.go:hover:not(:disabled){background:#00c45a}
-.btn.no{color:var(--red);border-color:rgba(255,68,68,.4);background:rgba(255,68,68,.08)}.btn.no:hover:not(:disabled){background:var(--red);color:#fff}
-.btn.plain:hover:not(:disabled){border-color:var(--blue)}
+.btn.go{color:var(--green);border-color:var(--green)}.btn.go:hover:not(:disabled){color:var(--green);border-color:var(--green);text-decoration:underline}
+.btn.no{color:var(--red);border-color:var(--red)}.btn.no:hover:not(:disabled){color:var(--red);border-color:var(--red);text-decoration:underline}
 
 .empty{padding:36px 16px;text-align:center;color:var(--t3);font-weight:600}
 .note{color:var(--t3);font-size:12px;margin-top:14px}
@@ -101,10 +103,10 @@ code{font-family:var(--mono);background:var(--bg3);border:1px solid var(--b1);bo
 .mini .e{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .mini .t{color:var(--t3);white-space:nowrap;font-size:12px}
 .btn.small{font-size:11px;padding:6px 10px;min-height:32px}
-.btn.gold{color:var(--yellow);border-color:rgba(255,200,0,.35);background:rgba(255,200,0,.06)}.btn.gold:hover:not(:disabled){background:rgba(255,200,0,.14)}
-.s-open{color:var(--yellow);background:rgba(255,200,0,.1);border-color:rgba(255,200,0,.25)}
-.s-in_progress{color:var(--cyan);background:rgba(0,212,255,.1);border-color:rgba(0,212,255,.25)}
-.s-resolved{color:var(--green);background:rgba(0,230,118,.1);border-color:rgba(0,230,118,.25)}
+.btn.gold{color:var(--yellow);border-color:var(--yellow)}.btn.gold:hover:not(:disabled){color:var(--yellow);border-color:var(--yellow);text-decoration:underline}
+/* Ticket status: just coloured text */
+.badge.s-open,.badge.s-in_progress,.badge.s-resolved{background:none;border:0;padding:0;border-radius:0}
+.s-open{color:var(--yellow)}.s-in_progress{color:var(--cyan)}.s-resolved{color:var(--green)}
 .thead,.trow{display:grid;grid-template-columns:70px minmax(0,2.2fr) minmax(0,1.4fr) 120px 110px;gap:12px;align-items:center;padding:12px 14px}
 .thead{font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:1.1px;border-bottom:1px solid var(--b1)}
 .trow{border-bottom:1px solid rgba(28,28,48,.8);cursor:pointer;color:inherit;font-weight:inherit;text-decoration:none}
@@ -159,6 +161,7 @@ textarea:focus,select.inp:focus,input.inp:focus{border-color:var(--blue)}
   .search{flex:1 1 0;min-width:0;order:3;font-size:16px}
   .spacer{display:none}
   .refresh{order:4;min-height:42px}
+  #users-export{order:5}
   .head{display:none}
   .row{grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;padding:14px}
   .row .who{grid-column:1}.row .st{grid-column:2;justify-self:end}
@@ -204,6 +207,7 @@ textarea:focus,select.inp:focus,input.inp:focus{border-color:var(--blue)}
       <span class="spacer"></span>
       <input class="search" id="search" type="search" placeholder="Search email or name…" autocomplete="off" aria-label="Search by email or name"/>
       <button class="refresh" id="refresh" type="button">↻ Refresh</button>
+      <button class="refresh" id="users-export" type="button" title="Every account with its profile details, plus a summary">⬇ Download Excel</button>
     </div>
     <div class="head"><span>Account</span><span>Status</span><span>Registered</span><span>Last sign-in</span><span></span></div>
     <div id="list" aria-live="polite"><div class="empty">Loading…</div></div>
@@ -294,12 +298,12 @@ function actionsFor(u){
   const more = (what, cls, text) => `<button class="btn small ${cls}" type="button" data-id="${u.id}" data-more="${what}"${busy}>${text}</button>`;
   if(u.is_admin){
     if(u.id === state.you) return '<span class="sub">Administrator (you)</span>' + more('reset', 'plain', 'Send reset link');
-    return '<span class="sub">Administrator</span>' + more('admin-off', 'plain', 'Remove admin') + more('reset', 'plain', 'Send reset link');
+    return '<span class="sub">Administrator</span>' + more('admin-off', 'no', 'Remove admin') + more('reset', 'plain', 'Send reset link');
   }
   const b = (act, cls, text) => `<button class="btn ${cls}" type="button" data-id="${u.id}" data-act="${act}"${busy}>${text}</button>`;
   if(u.status === 'pending') return b('approved', 'go', 'Approve') + b('blocked', 'no', 'Decline');
   if(u.status === 'approved') return b('blocked', 'no', 'Block') + more('admin-on', 'gold', 'Make admin') + more('reset', 'plain', 'Send reset link');
-  return b('approved', 'plain', 'Unblock');
+  return b('approved', 'go', 'Unblock');
 }
 
 function rowHtml(u){
@@ -579,10 +583,28 @@ async function moreAction(id, what){
   }
 }
 
+// Every account with its profile details, as an Excel file.
+async function downloadUsers(){
+  const btn = document.getElementById('users-export'); if(btn.disabled) return;
+  btn.disabled = true; const label = btn.textContent; btn.textContent = 'Preparing…';
+  try {
+    const res = await fetch('/api/admin/users/export');
+    if(res.status === 401){ location.href = '/login'; return; }
+    if(!res.ok){ let m = 'Something went wrong making the file.'; try { m = (await res.json()).message || m; } catch(e){} throw new Error(m); }
+    const blob = await res.blob();
+    const name = (/filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') || '') || [])[1] || 'aymetrix-users.xlsx';
+    const url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  } catch(e){ toast(e.message, 'err'); }
+  finally { btn.disabled = false; btn.textContent = label; }
+}
+
 document.getElementById('list').addEventListener('click', e => {
   const b = e.target.closest('button[data-more]');
   if(b) moreAction(Number(b.dataset.id), b.dataset.more);
 });
+document.getElementById('users-export').addEventListener('click', downloadUsers);
 document.getElementById('views').addEventListener('click', e => { const b = e.target.closest('button[data-view]'); if(b) location.hash = b.dataset.view; });
 document.getElementById('tk-tabs').addEventListener('click', e => { const t = e.target.closest('button[data-tkfilter]'); if(t){ center.tkFilter = t.dataset.tkfilter; renderTickets(); } });
 document.getElementById('tk-search').addEventListener('input', e => { center.tkQuery = e.target.value; renderTickets(); });

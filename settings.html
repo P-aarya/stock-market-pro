@@ -64,9 +64,9 @@ textarea{min-height:120px;resize:vertical;line-height:1.5}
 .fact .v{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 .badge{display:inline-block;padding:3px 9px;border-radius:5px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;border:1px solid;white-space:nowrap}
-.s-open{color:var(--yellow);background:rgba(255,200,0,.1);border-color:rgba(255,200,0,.25)}
-.s-in_progress{color:var(--cyan);background:rgba(0,212,255,.1);border-color:rgba(0,212,255,.25)}
-.s-resolved{color:var(--green);background:rgba(0,230,118,.1);border-color:rgba(0,230,118,.25)}
+/* Ticket status: just coloured text */
+.badge.s-open,.badge.s-in_progress,.badge.s-resolved{background:none;border:0;padding:0;border-radius:0}
+.s-open{color:var(--yellow)}.s-in_progress{color:var(--cyan)}.s-resolved{color:var(--green)}
 .b-admin{color:var(--cyan);background:rgba(0,212,255,.1);border-color:rgba(0,212,255,.25)}
 .b-user{color:var(--t2);background:var(--bg3);border-color:var(--b2)}
 
@@ -96,20 +96,45 @@ textarea{min-height:120px;resize:vertical;line-height:1.5}
 .toast.show{opacity:1;transform:translateX(-50%)}
 .toast.err{border-color:rgba(255,68,68,.5);color:#ff8d8d}.toast.ok{border-color:rgba(0,230,118,.4)}
 
+input[type=date]{width:100%;padding:10px 12px;border-radius:9px;border:1px solid var(--b2);background:var(--bg3);color:var(--t1);font-size:14px;outline:none;color-scheme:dark}
+input[type=date]:focus{border-color:var(--blue)}
+.age{color:var(--t3);font-size:12px;margin-top:6px;min-height:1em}
+.privacy{color:var(--t3);font-size:12px;margin-top:14px;padding-top:12px;border-top:1px solid var(--b1)}
+.sw-list{display:flex;flex-direction:column}
+.sw{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 0;margin:0;border-bottom:1px solid var(--b1);cursor:pointer;
+  text-transform:none;letter-spacing:0;font-size:13px;font-weight:400;color:var(--t1)}
+.sw:last-child{border-bottom:0}
+.sw .t{font-weight:700;font-size:13px}
+.sw .d{color:var(--t3);font-size:12px;font-weight:500;margin-top:2px}
+.sw input{appearance:none;-webkit-appearance:none;width:40px;height:22px;border-radius:11px;background:var(--b2);position:relative;flex-shrink:0;cursor:pointer;transition:background .15s;margin:0}
+.sw input::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .15s}
+.sw input:checked{background:var(--green)}
+.sw input:checked::after{left:21px}
+.sw input:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.group{font-size:11px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin:18px 0 2px}
+.group:first-child{margin-top:0}
+.danger{border-color:rgba(255,68,68,.35)}
+.danger h2{color:var(--red)}
+.btn.red{color:var(--red);border-color:var(--red);background:transparent}
+.btn.red:hover:not(:disabled){border-color:var(--red);text-decoration:underline}
+.btn.dl{display:inline-flex;align-items:center;gap:8px;text-decoration:none}
+
 @media(max-width:760px){
   .top{padding-left:calc(16px + env(safe-area-inset-left));padding-right:calc(16px + env(safe-area-inset-right))}
   .wrap{grid-template-columns:minmax(0,1fr);gap:14px;padding:16px calc(16px + env(safe-area-inset-right)) 32px calc(16px + env(safe-area-inset-left))}
-  .side{position:static;flex-direction:row;gap:4px;background:var(--bg2);border:1px solid var(--b1);border-radius:10px;padding:4px}
+  .side{position:static;flex-direction:row;gap:4px;background:var(--bg2);border:1px solid var(--b1);border-radius:10px;padding:4px;overflow-x:auto;scrollbar-width:none}
+  .side::-webkit-scrollbar{display:none}
   .side h1{display:none}
-  .sec-btn{justify-content:center;padding:10px 6px;font-size:12px;gap:6px}
+  .sec-btn{justify-content:center;padding:10px 8px;font-size:12px;gap:6px;flex:1 0 auto;width:auto;white-space:nowrap}
   .sec-btn .dot{margin-left:0}
   .card{padding:16px}
   .row2,.facts{grid-template-columns:minmax(0,1fr)}
-  input[type=text],input[type=password],select,textarea{font-size:16px}
+  input[type=text],input[type=password],input[type=date],select,textarea{font-size:16px}
   .actions .btn{flex:1 1 auto}
   .bubble{max-width:92%}
 }
-@media(max-width:380px){.brand small{display:none}.sec-btn svg{display:none}}
+@media(max-width:560px){.sec-btn svg{display:none}}
+@media(max-width:380px){.brand small{display:none}}
 </style>
 </head>
 <body>
@@ -125,8 +150,10 @@ textarea{min-height:120px;resize:vertical;line-height:1.5}
   <aside class="side" role="tablist" aria-label="Settings sections">
     <h1>Settings</h1>
     <button class="sec-btn" type="button" data-sec="account" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Account</button>
+    <button class="sec-btn" type="button" data-sec="notifications" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Notifications</button>
     <button class="sec-btn" type="button" data-sec="security" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Security</button>
     <button class="sec-btn" type="button" data-sec="help" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 4.9.7c0 1.7-2.4 2.2-2.4 3.8"/><line x1="12" y1="17" x2="12" y2="17.01"/></svg>Help Desk<span class="dot" id="help-dot"></span></button>
+    <button class="sec-btn" type="button" data-sec="data" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Your data</button>
   </aside>
 
   <main>
@@ -134,12 +161,22 @@ textarea{min-height:120px;resize:vertical;line-height:1.5}
     <section class="section" id="sec-account" aria-label="Account">
       <div class="card">
         <h2>Profile</h2>
-        <p class="lead">Your name is shown at the top of the dashboard.</p>
+        <p class="lead">Your name is shown at the top of the dashboard. Everything except your email is optional.</p>
         <form id="name-form" autocomplete="off">
           <div class="row2">
             <div><label for="name">Name</label><input id="name" type="text" maxlength="80" placeholder="Your name" autocomplete="name"/></div>
             <div><label for="email">Email</label><input id="email" type="text" readonly/></div>
           </div>
+          <div class="row2" style="margin-top:14px">
+            <div><label for="city">Region / city</label><input id="city" type="text" maxlength="80" placeholder="e.g. London" autocomplete="address-level2"/></div>
+            <div><label for="birth">Date of birth</label><input id="birth" type="date" min="1900-01-01" autocomplete="bday"/><div class="age" id="age"></div></div>
+          </div>
+          <div class="row2" style="margin-top:4px">
+            <div><label for="gender">Gender</label><select id="gender"><option value="">Choose…</option></select></div>
+            <div><label for="profession">Profession</label><select id="profession"><option value="">Choose…</option></select>
+              <input id="profession-other" type="text" maxlength="60" placeholder="Your profession" style="margin-top:8px" hidden/></div>
+          </div>
+          <p class="privacy">Optional. These details help us improve Aymetrix. Only you and our administrators can see them, and they are deleted if you delete your account.</p>
           <div class="actions"><button class="btn primary" type="submit" id="name-save">Save</button><span class="msg" id="name-msg" role="status"></span></div>
         </form>
       </div>
@@ -147,6 +184,16 @@ textarea{min-height:120px;resize:vertical;line-height:1.5}
         <h2>Account details</h2>
         <p class="lead">To change your email, raise a ticket in Help Desk.</p>
         <div class="facts" id="facts"><div class="empty">Loading…</div></div>
+      </div>
+    </section>
+
+    <!-- NOTIFICATIONS -->
+    <section class="section" id="sec-notifications" aria-label="Notifications">
+      <div class="card">
+        <h2>Notifications</h2>
+        <p class="lead">Choose what Aymetrix tells you about. Changes are saved straight away.</p>
+        <div class="sw-list" id="notify-list"><div class="empty">Loading…</div></div>
+        <p class="hint" style="margin-top:12px">Password reset emails are always sent, because they keep your account safe.</p>
       </div>
     </section>
 
@@ -211,6 +258,25 @@ textarea{min-height:120px;resize:vertical;line-height:1.5}
         </div>
       </div>
     </section>
+    <!-- YOUR DATA -->
+    <section class="section" id="sec-data" aria-label="Your data">
+      <div class="card">
+        <h2>Download my data</h2>
+        <p class="lead">One Excel file with two sheets: your <b>Portfolio</b> (holdings, current value, profit and loss) and your <b>Transactions</b> (every buy, sell and dividend).</p>
+        <a class="btn primary dl" href="/api/account/export" id="export-btn" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download Excel</a>
+      </div>
+      <div class="card danger">
+        <h2>Delete my account</h2>
+        <p class="lead">This permanently deletes your account and everything in it: portfolio, transactions, watchlist, price alerts, Help Desk tickets and profile details. It can't be undone. You may want to download your data first.</p>
+        <form id="delete-form" autocomplete="off">
+          <div class="row2">
+            <div><label for="del-password">Your password</label><input id="del-password" type="password" autocomplete="current-password" maxlength="128" required/></div>
+            <div><label for="del-confirm">Type DELETE to confirm</label><input id="del-confirm" type="text" maxlength="10" autocapitalize="characters" spellcheck="false" required placeholder="DELETE"/></div>
+          </div>
+          <div class="actions"><button class="btn red" type="submit" id="del-btn">Delete my account</button><span class="msg" id="del-msg" role="status"></span></div>
+        </form>
+      </div>
+    </section>
   </main>
 </div>
 <div class="toast" id="toast" role="status"></div>
@@ -254,9 +320,9 @@ let routed = false;
 function route(){
   const h = (location.hash || '#account').slice(1);
   const m = h.match(/^ticket-(\d+)$/);
-  const sec = m ? 'help' : (['account', 'security', 'help'].includes(h) ? h : 'account');
+  const sec = m ? 'help' : (['account', 'notifications', 'security', 'help', 'data'].includes(h) ? h : 'account');
   document.querySelectorAll('.section').forEach(s => s.classList.toggle('on', s.id === 'sec-' + sec));
-  document.querySelectorAll('.sec-btn').forEach(b => { const on = b.dataset.sec === sec; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
+  document.querySelectorAll('.sec-btn').forEach(b => { const on = b.dataset.sec === sec; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); if(on && b.scrollIntoView) b.scrollIntoView({ block: 'nearest', inline: 'nearest' }); });
   document.getElementById('help-list').hidden = !!m;
   document.getElementById('help-ticket').hidden = !m;
   if(m) openTicket(Number(m[1]));
@@ -265,6 +331,40 @@ function route(){
 }
 
 // ── account ──
+// Whole years from a YYYY-MM-DD date of birth to today ('' when there is none or it isn't a real past date).
+function ageFrom(iso, today = new Date()){
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); if(!m) return '';
+  const y = +m[1], mo = +m[2], d = +m[3];
+  let age = today.getFullYear() - y - ((today.getMonth() + 1 < mo || (today.getMonth() + 1 === mo && today.getDate() < d)) ? 1 : 0);
+  return age >= 0 && age < 130 ? age : '';
+}
+function showAge(){
+  const age = ageFrom(document.getElementById('birth').value);
+  document.getElementById('age').textContent = age === '' ? '' : `Age ${age}`;
+}
+function fillChoices(choices){
+  const g = document.getElementById('gender'), p = document.getElementById('profession');
+  if(g.options.length <= 1) Object.entries(choices.genders || {}).forEach(([k, v]) => { const o = document.createElement('option'); o.value = k; o.textContent = v; g.appendChild(o); });
+  if(p.options.length <= 1){
+    (choices.professions || []).forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; p.appendChild(o); });
+    const o = document.createElement('option'); o.value = '__other'; o.textContent = 'Other (type your own)'; p.appendChild(o);
+  }
+}
+function showProfessionOther(){
+  const other = document.getElementById('profession').value === '__other';
+  const box = document.getElementById('profession-other'); box.hidden = !other;
+}
+function renderProfile(){
+  const a = state.account; if(!a) return;
+  document.getElementById('city').value = a.city || '';
+  document.getElementById('birth').value = a.birth_date || '';
+  document.getElementById('birth').max = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  document.getElementById('gender').value = a.gender || '';
+  const prof = document.getElementById('profession'), known = [...prof.options].some(o => o.value === a.profession && o.value !== '__other');
+  prof.value = !a.profession ? '' : known ? a.profession : '__other';
+  document.getElementById('profession-other').value = known ? '' : (a.profession || '');
+  showProfessionOther(); showAge();
+}
 function renderAccount(){
   const a = state.account; if(!a) return;
   document.getElementById('email').value = a.email;
@@ -278,20 +378,90 @@ function renderAccount(){
   document.getElementById('facts').innerHTML = facts.map(([l, v, t]) => `<div class="fact"${t ? ` title="${escapeHtml(t)}"` : ''}><div class="l">${l}</div><div class="v">${v}</div></div>`).join('');
 }
 async function loadAccount(){
-  try { state.account = (await call('/api/account')).account; renderAccount(); }
+  try {
+    const d = await call('/api/account');
+    state.account = d.account; fillChoices(d.choices || {});
+    renderAccount(); renderProfile(); renderNotifications();
+  }
   catch(e){ document.getElementById('facts').innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`; }
+}
+function profileForm(){
+  const prof = document.getElementById('profession').value;
+  return { name: document.getElementById('name').value, city: document.getElementById('city').value,
+           birth_date: document.getElementById('birth').value, gender: document.getElementById('gender').value,
+           profession: prof === '__other' ? document.getElementById('profession-other').value : prof };
 }
 async function saveName(ev){
   ev.preventDefault();
   const btn = document.getElementById('name-save'); if(btn.disabled) return;
-  btn.disabled = true; setMsg('name-msg', '');
+  btn.disabled = true; setMsg('name-msg', 'Saving…');
   try {
-    const d = await call('/api/account/name', { method: 'PUT', body: JSON.stringify({ name: document.getElementById('name').value }) });
-    if(state.account) state.account.name = d.name;
-    document.getElementById('name').value = d.name;
+    const d = await call('/api/account/profile', { method: 'PUT', body: JSON.stringify(profileForm()) });
+    if(state.account) Object.assign(state.account, d.profile);
+    document.getElementById('name').value = d.profile.name;
+    renderProfile();
     setMsg('name-msg', 'Saved', 'ok');
   } catch(e){ setMsg('name-msg', e.message, 'err'); }
   finally { btn.disabled = false; }
+}
+
+// ── notifications ──
+const NOTIFY_ROWS = [
+  ['Email', 'email_ticket_replies', 'Help Desk replies by email', 'When the Aymetrix team replies to your ticket or changes its status.'],
+  ['Bell on the dashboard', 'bell_price_alerts', 'Price alerts', 'When a stock reaches a price you set an alert for.'],
+  ['Bell on the dashboard', 'bell_news', 'Market news', 'Important market headlines.'],
+  ['Bell on the dashboard', 'bell_events', 'Economic events', 'Upcoming economic events, their results and market holidays.'],
+  ['Bell on the dashboard', 'bell_support', 'Help Desk replies', 'When the team replies to your ticket.'],
+  ['Desktop', 'desktop', 'Desktop pop-ups', 'Show notifications outside the browser too (your browser must allow them).'],
+];
+function renderNotifications(){
+  const prefs = (state.account && state.account.notifications) || {};
+  let group = '';
+  document.getElementById('notify-list').innerHTML = NOTIFY_ROWS.map(([g, key, title, desc]) => {
+    const head = g !== group ? `<div class="group">${escapeHtml(g)}</div>` : ''; group = g;
+    return `${head}<label class="sw"><span><span class="t">${escapeHtml(title)}</span><span class="d" style="display:block">${escapeHtml(desc)}</span></span>
+      <input type="checkbox" data-pref="${key}" role="switch"${prefs[key] !== false ? ' checked' : ''} aria-label="${escapeHtml(title)}"/></label>`;
+  }).join('');
+}
+async function savePref(input){
+  const key = input.dataset.pref, on = input.checked;
+  input.disabled = true;
+  try {
+    const d = await call('/api/account/notifications', { method: 'PUT', body: JSON.stringify({ [key]: on }) });
+    if(state.account) state.account.notifications = d.notifications;
+    toast(on ? 'Turned on.' : 'Turned off.', 'ok');
+  } catch(e){ input.checked = !on; toast(e.message, 'err'); }
+  finally { input.disabled = false; }
+}
+
+// ── your data ──
+async function downloadData(ev){
+  ev.preventDefault();
+  const btn = document.getElementById('export-btn'); if(btn.dataset.busy) return;
+  btn.dataset.busy = '1'; const label = btn.lastChild.textContent; btn.lastChild.textContent = 'Preparing…';
+  try {
+    const res = await fetch('/api/account/export');
+    if(res.status === 401){ location.href = '/login'; return; }
+    if(!res.ok){ let m = 'Something went wrong making your file.'; try { m = (await res.json()).message || m; } catch(e){} throw new Error(m); }
+    const blob = await res.blob();
+    const name = (/filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') || '') || [])[1] || 'aymetrix-my-data.xlsx';
+    const url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  } catch(e){ toast(e.message, 'err'); }
+  finally { delete btn.dataset.busy; btn.lastChild.textContent = label; }
+}
+async function deleteAccount(ev){
+  ev.preventDefault();
+  const btn = document.getElementById('del-btn'); if(btn.disabled) return;
+  const password = document.getElementById('del-password').value, confirmWord = document.getElementById('del-confirm').value.trim();
+  if(confirmWord !== 'DELETE'){ setMsg('del-msg', 'Please type DELETE in capital letters to confirm.', 'err'); return; }
+  btn.disabled = true; setMsg('del-msg', 'Deleting…');
+  try {
+    await call('/api/account/delete', { method: 'POST', body: JSON.stringify({ password, confirm: confirmWord }) });
+    setMsg('del-msg', 'Your account has been deleted.', 'ok');
+    setTimeout(() => { location.href = '/login'; }, 1500);
+  } catch(e){ setMsg('del-msg', e.message, 'err'); btn.disabled = false; }
 }
 
 // ── security ──
@@ -389,6 +559,11 @@ async function sendReply(ev){
 
 document.querySelectorAll('.sec-btn').forEach(b => b.addEventListener('click', () => { location.hash = b.dataset.sec; }));
 document.getElementById('name-form').addEventListener('submit', saveName);
+document.getElementById('birth').addEventListener('input', showAge);
+document.getElementById('profession').addEventListener('change', () => { showProfessionOther(); if(!document.getElementById('profession-other').hidden) document.getElementById('profession-other').focus(); });
+document.getElementById('notify-list').addEventListener('change', e => { const i = e.target.closest('input[data-pref]'); if(i) savePref(i); });
+document.getElementById('export-btn').addEventListener('click', downloadData);
+document.getElementById('delete-form').addEventListener('submit', deleteAccount);
 document.getElementById('pw-form').addEventListener('submit', changePassword);
 document.getElementById('pw-show').addEventListener('change', e => document.querySelectorAll('input[data-pw]').forEach(i => { i.type = e.target.checked ? 'text' : 'password'; }));
 document.getElementById('new-ticket-btn').addEventListener('click', () => showNewTicket(true));

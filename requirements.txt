@@ -14,3 +14,4 @@ pytz
 python-multipart
 
 vaderSentiment
+openpyxl

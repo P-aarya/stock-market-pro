@@ -412,6 +412,11 @@ def _email_support(ticket, author_email, body, base, is_reply):
         log.error("Could not queue the support email for ticket #%s: %s", ticket.get("id"), e)
 
 
+def _wants_email(user_id):
+    import auth
+    return auth.wants(user_id, "email_ticket_replies")
+
+
 def _tell_user(raw, ticket, body, status_label, base, now):
     """Bell notification plus email to the person who raised the ticket. Failures are logged; the reply is saved anyway."""
     title = f"Reply on ticket #{ticket['id']}" if body else f"Ticket #{ticket['id']} is now {status_label.lower()}"
@@ -421,7 +426,7 @@ def _tell_user(raw, ticket, body, status_label, base, now):
     except Exception as e:                                   # noqa: BLE001
         log.error("Could not add the bell notification for ticket #%s: %s", ticket["id"], e)
     to = raw.get("user_email")
-    if to:
+    if to and _wants_email(raw["user_id"]):
         try:
             import mailer
             mailer.ticket_update(to, ticket, body, status_label, base)
