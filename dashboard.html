@@ -373,6 +373,70 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 
 @media(max-width:1100px){.g4{grid-template-columns:repeat(2,1fr);}.mgrid{grid-template-columns:repeat(2,1fr);}.intgrid{grid-template-columns:repeat(2,1fr);}}
 @media(max-width:700px){.g4,.g3,.g2,.g31,.fs2{grid-template-columns:1fr;}}
+
+/* ── Plan locks ──
+   Parts of the page the person's plan doesn't include (marked data-feature) stay visible but covered by a padlock. The server
+   refuses their data as well; this only keeps the page from showing empty boxes. */
+.is-locked{position:relative}
+.is-locked:not(.ntab):not(.fstab){overflow:hidden}
+.is-locked:not(.ntab):not(.fstab)>*:not(.lockcover){filter:blur(5px) saturate(.6);opacity:.4;pointer-events:none;user-select:none}
+.lockcover{position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:12px;text-align:center;
+  background:rgba(5,5,8,.5);border:0;border-radius:inherit;color:var(--t1);font-family:inherit;cursor:pointer}
+.lockcover:hover,.lockcover:focus-visible{background:rgba(5,5,8,.36)}
+.lockcover:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+.lockcover svg{color:var(--cyan)}
+.lockcover b{font-size:13px;font-weight:800}
+.lockcover small{color:var(--t2);font-size:11px;font-weight:600}
+.ntab.is-locked,.fstab.is-locked{opacity:.62}
+.ntab.is-locked::after,.fstab.is-locked::after{content:"";position:absolute;top:4px;right:5px;width:9px;height:9px;background:currentColor;
+  -webkit-mask:var(--lock-icon) center/contain no-repeat;mask:var(--lock-icon) center/contain no-repeat}
+:root{--lock-icon:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'><rect x='4' y='11' width='16' height='10' rx='2'/><path d='M8 11V8a4 4 0 0 1 8 0v3'/></svg>")}
+#up-modal{position:fixed;inset:0;z-index:100001;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.62)}
+#up-modal.open{display:flex}
+.up-box{width:100%;max-width:380px;background:var(--bg2);border:1px solid var(--b3);border-radius:14px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.up-box h3{margin:0 0 8px;font-size:17px;font-weight:800}
+.up-box p{margin:0 0 18px;color:var(--t2);font-size:14px;line-height:1.5}
+.up-box .btn{width:100%;min-height:42px;justify-content:center}
+.up-box .btn+.btn{margin-top:8px}
+.up-box .btns{background:var(--bg3);color:var(--t1);border:1px solid var(--b2)}
+/* ── Profile ── */
+.prof-card,.prof-sec{max-width:1000px;margin-left:auto;margin-right:auto}
+.prof-top{display:flex;align-items:center;gap:16px}
+.prof-avatar{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--cyan));color:#fff;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900;flex:none;text-transform:uppercase}
+.prof-who{min-width:0}
+.prof-name{font-size:18px;font-weight:800;color:var(--t1);overflow-wrap:anywhere}
+.prof-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin:16px 0}
+.prof-box{background:var(--bg3);border:1px solid var(--b1);border-radius:10px;padding:12px 14px;min-width:0}
+.prof-lbl{display:block;font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:6px}
+.prof-val{font-size:17px;font-weight:800;color:var(--t1);overflow-wrap:anywhere}
+.prof-note{font-size:12px;font-weight:600;color:var(--t3);margin-top:2px}
+.prof-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.prof-btn{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 18px;border-radius:8px;font:800 13px var(--sans);cursor:pointer;border:1px solid var(--b2);background:var(--bg3);color:var(--t1);text-decoration:none}
+.prof-btn:hover{border-color:var(--blue)}
+.prof-btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+.prof-btn.primary:hover{background:#3d7de0}
+.prof-btn:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.prof-sec{margin-top:16px}
+.plan-perks{margin:0;padding:0;list-style:none;display:grid;gap:10px}
+.plan-perks b{display:block;font-size:13px;font-weight:800;color:var(--t1)}
+.plan-perks span{display:block;font-size:12px;font-weight:500;color:var(--t3);line-height:1.45}
+.prof-incl .plan-perks{grid-template-columns:repeat(2,1fr);gap:12px 20px}
+.plans-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:6px}
+.plan-card{background:var(--bg2);border:1px solid var(--b1);border-radius:11px;padding:16px;display:flex;flex-direction:column;gap:9px;min-width:0}
+.plan-card.current{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue) inset}
+.plan-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.plan-name{font-size:15px;font-weight:800;color:var(--t1)}
+.plan-tag{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;padding:2px 8px;border-radius:4px;background:rgba(79,142,247,.16);color:var(--blue)}
+.plan-tag.dim{background:var(--bg3);color:var(--t3)}
+.plan-price{font-family:var(--mono);font-size:22px;font-weight:900;color:var(--t1)}
+.plan-price small{font-family:var(--sans);font-size:11px;font-weight:600;color:var(--t3)}
+.plan-incl{font-size:12px;font-weight:700;color:var(--cyan)}
+.plan-card .plan-perks{flex:1}
+.plan-cta{margin-top:auto;width:100%}
+.prof-howto{margin-top:12px;font-size:13px;font-weight:600;color:var(--t2);line-height:1.5}
+.prof-howto:empty{display:none}
+@media(max-width:900px){.plans-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){.prof-grid,.plans-grid,.prof-incl .plan-perks{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -387,11 +451,12 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   </div>
   <div class="ntabs">
     <button class="ntab on" onclick="showPage('market',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></svg></span><span class="lbl">Market</span></button>
-    <button class="ntab" id="ntab-ipos" onclick="showPage('ipos',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span><span class="lbl">IPOs</span></button>
+    <button class="ntab" id="ntab-ipos" data-feature="pre_ipo" onclick="showPage('ipos',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span><span class="lbl">IPOs</span></button>
     <button class="ntab" onclick="showPage('watchlist',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.1 8.3 22 9.3 17 14.1 18.2 21 12 17.8 5.8 21 7 14.1 2 9.3 8.9 8.3 12 2"/></svg></span><span class="lbl">Watchlist</span></button>
-    <button class="ntab" onclick="showPage('commodities',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg></span><span class="lbl" data-short="Commod.">Commodities</span></button>
-    <button class="ntab" onclick="showPage('portfolio',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg></span><span class="lbl">Portfolio</span></button>
-    <button class="ntab" onclick="showPage('transactions',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span><span class="lbl" data-short="Trades">Transactions</span></button>
+    <button class="ntab" data-feature="commodities" onclick="showPage('commodities',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg></span><span class="lbl" data-short="Commod.">Commodities</span></button>
+    <button class="ntab" data-feature="portfolio_view" onclick="showPage('portfolio',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg></span><span class="lbl">Portfolio</span></button>
+    <button class="ntab" data-feature="portfolio_view" onclick="showPage('transactions',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span><span class="lbl" data-short="Trades">Transactions</span></button>
+    <button class="ntab" id="ntab-profile" onclick="showPage('profile',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg></span><span class="lbl">Profile</span></button>
   </div>
   <div class="nav-r">
     <button id="nt-bell" class="nt-bell" onclick="ntToggleBell(event)" title="Notifications"><svg class="lic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span id="nt-badge" class="nt-badge" style="display:none">0</span></button>
@@ -448,7 +513,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   </div>
 
   <!-- AI Stock Finder + Manual Screener Combined -->
-  <div class="ai-wrap">
+  <div class="ai-wrap" data-feature="ai_stock_finder">
     <div class="ai-header">
       <div>
         <div class="ai-title">AI Stock Finder</div>
@@ -492,7 +557,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   </div>
 
   <!-- The prediction model's top 5 for the next 3 months -->
-  <div class="card" id="top5-card" style="margin-bottom:16px">
+  <div class="card" id="top5-card" data-feature="stock_prediction" style="margin-bottom:16px">
     <div class="chdr"><div class="ctitle">Top 5 Predicted Stocks — Next 3 Months</div><span class="t5-sub">Ranked by expected gain × chance of going up</span></div>
     <div class="tw"><table class="t5">
       <thead><tr><th>#</th><th>Ticker</th><th>Company</th><th>Price</th><th>3M Target</th><th>Upside</th><th>Chance Up</th><th>Signal</th></tr></thead>
@@ -761,7 +826,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   </div>
   <div class="info-note" id="pf-warn" style="display:none;border-left-color:var(--yellow)"></div>
   <!-- AI Portfolio Review — top after KPI -->
-  <div class="ai-wrap" style="margin-bottom:16px;">
+  <div class="ai-wrap" data-feature="ai_interaction" style="margin-bottom:16px;">
     <div class="ai-header">
       <div>
         <div class="ai-title">AI Portfolio Review</div>
@@ -813,7 +878,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <tbody id="tb-pf"><tr><td colspan="14"><div class="load"><div class="spin"></div></div></td></tr></tbody>
     </table></div>
   </div>
-  <div class="card" id="pf-form-card">
+  <div class="card" id="pf-form-card" data-feature="portfolio_mgt">
     <div class="stitle" id="pf-form-title">Add Holding</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;align-items:end">
       <div><label class="flbl">Ticker</label><input class="finp" id="a-tick" placeholder="AAPL"/></div>
@@ -864,7 +929,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <tbody id="tb-tx"><tr><td colspan="9"><div class="load"><div class="spin"></div></div></td></tr></tbody>
     </table></div>
   </div>
-  <div class="card" id="tx-form-card">
+  <div class="card" id="tx-form-card" data-feature="portfolio_mgt">
     <div class="stitle" id="tx-form-title">Add Transaction</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;align-items:end">
       <div><label class="flbl">Ticker</label><input class="finp" id="tx-tick" placeholder="AAPL"/></div>
@@ -882,6 +947,11 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     <div class="peer-legend">Editing or deleting a past transaction does not change your Holdings.</div>
   </div>
 
+</div>
+
+<!-- ═══════════ PROFILE PAGE ═══════════ -->
+<div class="page" id="page-profile">
+  <div id="prof-body"><div class="load"><div class="spin"></div>Loading your profile...</div></div>
 </div>
 
 <!-- ═══════════ COMMODITIES PAGE ═══════════ -->
@@ -1020,7 +1090,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <button class="fstab" onclick="showFST('company',this)">Company</button>
       <button class="fstab" onclick="showFST('peers',this)">Peers</button>
       <button class="fstab" onclick="showFST('financials',this)">Financials</button>
-      <button class="fstab" onclick="showFST('intelligence',this)">Forecast</button>
+      <button class="fstab" data-feature="stock_prediction" onclick="showFST('intelligence',this)">Forecast</button>
       <button class="fstab" onclick="showFST('earnings',this)">Earnings</button>
       <button class="fstab" onclick="showFST('dividends',this)">Dividends</button>
       <button class="fstab" onclick="showFST('news',this)">News</button>
@@ -1317,7 +1387,53 @@ function showSignInProblem(){
   d.innerHTML='Your sign-in is not reaching the server, so data cannot load. Open the app at the address the server prints, or <a href="/logout" style="color:#fff;text-decoration:underline">sign out and sign in again</a>.';
   document.body.appendChild(d);
 }
-async function api(url){try{const r=await fetch(API+url);if(signedOut(r))return null;if(!r.ok)throw new Error(r.status);return await r.json();}catch(e){console.error('API:',url,e);return null;}}
+// Answers 403 "upgrade_required" when the plan doesn't include what was asked for: that is expected (the part is padlocked), so stay quiet.
+async function api(url){try{const r=await fetch(API+url);if(signedOut(r))return null;if(r.status===403)return null;if(!r.ok)throw new Error(r.status);return await r.json();}catch(e){console.error('API:',url,e);return null;}}
+
+// ── Subscription plan ──
+// The server tells the page which features this person's plan includes, and refuses the rest. The page uses the same list to
+// cover what isn't included with a padlock. With no list at all (a page opened outside the server) nothing is hidden.
+const PLAN=(()=>{
+  const g=n=>document.querySelector('meta[name="'+n+'"]')?.content||'';
+  const feats=document.querySelector('meta[name="smp-features"]');
+  let locks={};try{locks=JSON.parse(g('smp-locks')||'{}');}catch(e){}
+  return{name:g('smp-plan'),features:feats?new Set(feats.content.split(',').filter(Boolean)):null,locks};
+})();
+const can=f=>!f||!PLAN.features||PLAN.features.has(f);
+const LOCK_ICON='<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+function lockText(f){
+  const i=PLAN.locks[f]||{};
+  return{label:i.label||'This feature',where:i.plan?('Included in the '+i.plan+' plan'):'Included in higher plans'};
+}
+/** Cover `el` with a padlock panel that opens the "not in your plan" message. Tabs only get a padlock mark: pressing them shows the message. */
+function lockElement(el,f){
+  if(el.classList.contains('is-locked'))return;
+  el.classList.add('is-locked');
+  const t=lockText(f);
+  if(el.classList.contains('ntab')||el.classList.contains('fstab')){el.setAttribute('title',t.label+' — '+t.where);return;}
+  const b=document.createElement('button');b.type='button';b.className='lockcover';b.innerHTML=LOCK_ICON;
+  const lab=document.createElement('b');lab.textContent=t.label;
+  const sub=document.createElement('small');sub.textContent=t.where;
+  b.append(lab,sub);b.addEventListener('click',()=>showUpgrade(f));
+  el.appendChild(b);
+}
+function applyPlan(){
+  document.querySelectorAll('[data-feature-hide]').forEach(el=>{if(!can(el.dataset.featureHide))el.style.setProperty('display','none','important');});
+  document.querySelectorAll('[data-feature]').forEach(el=>{if(!can(el.dataset.feature))lockElement(el,el.dataset.feature);});
+}
+let upFocus=null;
+function showUpgrade(f){
+  const m=document.getElementById('up-modal');if(!m)return;
+  const t=lockText(f);
+  document.getElementById('up-text').textContent=t.label+' isn’t part of your '+(PLAN.name||'current')+' plan. '+t.where+'.';
+  upFocus=document.activeElement;m.classList.add('open');document.getElementById('up-ok').focus();
+}
+function closeUpgrade(){
+  const m=document.getElementById('up-modal');if(m)m.classList.remove('open');
+  if(upFocus&&upFocus.focus)upFocus.focus();upFocus=null;
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeUpgrade();});
+document.addEventListener('DOMContentLoaded',applyPlan);
 // Administrators get a link to the user-access page, with the number of people waiting for approval
 function addAdminLink(nav){
   const a=document.createElement('a');a.href='/admin';a.className='nadmin';a.title='User access';
@@ -1338,7 +1454,98 @@ function addAdminLink(nav){
 // A session for an account that has since been removed still passes the cookie check: send that person to the login page
 (async()=>{try{const r=await fetch(API+'/api/auth/status');const d=await r.json();if(d&&d.signed_in===false)location.href='/login';}catch(e){}})();
 
+// ── Profile page ──
+// Who the person is, when they joined, their plan and what it includes; the Upgrade button opens every plan with its perks.
+// There is no online payment yet: asking for a plan opens an email to UPGRADE_CONTACT_EMAIL, or says who to ask.
+let profileData=null,profilePlansOpen=false,profileScroll=false;
+const profileDate=s=>s?new Date(s*1000).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
+const profilePrice=p=>p?'$'+p.toFixed(2):'Free';
+/** The email that asks for `plan`, or '' when no address is set up. */
+function profileUpgradeHref(d,plan){
+  if(!d.upgrade_contact)return'';
+  const subject='Upgrade to the '+plan.name+' plan';
+  const body='Hello,\n\nPlease move my account ('+d.email+') to the '+plan.name+' plan ($'+plan.price.toFixed(2)+' a month).\n\nThank you';
+  return'mailto:'+d.upgrade_contact+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+}
+const profilePerks=list=>'<ul class="plan-perks">'+list.map(f=>`<li><b>${escapeHtml(f.label)}</b><span>${escapeHtml(f.description)}</span></li>`).join('')+'</ul>';
+function profilePlanCard(d,p){
+  const rel=d.admin?'none':p.level===d.plan.level?'current':p.level<d.plan.level?'below':'above';
+  const tag=rel==='current'?'<span class="plan-tag">Your plan</span>':rel==='below'?'<span class="plan-tag dim">Included in your plan</span>':'';
+  let cta='';
+  if(rel==='above'){
+    const href=profileUpgradeHref(d,p);
+    cta=href?`<a class="prof-btn primary plan-cta" href="${escapeHtml(href)}" title="Opens an email asking for this plan">Upgrade to ${escapeHtml(p.name)}</a>`
+            :`<button type="button" class="prof-btn primary plan-cta" onclick="profileHowToUpgrade(${p.level})">Upgrade to ${escapeHtml(p.name)}</button>`;
+  }
+  return`<article class="plan-card${rel==='current'?' current':''}" data-plan="${p.level}">
+    <div class="plan-head"><div class="plan-name">${escapeHtml(p.name)}</div>${tag}</div>
+    <div class="plan-price">$${p.price.toFixed(2)} <small>/ month</small></div>
+    ${p.includes?`<div class="plan-incl">Everything in ${escapeHtml(p.includes)}, plus:</div>`:''}
+    ${profilePerks(p.adds)}${cta}</article>`;
+}
+/** The whole profile page for the data from /api/profile; `open` says whether the plan comparison is showing. */
+function profileHtml(d,open){
+  const top=d.plans.length&&d.plan.level!=null&&d.plan.level>=Math.max(...d.plans.map(p=>p.level));
+  const canUpgrade=!d.admin&&!top;
+  const label=open?'Hide plans':canUpgrade?'Upgrade plan':'View plans';
+  const planNote=d.admin?'Full access to everything':profilePrice(d.plan.price)+(d.plan.price?' per month':'');
+  const contactNote=d.upgrade_contact
+    ?`There is no online payment yet. An Upgrade button opens an email to ${escapeHtml(d.upgrade_contact)} asking for that plan.`
+    :'There is no online payment yet. Plans are changed by an administrator: ask them to move your account to the plan you want.';
+  return`<div class="card prof-card">
+    <div class="prof-top"><div class="prof-avatar" aria-hidden="true">${escapeHtml((d.email||'?').charAt(0))}</div>
+      <div class="prof-who"><span class="prof-lbl">Profile name</span><div class="prof-name" id="prof-name">${escapeHtml(d.email)}</div></div></div>
+    <div class="prof-grid">
+      <div class="prof-box"><span class="prof-lbl">Member since</span><div class="prof-val" id="prof-joined">${escapeHtml(profileDate(d.joined_at))}</div></div>
+      <div class="prof-box"><span class="prof-lbl">Current plan</span><div class="prof-val" id="prof-plan">${escapeHtml(d.plan.name)}</div><div class="prof-note">${escapeHtml(planNote)}</div></div>
+    </div>
+    <div class="prof-actions"><button type="button" class="prof-btn primary" id="prof-upgrade" aria-expanded="${open?'true':'false'}" aria-controls="prof-plans" onclick="toggleProfilePlans()">${label}</button>
+      ${top&&!d.admin?'<span class="prof-note">You are on our top plan.</span>':''}</div>
+  </div>
+  <div class="card prof-sec prof-incl"><div class="chdr"><div class="ctitle">Your plan includes</div></div>${profilePerks(d.included)}</div>
+  <section class="prof-sec" id="prof-plans" aria-label="Plans and perks"${open?'':' hidden'}>
+    <div class="card"><div class="chdr"><div class="ctitle">Plans</div></div>
+      <div class="info-note">${contactNote}</div>
+      <div class="plans-grid">${d.plans.map(p=>profilePlanCard(d,p)).join('')}</div>
+      <div class="prof-howto" id="prof-howto" role="status"></div></div>
+  </section>`;
+}
+function renderProfile(){
+  const body=document.getElementById('prof-body');if(!body||!profileData)return;
+  body.innerHTML=profileHtml(profileData,profilePlansOpen);
+  if(profilePlansOpen&&profileScroll){profileScroll=false;const el=document.getElementById('prof-plans');if(el&&el.scrollIntoView)el.scrollIntoView({behavior:'smooth',block:'start'});}
+}
+async function loadProfile(){
+  const body=document.getElementById('prof-body');if(!body)return;
+  try{
+    const r=await fetch(API+'/api/profile');
+    if(signedOut(r))return;
+    const d=await r.json();
+    if(!r.ok||d.status!=='success')throw new Error(d&&d.message||r.status);
+    profileData=d;renderProfile();
+  }catch(e){
+    if(!profileData)body.innerHTML='<div class="empty">We couldn’t load your profile. <button type="button" class="linkbtn" onclick="loadProfile()">Try again</button></div>';
+  }
+}
+function toggleProfilePlans(){
+  profilePlansOpen=!profilePlansOpen;profileScroll=profilePlansOpen;renderProfile();
+  const b=document.getElementById('prof-upgrade');if(b)b.focus({preventScroll:true});
+}
+/** With no email address set up, say who to ask. */
+function profileHowToUpgrade(level){
+  const p=profileData&&profileData.plans.find(x=>x.level===level),el=document.getElementById('prof-howto');if(!p||!el)return;
+  el.textContent='To switch to '+p.name+' ('+profilePrice(p.price)+' a month), ask an administrator to move '+profileData.email+' to that plan.';
+}
+/** The padlock message's "See plans": open the profile with the comparison showing. */
+function seePlans(){
+  closeUpgrade();
+  const tab=document.getElementById('ntab-profile');if(!tab)return;
+  profilePlansOpen=true;profileScroll=true;showPage('profile',tab);
+}
+
 function showPage(n,btn){
+  const lockedBy=btn&&btn.dataset&&btn.dataset.feature;
+  if(lockedBy&&!can(lockedBy)){showUpgrade(lockedBy);return;}           // not in this plan: say so rather than open an empty page
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('on'));
   document.getElementById('page-'+n).classList.add('on');
@@ -1350,6 +1557,7 @@ function showPage(n,btn){
   if(n==='transactions')loadTx();
   if(n==='commodities'){loadCommodities();loadMacro();loadComCo();}
   if(n==='watchlist')loadWatchlist();
+  if(n==='profile')loadProfile();
   if(n==='ipos'&&(!ipoFetchedAt||Date.now()-ipoFetchedAt>IPO_REFRESH_MS))loadIPOs();
 }
 function showSub(g,t,btn){
@@ -1358,6 +1566,8 @@ function showSub(g,t,btn){
   btn.classList.add('on');
 }
 function showFST(t,btn){
+  const lockedBy=btn&&btn.dataset&&btn.dataset.feature;
+  if(lockedBy&&!can(lockedBy)){showUpgrade(lockedBy);return;}
   document.querySelectorAll('.fssec').forEach(s=>s.classList.remove('on'));
   document.querySelectorAll('.fstab').forEach(b=>b.classList.remove('on'));
   document.getElementById('fss-'+t).classList.add('on');
@@ -2112,8 +2322,9 @@ function periodRange(year,quarter,today){
 function quickRange(kind,today,firstDate){
   const[y,m,d]=today.split('-').map(Number);
   const yearsBack=n=>isoDay(y-n,m,Math.min(d,daysInMonth(y-n,m)));
-  const starts={YTD:isoDay(y,1,1),'1Y':yearsBack(1),'3Y':yearsBack(3),'5Y':yearsBack(5),'10Y':yearsBack(10),MAX:firstDate};
-  const names={YTD:'Year to date','1Y':'Last year','3Y':'Last 3 years','5Y':'Last 5 years','10Y':'Last 10 years',MAX:'Since listing'};
+  const monthsBack=n=>{let yy=y,mm=m-n;while(mm<1){mm+=12;yy--;}return isoDay(yy,mm,Math.min(d,daysInMonth(yy,mm)));};
+  const starts={YTD:isoDay(y,1,1),'1M':monthsBack(1),'3M':monthsBack(3),'6M':monthsBack(6),'1Y':yearsBack(1),'3Y':yearsBack(3),'5Y':yearsBack(5),'10Y':yearsBack(10),MAX:firstDate};
+  const names={YTD:'Year to date','1M':'Last month','3M':'Last 3 months','6M':'Last 6 months','1Y':'Last year','3Y':'Last 3 years','5Y':'Last 5 years','10Y':'Last 10 years',MAX:'Since listing'};
   let start=starts[kind];if(!start)return null;
   if(firstDate&&start<firstDate)start=firstDate;                 // a stock that is younger than the period: start when it started
   return{start,end:today,partial:false,label:names[kind]};
@@ -2413,17 +2624,72 @@ function peerAdd(t,name){
   renderPeerChips();renderPeerTable();
 }
 let peerChartSeq=0;
+// The period of the price chart under the table: a preset (1M ... Max) or two dates. It is kept while the table is rebuilt for
+// another peer or another stock, so one period can be compared across stocks.
+let peerPeriod={kind:'1Y',start:'',end:''};
+const PEER_PERIODS=[['1M','1M'],['3M','3M'],['6M','6M'],['YTD','YTD'],['1Y','1Y'],['3Y','3Y'],['5Y','5Y'],['10Y','10Y'],['MAX','Max']];
+const peerDate=iso=>new Date(iso+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+/** The part of the request that names the chosen period. */
+function peerPeriodParams(p,today){
+  if(p.kind==='MAX')return'&period=max';
+  if(p.kind==='custom')return'&start='+encodeURIComponent(p.start)+'&end='+encodeURIComponent(p.end);
+  const r=quickRange(p.kind,today||todayIso(),null);
+  return r?'&start='+r.start+'&end='+r.end:'';
+}
+/** The picker's buttons and date boxes, showing the current choice. */
+function peerPeriodInner(){
+  const on=k=>peerPeriod.kind===k?' on':'',custom=peerPeriod.kind==='custom';
+  return`<div class="period-row"><span class="period-lbl">Period</span>${PEER_PERIODS.map(([k,l])=>`<button class="fbtn${on(k)}" onclick="peerSetPeriod('${k}')">${l}</button>`).join('')}</div>
+    <div class="period-row"><span class="period-lbl">Custom</span>
+      <input type="date" class="srch" id="peer-from" aria-label="From date" value="${custom?escapeHtml(peerPeriod.start):''}" max="${todayIso()}"/>
+      <span class="period-or">to</span>
+      <input type="date" class="srch" id="peer-to" aria-label="To date" value="${custom?escapeHtml(peerPeriod.end):''}" max="${todayIso()}"/>
+      <button class="fbtn${on('custom')}" id="peer-apply" onclick="peerApplyDates()">Apply</button></div>
+    <div class="peer-period-msg" id="peer-period-msg"></div>`;
+}
+function peerShowPeriod(){const el=document.getElementById('peer-period');if(el)el.innerHTML=peerPeriodInner();}
+function peerPeriodMsg(text){const el=document.getElementById('peer-period-msg');if(el)el.textContent=text||'';}
+function peerSetPeriod(kind){
+  peerPeriod={kind,start:'',end:''};
+  peerShowPeriod();loadPeerChart(peerState.chartTickers);
+}
+function peerApplyDates(){
+  const from=document.getElementById('peer-from').value,to=document.getElementById('peer-to').value;
+  if(!from||!to){peerPeriodMsg('Pick both a start and an end date.');return;}
+  if(from>=to){peerPeriodMsg('The start date must be before the end date.');return;}
+  if(from>todayIso()){peerPeriodMsg("That period hasn't started yet.");return;}
+  peerPeriod={kind:'custom',start:from,end:to};
+  peerShowPeriod();loadPeerChart(peerState.chartTickers);
+}
 async function loadPeerChart(tickers){
+  if(!tickers||!tickers.length)return;
   const seq=++peerChartSeq,msg=document.getElementById('peer-chart-msg'),box=document.getElementById('peer-chart-box');
   if(!msg||!box)return;
-  const d=await api('/api/compare/prices?tickers='+encodeURIComponent(tickers.join(',')));
-  if(seq!==peerChartSeq||!document.getElementById('peer-px-c'))return;      // a newer table replaced this one
-  if(!d||d.status!=='success'||!d.dates.length){msg.innerHTML='<div class="empty">Price history isn\'t available for this comparison.</div>';box.style.display='none';return;}
-  msg.style.display=(d.missing||[]).length?'block':'none';
-  if((d.missing||[]).length)msg.innerHTML=`<div class="peer-legend" style="margin:0 0 6px">No price history for: ${d.missing.map(escapeHtml).join(', ')}</div>`;
+  peerState.chartTickers=tickers;
+  const title=document.getElementById('peer-chart-title'),perf=document.getElementById('peer-perf');
+  msg.style.display='block';msg.innerHTML='<div class="load"><div class="spin"></div>Loading prices...</div>';box.style.opacity='.35';
+  const res=await periodFetch('/api/compare/prices?tickers='+encodeURIComponent(tickers.join(','))+peerPeriodParams(peerPeriod));
+  if(seq!==peerChartSeq||!document.getElementById('peer-px-c'))return;      // a newer choice, or a newer table, replaced this one
+  const d=res.ok?res.data:null;
+  box.style.opacity='';
+  if(!d||d.status!=='success'||!d.dates||!d.dates.length){
+    const why=!res.ok?escapeHtml(res.message||"Price history isn't available for this comparison."):"Price history isn't available for this comparison in this period."+(((d&&d.missing)||[]).length?' No prices for: '+d.missing.map(escapeHtml).join(', ')+'.':'');
+    msg.innerHTML='<div class="empty">'+why+'</div>';box.style.display='none';if(perf)perf.innerHTML='';
+    return;
+  }
+  if(title)title.textContent='Price performance, '+peerDate(d.start)+' – '+peerDate(d.end)+' (rebased to 100)';
+  const notes=[];
+  if((d.missing||[]).length)notes.push('No price history for: '+d.missing.map(escapeHtml).join(', '));
+  if(d.starts_late&&(d.limited_by||[]).length)notes.push(`The chart starts on ${peerDate(d.start)}, the first day all of these have prices (${d.limited_by.map(escapeHtml).join(', ')} began trading then).`);
+  msg.style.display=notes.length?'block':'none';
+  msg.innerHTML=notes.map(n=>`<div class="peer-legend" style="margin:0 0 6px">${n}</div>`).join('');
+  const names=Object.keys(d.series);
+  if(perf)perf.innerHTML='<span class="peer-perf-lbl">Change over this period</span>'+names.map((t,i)=>{
+    const c=(d.changes||{})[t];
+    return`<span class="peer-chg${t===tickers[0]?' tgt':''}"><i style="background:${C[i%C.length]}"></i><b>${escapeHtml(t)}</b><span class="${gc(c)}">${c!=null?(c>=0?'+':'')+f2(c)+'%':'—'}</span></span>`;
+  }).join('');
   box.style.display='block';
   dc('peer-px-c');const ctx=document.getElementById('peer-px-c').getContext('2d');
-  const names=Object.keys(d.series);
   charts['peer-px-c']=new Chart(ctx,{type:'line',data:{labels:d.dates,datasets:names.map((t,i)=>({label:t,data:d.series[t],borderColor:C[i%C.length],borderWidth:t===tickers[0]?3:1.8,pointRadius:0,tension:0.1}))},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
       plugins:{legend:{labels:{color:'#c0cce0',font:{size:11,weight:'700'}}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+f2(c.raw,1)}}},
@@ -2482,7 +2748,9 @@ async function renderPeerTable(){
   setTimeout(()=>loadPeerChart(T),0);
   body.innerHTML=`<div class="tw"><table class="peer-table"><thead>${head}</thead><tbody>${rows}</tbody></table></div>
     <div class="peer-legend">★ best in row &nbsp;·&nbsp; ▲ ▼ ≈ ${escapeHtml(tgt)} better / worse / in line with the peer median &nbsp;·&nbsp; "—" = not available or not meaningful (for example a negative P/E)</div>${missing}
-    <div class="card" style="margin-top:14px"><div class="chdr"><div class="ctitle">1-year price performance (rebased to 100)</div></div>
+    <div class="card" style="margin-top:14px"><div class="chdr"><div class="ctitle" id="peer-chart-title">Price performance (rebased to 100)</div></div>
+      <div class="period-bar peer-period" id="peer-period">${peerPeriodInner()}</div>
+      <div class="peer-perf" id="peer-perf"></div>
       <div id="peer-chart-msg"><div class="load"><div class="spin"></div>Loading prices...</div></div>
       <div style="height:260px;display:none" id="peer-chart-box"><canvas id="peer-px-c"></canvas></div></div>
     <div class="card" style="margin-top:14px"><div class="chdr"><div class="ctitle">AI summary</div><button class="linkbtn" id="peer-verdict-btn" onclick="loadPeerVerdict()">Summarize this comparison</button></div>
@@ -4596,9 +4864,9 @@ async function loadTop5(){
 }
 
 async function init(){
-  loadIPOs(); // independent of the rest of the page
-  ecoInitMonth(); // Set current month for economic calendar
-  loadTop5(); // the model's top 5 for the next 3 months
+  if(can('pre_ipo'))loadIPOs();   // independent of the rest of the page
+  ecoInitMonth();                  // the economic calendar starts on the current month
+  if(can('stock_prediction'))loadTop5(); // the model's top 5 for the next 3 months
   await Promise.all([loadSummary(),loadIndices(),loadSentiment(),loadSectors(),loadGL(),loadEarnings(),loadMarketNews(),loadStocks(),loadCurrencies()]);   // loadPredictions() fed the Market Intelligence grid, which the compact layout replaced
 }
 
@@ -5753,6 +6021,16 @@ function loadPortfolioTickers() {
 .peer-table .peer-sub{font-size:10px;font-weight:600;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px;margin-left:auto;}
 .peer-pos{margin-left:5px;font-size:10px;}
 .peer-legend{font-size:11px;font-weight:600;color:var(--t3);margin-top:10px;}
+.peer-period{margin:4px 0 10px;}
+.peer-period-msg{flex-basis:100%;font-size:12px;font-weight:700;color:var(--red);}
+.peer-period-msg:empty{display:none;}
+.peer-perf{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin:0 0 10px;font-size:12px;font-weight:700;}
+.peer-perf:empty{display:none;}
+.peer-perf-lbl{font-size:11px;font-weight:800;color:var(--t2);text-transform:uppercase;letter-spacing:1px;}
+.peer-chg{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);}
+.peer-chg i{width:9px;height:9px;border-radius:50%;flex:none;}
+.peer-chg.tgt b{color:var(--t1);}
+#peer-chart-box{transition:opacity .15s;}
 /* ── IPO calendar ── */
 .ipo-strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}
 .ipo-card{background:var(--bg3);border:1px solid var(--b1);border-radius:9px;padding:12px;}
@@ -5929,13 +6207,13 @@ button,select,.ntab,.fstab,.stab,.fbtn,.pgbtn{touch-action:manipulation;-webkit-
 </style>
 
 <!-- Bounty Button -->
-<button id="bounty-btn" onclick="toggleBounty()" title="Chat with Bounty AI">
+<button id="bounty-btn" data-feature-hide="ai_interaction" onclick="toggleBounty()" title="Chat with Bounty AI">
   <svg class="lic" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
   <span id="bounty-badge">1</span>
 </button>
 
 <!-- Bounty Window -->
-<div id="bounty-win">
+<div id="bounty-win" data-feature-hide="ai_interaction">
   <div id="bounty-hdr">
     <div class="b-avatar"><svg class="lic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
     <div>
@@ -6369,10 +6647,10 @@ document.addEventListener('click', e => {
 // ─── Timers ─────────────────────────────────────────────────
 ntRenderBell();
 setTimeout(checkAlertsForNotifications, 4000);
-setInterval(checkAlertsForNotifications, 60 * 1000);      // price alerts: every minute
+setInterval(checkAlertsForNotifications, 60 * 1000);    // price alerts: every minute
 setTimeout(ntPollFeed, 6000);
-setInterval(ntPollFeed, 5 * 60 * 1000);                   // news + economic events: every 5 minutes
-setInterval(ntEventReminders, 60 * 1000);                 // 15-minute release reminders
+setInterval(ntPollFeed, 5 * 60 * 1000);                 // news + economic events: every 5 minutes
+setInterval(ntEventReminders, 60 * 1000);               // 15-minute release reminders
 
 // ─── QUARTERLY RESULTS ─────────────────────────────────────
 async function loadQuarterly(){
@@ -6506,6 +6784,7 @@ function bountyHistoryForApi(){
 }
 
 function toggleBounty(){
+  if(!can('ai_interaction')){showUpgrade('ai_interaction');return;}
   bountyOpen = !bountyOpen;
   const win = document.getElementById('bounty-win');
   const badge = document.getElementById('bounty-badge');
@@ -6883,5 +7162,13 @@ initWatchlist();
   <div id="nt-alerts" style="display:none"></div>
 </div>
 <div id="nt-toasts"></div>
+<div id="up-modal" role="dialog" aria-modal="true" aria-labelledby="up-title" onclick="if(event.target===this)closeUpgrade()">
+  <div class="up-box">
+    <h3 id="up-title">Not in your plan</h3>
+    <p id="up-text"></p>
+    <button type="button" class="btn btnp" id="up-plans" onclick="seePlans()">See plans</button>
+    <button type="button" class="btn btns" id="up-ok" onclick="closeUpgrade()">Got it</button>
+  </div>
+</div>
 </body>
 </html>

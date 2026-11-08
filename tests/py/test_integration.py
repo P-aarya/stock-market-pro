@@ -62,7 +62,8 @@ POST /api/alerts/create
 POST /api/portfolio/add
 POST /api/transactions/add
 """.split("\n")
-SHARED_ROUTES = 50      # routes both of you had (market data, stocks, news, login ...)
+ONLY_TIERS = ["GET /api/public/stocks", "GET /api/profile"]        # the Free tier's price list, and the signed-in profile page (tiers.py)
+SHARED_ROUTES = 51      # routes both of you had (market data, stocks, news, login ...), plus one Aarya added after the merge
 
 
 def source(name):
@@ -77,7 +78,7 @@ class NothingIsLost(unittest.TestCase):
     def test_every_endpoint_either_of_you_built_is_there_exactly_once(self):
         actual = self.routes()
         self.assertEqual(len(actual), len(set(actual)), f"registered twice (the second would never run): {sorted({r for r in actual if actual.count(r) > 1})}")
-        want = {r for r in ONLY_ABHEEK + ONLY_AARYA if r}
+        want = {r for r in ONLY_ABHEEK + ONLY_AARYA + ONLY_TIERS if r}
         self.assertFalse(want - set(actual), f"missing: {sorted(want - set(actual))}")
         self.assertEqual(len(set(actual)), SHARED_ROUTES + len(want), "the number of endpoints changed: something was added or lost")
 

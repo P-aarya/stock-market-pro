@@ -9,6 +9,7 @@ Account administration. Run it from the project folder with the virtual environm
     python manage_users.py block EMAIL              stop an account signing in
     python manage_users.py claim-legacy EMAIL       give the portfolio, transactions and price alerts saved before accounts existed to EMAIL
     python manage_users.py set-password EMAIL       reset someone's password (there is no "forgot password" email)
+    python manage_users.py set-plan EMAIL PLAN      move an account to a plan: 2 or Basic, 3 or "AI Stock Finder", 4, 5 or Deluxe, 6 or Premier
     python manage_users.py list-users [--pending]
     python manage_users.py delete-user EMAIL --yes  delete an account together with its holdings, transactions, price alerts and watchlist
 
@@ -16,16 +17,21 @@ Back the database up before the first `migrate`: it adds a column to the portfol
 """
 import argparse
 import getpass
+import re
 import sys
 
 import auth
+import tiers
 
-USERS_DDL = """CREATE TABLE IF NOT EXISTS users (
+DEFAULT_TIER = tiers.account_tier()      # the plan every account is on until it is moved
+
+USERS_DDL = f"""CREATE TABLE IF NOT EXISTS users (
   id INT NOT NULL AUTO_INCREMENT,
   email VARCHAR(254) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   status VARCHAR(10) NOT NULL DEFAULT 'pending',
   is_admin TINYINT(1) NOT NULL DEFAULT 0,
+  tier TINYINT NOT NULL DEFAULT {DEFAULT_TIER},
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   last_login_at TIMESTAMP NULL DEFAULT NULL,
   reviewed_at TIMESTAMP NULL DEFAULT NULL,
@@ -52,6 +58,7 @@ USERS_COLUMNS = (
     ("is_admin", "TINYINT(1) NOT NULL DEFAULT 0"),
     ("reviewed_at", "TIMESTAMP NULL DEFAULT NULL"),
     ("reviewed_by", "INT NULL"),
+    ("tier", f"TINYINT NOT NULL DEFAULT {DEFAULT_TIER}"),      # the subscription plan (tiers.py); existing accounts start on the lowest account plan
 )
 
 
@@ -98,7 +105,8 @@ def migrate(conn):
     cur.execute(WATCHLIST_DDL)
     done = ["users table ready", "watchlist table ready"]
     added = add_users_columns(cur)
-    done.append("users: added " + ", ".join(added) + " (existing accounts are approved)" if added else "users: approval columns already there")
+    notes = (["existing accounts are approved"] if "status" in added else []) + ([f"existing accounts are on the {tiers.TIERS[DEFAULT_TIER].name} plan"] if "tier" in added else [])
+    done.append("users: added " + ", ".join(added) + (f" ({'; '.join(notes)})" if notes else "") if added else "users: approval and plan columns already there")
     for table in PERSONAL_TABLES:
         done.append(f"{table}: added user_id column" if add_user_id_column(cur, table) else f"{table}: user_id column already there")
     for table in OPTIONAL_PERSONAL_TABLES:
@@ -170,6 +178,27 @@ def set_admin(conn, user_id, is_admin):
     conn.commit()
 
 
+def account_plans():
+    """The plans an account can be on (Free is for visitors without an account)."""
+    return [t for _, t in sorted(tiers.TIERS.items()) if t.account]
+
+
+def parse_plan(text):
+    """The plan an administrator typed: its number (3) or its name (Deluxe, "ai stock finder"). Anything else is refused with the choices."""
+    wanted = re.sub(r"[^a-z0-9]", "", str(text).lower())
+    for t in account_plans():
+        if wanted in (str(t.level), re.sub(r"[^a-z0-9]", "", t.name.lower())):
+            return t
+    raise auth.AuthError("Choose one of: " + ", ".join(f"{t.level} = {t.name} (${t.price:.2f})" for t in account_plans()))
+
+
+def set_plan(conn, user_id, plan):
+    """Move an account to `plan`. It applies within a few seconds of the person's next request."""
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET tier = %s WHERE id = %s", (plan.level, user_id))
+    conn.commit()
+
+
 def _ask_password(email):
     while True:
         first = getpass.getpass("Password: ")
@@ -189,6 +218,9 @@ def main(argv=None):
     sub.add_parser("migrate")
     lu = sub.add_parser("list-users")
     lu.add_argument("--pending", action="store_true", help="only accounts waiting for approval")
+    sp = sub.add_parser("set-plan")
+    sp.add_argument("email")
+    sp.add_argument("plan", nargs="+", help="the plan's number or name")
     for name in ("create-user", "claim-legacy", "set-password", "delete-user", "approve", "block", "make-admin", "remove-admin"):
         p = sub.add_parser(name)
         p.add_argument("email")
@@ -222,11 +254,15 @@ def main(argv=None):
             print("✓ Password changed. Any browser that is signed in stays signed in until its session expires.")
         elif args.cmd == "list-users":
             cur = conn.cursor()
-            cur.execute("SELECT id, email, status, is_admin, created_at, last_login_at FROM users" + (" WHERE status = 'pending'" if args.pending else "") + " ORDER BY id")
-            for uid, email, status, admin, created, last in cur.fetchall():
+            cur.execute("SELECT id, email, status, is_admin, tier, created_at, last_login_at FROM users" + (" WHERE status = 'pending'" if args.pending else "") + " ORDER BY id")
+            for uid, email, status, admin, tier, created, last in cur.fetchall():
                 role = "admin" if admin else ""
                 seen = f"last sign-in {last:%Y-%m-%d}" if last else "never signed in"
-                print(f"#{uid:<4} {email:<38} {status:<9} {role:<6} created {created:%Y-%m-%d}   {seen}")
+                print(f"#{uid:<4} {email:<38} {status:<9} {role:<6} {tiers.resolve(tier).name:<15} created {created:%Y-%m-%d}   {seen}")
+        elif args.cmd == "set-plan":
+            plan = parse_plan(" ".join(args.plan))
+            set_plan(conn, _user_id(conn, args.email), plan)
+            print(f"✓ {auth.normalize_email(args.email)} is now on the {plan.name} plan (${plan.price:.2f} a month). It applies within a few seconds.")
         elif args.cmd in ("approve", "block"):
             user_id = _user_id(conn, args.email)
             if args.cmd == "block":

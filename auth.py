@@ -6,7 +6,8 @@ signed with a secret key. The cookie proves who someone is; whether they are sti
 blocked them) is checked against the database, remembered for a few seconds so a page's many requests share one lookup.
 
 Every account has a status: "pending" (registered, waiting for an administrator), "approved" or "blocked". Only approved
-accounts can sign in. Administrators are accounts with is_admin set, which only manage_users.py can grant.
+accounts can sign in. Administrators are accounts with is_admin set, which only manage_users.py can grant. Every account
+also has a subscription tier (see tiers.py) that decides which parts of the app it can use.
 """
 import base64
 import hashlib
@@ -219,7 +220,12 @@ class MySQLStore:
     def _user(row):
         if row is None:
             return None
-        return {**row, "is_admin": bool(row.get("is_admin"))}
+        user = {**row, "is_admin": bool(row.get("is_admin"))}
+        if "tier" in user:
+            user["tier"] = int(user["tier"]) if user["tier"] is not None else None
+        if "created_at" in user:
+            user["created_at"] = int(user["created_at"]) if user["created_at"] is not None else None
+        return user
 
     def create(self, email, password_hash, status="pending", is_admin=False):
         import mysql.connector
@@ -246,7 +252,7 @@ class MySQLStore:
     def get(self, user_id):
         def work(conn):
             cur = conn.cursor(dictionary=True)
-            cur.execute("SELECT id, email, status, is_admin FROM users WHERE id = %s", (user_id,))
+            cur.execute("SELECT id, email, status, is_admin, tier, UNIX_TIMESTAMP(created_at) AS created_at FROM users WHERE id = %s", (user_id,))
             return self._user(cur.fetchone())
         return self._run(work)
 
@@ -255,7 +261,7 @@ class MySQLStore:
         zone, which a browser would misread, whereas UNIX_TIMESTAMP is exact."""
         def work(conn):
             cur = conn.cursor(dictionary=True)
-            cur.execute("SELECT id, email, status, is_admin, UNIX_TIMESTAMP(created_at) AS created_at, "
+            cur.execute("SELECT id, email, status, is_admin, tier, UNIX_TIMESTAMP(created_at) AS created_at, "
                         "UNIX_TIMESTAMP(last_login_at) AS last_login_at, UNIX_TIMESTAMP(reviewed_at) AS reviewed_at FROM users ORDER BY id DESC")
             return [{**self._user(r), **{k: (int(r[k]) if r[k] is not None else None) for k in ("created_at", "last_login_at", "reviewed_at")}} for r in cur.fetchall()]
         return self._run(work)
@@ -321,7 +327,7 @@ access_cache = AccessCache()
 
 
 def access_for(user_id):
-    """{"id", "email", "status", "is_admin"} for the account, or None if it no longer exists. Remembered briefly."""
+    """{"id", "email", "status", "is_admin", "tier", "created_at"} for the account, or None if it no longer exists. Remembered briefly."""
     return access_cache.get(user_id, lambda: store.get(user_id))
 
 

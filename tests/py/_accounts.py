@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 import _path  # noqa: F401
 import api
 import auth
+import tiers
 import watchlist
 
 
@@ -19,6 +20,12 @@ def _no_database(*args, **kwargs):
 import mysql.connector
 
 mysql.connector.connect = _no_database
+
+
+# A stand-in for the top plan. Ordinary tests use accounts on it so the plan limits don't get in their way; the tests about
+# the plans themselves (test_tiers.py) ask for the real tiers explicitly and take this one out while they run.
+FULL_TIER = 99
+tiers.TIERS[FULL_TIER] = tiers.Tier(FULL_TIER, "Everything", 0.0, tuple(tiers.FEATURES))
 
 
 class FakeStore:
@@ -35,7 +42,8 @@ class FakeStore:
 
     @staticmethod
     def _public(u):
-        return {"id": u["id"], "email": u["email"], "status": u.get("status", "approved"), "is_admin": bool(u.get("is_admin", False))}
+        return {"id": u["id"], "email": u["email"], "status": u.get("status", "approved"), "is_admin": bool(u.get("is_admin", False)),
+                "tier": u.get("tier", FULL_TIER), "created_at": u.get("created_at")}
 
     def create(self, email, password_hash, status="pending", is_admin=False):
         self._check()
@@ -43,6 +51,7 @@ class FakeStore:
             raise auth.AuthError("An account with that email already exists. Try signing in instead.", 409)
         user_id, self.next_id = self.next_id, self.next_id + 1
         self.users[user_id] = {"id": user_id, "email": email, "password_hash": password_hash, "status": status, "is_admin": is_admin,
+                               "tier": tiers.account_tier(),      # what the real table's column default gives a new sign-up
                                "created_at": 1_700_000_000 + user_id, "last_login_at": None, "reviewed_at": None}
         return user_id
 
@@ -76,12 +85,12 @@ class FakeStore:
 auth.store = FakeStore()
 
 
-def add_user(email, status="approved", is_admin=False, user_id=None):
+def add_user(email, status="approved", is_admin=False, user_id=None, tier=FULL_TIER):
     """Put an account straight into the fake store (no password needed) and return its id."""
     store = auth.store
     uid = user_id or store.next_id
     store.next_id = max(store.next_id, uid + 1)
-    store.users[uid] = {"id": uid, "email": email, "password_hash": "", "status": status, "is_admin": is_admin,
+    store.users[uid] = {"id": uid, "email": email, "password_hash": "", "status": status, "is_admin": is_admin, "tier": tier,
                         "created_at": 1_700_000_000 + uid, "last_login_at": None, "reviewed_at": None}
     auth.access_cache.invalidate(uid)
     return uid
@@ -95,7 +104,7 @@ class AccountsTestCase:
         auth.store = FakeStore()
         auth.access_cache.clear()
         api.ALLOW_SIGNUP, api.SIGNUP_CODE, api.REQUIRE_APPROVAL = True, "", True
-        for limiter in (api._login_by_client, api._login_by_email, api._signups):
+        for limiter in (api._login_by_client, api._login_by_email, api._signups, api._public_hits):
             limiter.reset()
         api._agent_hits.clear()
         # personal data endpoints answer with empty data, so a test can see whether a request got through
@@ -106,19 +115,20 @@ class AccountsTestCase:
     def tearDown(self):
         auth.store, api.ALLOW_SIGNUP, api.SIGNUP_CODE, api.REQUIRE_APPROVAL = self._saved
         auth.access_cache.clear()
-        for limiter in (api._login_by_client, api._login_by_email, api._signups):
+        for limiter in (api._login_by_client, api._login_by_email, api._signups, api._public_hits):
             limiter.reset()
         api._agent_hits.clear()
 
 
-def signed_in_client(user_id=1, is_admin=False, create=True, **kwargs):
+def signed_in_client(user_id=1, is_admin=False, create=True, tier=FULL_TIER, **kwargs):
     """A test client carrying a valid session cookie for `user_id`, who is made an approved account if it isn't one yet
-    (pass create=False for a cookie whose account does not exist). Also makes sure no test can reach the real database
+    (pass create=False for a cookie whose account does not exist; `tier` picks its plan, by default one with everything).
+    Also makes sure no test can reach the real database
     through the accounts layer."""
     if not isinstance(auth.store, FakeStore):
         auth.store = FakeStore()
     if create and user_id not in auth.store.users:
-        add_user(f"user{user_id}@example.com", "approved", is_admin, user_id)
+        add_user(f"user{user_id}@example.com", "approved", is_admin, user_id, tier)
     auth.access_cache.clear()
     client = TestClient(api.app, **kwargs)
     client.cookies.set(api.SESSION_COOKIE, auth.make_token(user_id))

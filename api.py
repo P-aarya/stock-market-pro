@@ -1,7 +1,7 @@
 # ============================================================
 # STOCK MARKET PRO - api.py (Final Clean Version)
 # ============================================================
-from fastapi import Depends, FastAPI, Body, HTTPException, Request
+from fastapi import Depends, FastAPI, Body, HTTPException, Request, Response
 from starlette.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
@@ -24,6 +24,7 @@ load_dotenv()
 
 import auth
 import auth_pages
+import tiers
 
 app = FastAPI(title="Aymetrix API")
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(",") if o.strip()]
@@ -36,9 +37,20 @@ app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_methods=["*
 #   ALLOW_SIGNUP=false  closes registration (accounts can still be made with manage_users.py)
 #   SIGNUP_CODE=...     keeps registration open only for people who know the code
 #   APP_SECRET=...      the key sessions are signed with (otherwise a random one is kept in .app_secret)
+#   UPGRADE_CONTACT_EMAIL=...  the address the profile page's "Request this plan" buttons write to (optional; no online payment yet)
 ALLOW_SIGNUP = os.getenv("ALLOW_SIGNUP", "true").strip().lower() not in ("false", "0", "no")
 REQUIRE_APPROVAL = os.getenv("REQUIRE_APPROVAL", "true").strip().lower() not in ("false", "0", "no")
 SIGNUP_CODE = os.getenv("SIGNUP_CODE", "")
+
+
+def _plain_email(value: str) -> str:
+    """`value` if it is a plain email address, else "" (so nothing can be smuggled into a mailto link)."""
+    import re
+    return value if re.fullmatch(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}", value) else ""
+
+
+# Where the profile page sends someone who asks for a higher plan (there is no online payment yet). Optional.
+UPGRADE_CONTACT = _plain_email(os.getenv("UPGRADE_CONTACT_EMAIL", "").strip())
 SESSION_COOKIE = "smp_session"
 _login_by_client = auth.RateLimiter(5, 300)     # wrong passwords per client in 5 minutes ...
 _login_by_email = auth.RateLimiter(10, 900)     # ... and per account in 15 minutes
@@ -57,6 +69,10 @@ _APP_ASSETS = {
     "/logo.svg": ("logo.svg", "image/svg+xml"),
 }
 _OPEN_PATHS = {"/login", "/register", "/logout", "/health", "/api/auth/status", "/favicon.ico"} | set(_APP_ASSETS)
+# The Free tier is a visitor with no account (tiers.py). They may load "/", which shows them only the public page (the price
+# list and a read-only portfolio page), and that list's own feed. Everything else still needs a sign-in.
+_ANONYMOUS_PATHS = {"/", "/api/public/stocks"}
+_public_hits = auth.RateLimiter(120, 60)            # price-list requests per visitor per minute
 
 
 _SETUP_HINT = "The accounts tables need a database update. Run: python manage_users.py migrate"
@@ -77,9 +93,22 @@ def _unavailable(request: Request, status: int, message: str):
     return HTMLResponse(auth_pages.notice_page("Temporarily unavailable", message), status_code=status)
 
 
+def _plan_denied(request: Request, feature: str, plan: dict):
+    """The answer to a signed-in person asking for something their plan doesn't include."""
+    info = tiers.upgrade_info(feature)
+    if feature == tiers.UNCLASSIFIED:
+        log.warning("%s %s has no tier rule (tiers.py); refusing it for non-administrators", request.method, request.url.path)
+    message = f"{info['label']} isn't included in the {plan['name']} plan. " + (
+        f"It comes with the {info['required_name']} plan." if info["required_name"] else "Higher plans will include it.")
+    if request.url.path.startswith(("/api/", "/agent/")):
+        return JSONResponse({"status": "error", "code": "upgrade_required", "message": message, **info}, status_code=403)
+    return HTMLResponse(auth_pages.notice_page("Not in your plan", message, "/", "Back to the dashboard"), status_code=403)
+
+
 @app.middleware("http")
 async def require_login(request: Request, call_next):
     request.state.user_id, request.state.is_admin = None, False
+    request.state.tier, request.state.features = tiers.visitor_plan().level, tiers.visitor_features()
     if request.method == "OPTIONS" or request.url.path in _OPEN_PATHS:
         return await call_next(request)
     try:
@@ -90,7 +119,15 @@ async def require_login(request: Request, call_next):
         log.exception("Could not check access")
         return _unavailable(request, 503, "We couldn't check your access just now. Please try again in a moment.")
     if user:
-        request.state.user_id, request.state.is_admin = user["id"], bool(user["is_admin"])
+        is_admin = bool(user["is_admin"])
+        plan = tiers.resolve(user.get("tier"))
+        request.state.user_id, request.state.is_admin, request.state.tier = user["id"], is_admin, plan.level
+        request.state.features = tiers.ADMIN_FEATURES if is_admin else tiers.features_for(plan.level)
+        needed = tiers.feature_for(request.method, request.url.path)
+        if not is_admin and needed != tiers.NO_FEATURE and needed not in request.state.features:
+            return _plan_denied(request, needed, tiers.describe(plan.level))
+        return await call_next(request)
+    if request.url.path in _ANONYMOUS_PATHS:
         return await call_next(request)
     if request.url.path.startswith(("/api/", "/agent/")):
         return JSONResponse({"status": "error", "message": "Please sign in."}, status_code=401)
@@ -226,17 +263,69 @@ def logout():
 def auth_status(request: Request):
     user_id = auth.read_token(request.cookies.get(SESSION_COOKIE, ""))
     if user_id is None:
-        return {"enabled": True, "signed_in": False, "user": None, "admin": False}
+        return {"enabled": True, "signed_in": False, "user": None, "admin": False, "plan": tiers.describe_visitor()}
     try:
         user = auth.access_for(user_id)
     except Exception:
         return {"enabled": True, "signed_in": True, "user": None, "admin": False}   # a database hiccup shouldn't sign anyone out
     if not user or user["status"] != "approved":
-        return {"enabled": True, "signed_in": False, "user": None, "admin": False}
-    return {"enabled": True, "signed_in": True, "user": {"id": user["id"], "email": user["email"]}, "admin": bool(user["is_admin"])}
+        return {"enabled": True, "signed_in": False, "user": None, "admin": False, "plan": tiers.describe_visitor()}
+    admin = bool(user["is_admin"])
+    plan = tiers.describe(user.get("tier"))
+    return {"enabled": True, "signed_in": True, "user": {"id": user["id"], "email": user["email"]}, "admin": admin, "plan": plan,
+            "features": sorted(tiers.ADMIN_FEATURES if admin else tiers.features_for(plan["level"]))}
+
+
+@app.get("/api/profile")
+def get_profile(request: Request, response: Response, user_id: int = Depends(current_user_id)):
+    """The signed-in person's own profile: who they are, when they joined, their plan and what it includes, and every plan with
+    its perks for the comparison. Nothing about anyone else, and never the password hash."""
+    response.headers["Cache-Control"] = "private, no-store"
+    try:
+        user = auth.get_user(user_id)                       # the account as it is now, not the remembered copy
+    except Exception:
+        log.exception("Could not load the profile")
+        return agent_error(503, "We couldn't load your profile just now. Please try again in a moment.")
+    if not user:
+        return agent_error(401, "Please sign in.")
+    admin = bool(request.state.is_admin)
+    plan = {"level": None, "name": "Administrator", "price": None} if admin else tiers.describe(user.get("tier"))
+    features = tiers.ADMIN_FEATURES if admin else tiers.features_for(plan["level"])
+    return {"status": "success", "email": user["email"], "joined_at": user.get("created_at"), "admin": admin, "plan": plan,
+            "included": tiers.feature_list(features), "plans": tiers.catalog(), "upgrade_contact": UPGRADE_CONTACT or None}
 
 
 # ── Serve dashboard.html directly from port 8000 ──
+def _plan_label(request: Request) -> str:
+    """'Basic' for an account on that plan, 'Administrator' for an administrator."""
+    if getattr(request.state, "is_admin", False):
+        return "Administrator"
+    return tiers.describe(getattr(request.state, "tier", None))["name"]
+
+
+def _locked_features(request: Request) -> dict:
+    """What the page says on a padlock: for each feature this person's plan lacks, its name and the plan that includes it."""
+    have = getattr(request.state, "features", frozenset())
+    out = {}
+    for feature in tiers.FEATURES:
+        if feature not in have:
+            info = tiers.upgrade_info(feature)
+            out[feature] = {"label": info["label"], "plan": info["required_name"]}
+    return out
+
+
+def _public_response():
+    """What a visitor without an account sees at "/": the Free tier's price list (public.html)."""
+    path = os.path.join(_BASE_DIR, "public.html")
+    if not os.path.exists(path):
+        return RedirectResponse("/login", status_code=302)
+    with open(path, encoding="utf-8") as f:
+        page = f.read()
+    plan = tiers.TIERS[tiers.account_tier()]                 # the plan the page invites people to join
+    page = page.replace("<!--PLAN_NAME-->", _escape_html(plan.name)).replace("<!--PLAN_PRICE-->", f"{plan.price:.2f}")
+    return HTMLResponse(page, headers={"Cache-Control": "private, no-cache"})
+
+
 def _dashboard_response(request: Request):
     path = os.path.join(_BASE_DIR, "dashboard.html")
     if not os.path.exists(path):
@@ -252,13 +341,18 @@ def _dashboard_response(request: Request):
             user = None
         meta = (f'<meta name="smp-user-id" content="{int(user_id)}">'
                 f'<meta name="smp-user-email" content="{_escape_html((user or {}).get("email", ""), quote=True)}">'
-                f'<meta name="smp-user-admin" content="{1 if getattr(request.state, "is_admin", False) else 0}">')
+                f'<meta name="smp-user-admin" content="{1 if getattr(request.state, "is_admin", False) else 0}">'
+                f'<meta name="smp-plan" content="{_escape_html(_plan_label(request), quote=True)}">'
+                f'<meta name="smp-features" content="{",".join(sorted(getattr(request.state, "features", ())))}">'
+                f'<meta name="smp-locks" content="{_escape_html(json.dumps(_locked_features(request)), quote=True)}">')
     # The page is different for every person, so it must never be stored by a browser cache or a shared proxy.
     return HTMLResponse(page.replace("<!--SMP_USER-->", meta, 1), headers={"Cache-Control": "private, no-store"})
 
 
 @app.get("/")
 def serve_root(request: Request):
+    if getattr(request.state, "user_id", None) is None:
+        return _public_response()
     return _dashboard_response(request)
 
 
@@ -277,6 +371,22 @@ def _app_asset_route(filename: str, media_type: str):
 
 for _route, (_file, _type) in _APP_ASSETS.items():
     app.add_api_route(_route, _app_asset_route(_file, _type), methods=["GET"], include_in_schema=False)
+
+@app.get("/api/public/stocks")
+def public_stocks(request: Request, response: Response):
+    """The Free tier's price list for visitors without an account: ticker, name, sector, price and today's change for
+    every stock, and nothing more. Answered from the same in-memory list as the search box, so a crowd of visitors never
+    reaches the database; each visitor is limited to a modest number of requests a minute."""
+    client = _client_id(request)
+    if _public_hits.blocked(client):
+        return JSONResponse({"status": "error", "message": "Too many requests. Please wait a minute and try again."},
+                            status_code=429, headers={"Retry-After": "60"})
+    _public_hits.record(client)
+    rows = _stock_directory()
+    response.headers["Cache-Control"] = "public, max-age=30"
+    return {"fields": ["ticker", "company_name", "sector", "current_price", "price_change_pct"],
+            "stocks": [tiers.public_stock_row(r) for r in rows], "updated": _directory_cache["at"] or None}
+
 
 @app.get("/health")
 def health():
@@ -403,6 +513,11 @@ _directory_lock = __import__("threading").Lock()
 def _plain_name(text):
     """'McDonald's Corp.' -> 'mcdonaldscorp' (lower case, letters and digits only)."""
     return __import__("re").sub(r"[^a-z0-9]", "", (text or "").lower())
+
+
+def _plan_features(request) -> frozenset:
+    """The features of the plan behind this request. Missing (a call outside a request) counts as nothing: fail closed."""
+    return getattr(getattr(request, "state", None), "features", frozenset())
 
 
 def _stock_directory():
@@ -1985,7 +2100,8 @@ class StatusBody(BaseModel):
 @app.get("/api/admin/users")
 def admin_list_users(admin_id: int = Depends(require_admin)):
     try:
-        return {"status": "success", "you": admin_id, **auth.list_users()}
+        return {"status": "success", "you": admin_id, **auth.list_users(),
+                "plans": {str(n): {"name": t.name, "price": t.price} for n, t in tiers.TIERS.items() if n >= tiers.account_tier()}}
     except Exception:
         log.exception("Listing users failed")
         return agent_error(500, "Something went wrong loading the accounts.")
@@ -2195,13 +2311,19 @@ def _parse_compare_tickers(tickers: str):
 
 
 @app.get("/api/compare/prices")
-def compare_prices(tickers: str = Query(..., min_length=1, max_length=120)):
-    """One-year closing prices rebased to 100, so the stocks' relative performance can be charted."""
+def compare_prices(tickers: str = Query(..., min_length=1, max_length=120), start: Optional[Date] = Query(None), end: Optional[Date] = Query(None),
+                   period: Optional[str] = Query(None, pattern="^max$")):
+    """Closing prices rebased to 100 over a chosen period, so the stocks' relative performance can be charted. The period is
+    `start` and `end` (both), `period=max` (everything there is), or, when none is given, the last year."""
     valid, error = _parse_compare_tickers(tickers)
     if error:
         return error
+    if period and (start or end):
+        return agent_error(400, "Choose either a period or start and end dates, not both.")
     try:
-        return {"status": "success", **peers.rebased_prices(valid)}
+        return {"status": "success", **peers.rebased_prices(valid, start, end, to_max=bool(period))}
+    except stock_period.PeriodError as e:
+        return agent_error(e.status, e.message)
     except Exception:
         log.exception("Price comparison failed")
         return agent_error(500, "Something went wrong loading prices.")
@@ -2245,6 +2367,10 @@ def recommend_payload(body: RecommendRequest) -> dict:
 
 @app.post("/agent/recommend")
 def agent_recommend(request: Request, body: RecommendRequest):
+    # A single question is the AI stock finder. Carrying on a conversation (earlier messages, or a reply to one) is Bounty, the
+    # AI interaction feature, which has its own route (/agent/recommend/stream); this is its fallback, so it needs that plan too.
+    if (body.chat_history or body.reply_to.strip()) and "ai_interaction" not in _plan_features(request):
+        return _plan_denied(request, "ai_interaction", tiers.describe(getattr(request.state, "tier", None)))
     limited = check_rate_limit(request)
     if limited:
         return limited

@@ -78,7 +78,8 @@ class ACookieDoesNotOutliveApproval(AccountsTestCase, unittest.TestCase):
             uid = add_user(f"{status}@example.com", status)
             c = signed_in_client(uid, follow_redirects=False)
             self.assertEqual(c.get("/api/portfolio").status_code, 401, status)
-            page = c.get("/"); self.assertEqual((page.status_code, page.headers["location"]), (302, "/login"), status)
+            dash = c.get("/dashboard.html"); self.assertEqual((dash.status_code, dash.headers["location"]), (302, "/login"), status)
+            self.assertNotIn('id="page-market"', c.get("/").text, status)               # they see the public price list, never the dashboard
             self.assertEqual(c.get("/admin").status_code, 302, status)
             st = c.get("/api/auth/status").json(); self.assertEqual((st["signed_in"], st["user"], st["admin"]), (False, None, False), status)
 
@@ -199,7 +200,7 @@ class AdminApi(AccountsTestCase, unittest.TestCase):
         self.assertEqual([u["id"] for u in d["users"]], [4, 3, 2, 1])
         self.assertEqual(d["counts"], {"pending": 1, "approved": 2, "blocked": 1, "total": 4}); self.assertEqual(d["you"], self.admin)
         for u in d["users"]:
-            self.assertEqual(set(u), {"id", "email", "status", "is_admin", "created_at", "last_login_at", "reviewed_at"})
+            self.assertEqual(set(u), {"id", "email", "status", "is_admin", "tier", "created_at", "last_login_at", "reviewed_at"})
         self.assertNotIn("password", self.a.get("/api/admin/users").text.lower())
 
     def test_the_summary_counts_those_waiting(self):

@@ -24,7 +24,23 @@ button:hover{background:#3d7de0}
 .hint{margin:6px 0 0;color:var(--muted);font-size:12px}
 .alt{margin:20px 0 0;text-align:center;color:var(--muted);font-size:13px}
 a{color:var(--cyan);font-weight:700;text-decoration:none}a:hover{text-decoration:underline}
+.wrap{width:100%;max-width:400px}
+.disclaimer{margin-top:16px;padding:16px 18px;border:1px solid var(--line);border-radius:12px;background:rgba(12,12,22,.7);color:#a9b6c8;font-size:12px;line-height:1.55}
+.disclaimer h2{margin:0 0 10px;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:#d5deeb}
+.disclaimer ul{margin:0;padding-left:18px}
+.disclaimer li+li{margin-top:8px}
+.disclaimer b{color:#d5deeb}
+.disclaimer p{margin:10px 0 0}
 """
+
+# Shown under the sign-up box, outside it, so it is read before the account is made.
+DISCLAIMER = """<aside class="disclaimer" aria-labelledby="disclaimer-title"><h2 id="disclaimer-title">Please read before you sign up</h2>
+<ul>
+<li><b>For information only.</b> Aymetrix is provided for information purposes only. Nothing in it is financial, investment, tax or legal advice, or an offer or recommendation to buy or sell anything.</li>
+<li><b>No liability for losses.</b> You use this app at your own risk. Prices and data may be delayed, incomplete or wrong, and predictions and AI answers can be mistaken. Any loss you may suffer from decisions made with the help of this app is yours alone, and Aymetrix and AYEIM Ventures cannot be held accountable for it.</li>
+<li><b>US stock market only.</b> Aymetrix covers the US stock market only. Stocks and markets in other countries are not included.</li>
+</ul>
+<p>By creating an account you confirm that you have read and accepted this.</p></aside>"""
 
 _SHOW_SCRIPT = """<script>
 document.getElementById('show').addEventListener('change',function(){
@@ -33,13 +49,14 @@ document.getElementById('show').addEventListener('change',function(){
 </script>"""
 
 
-def _page(title: str, body: str) -> str:
+def _page(title: str, body: str, below: str = "") -> str:
+    """`body` goes in the box; `below` (already HTML) goes under it, outside the box."""
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#08080e"><meta name="color-scheme" content="dark">
 <link rel="icon" type="image/png" href="/icon-192.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="manifest" href="/manifest.webmanifest">
-<title>{html.escape(title)} · Aymetrix</title><style>{_CSS}</style></head><body>
+<title>{html.escape(title)} · Aymetrix</title><style>{_CSS}</style></head><body><div class="wrap">
 <main class="card"><div class="brand"><img src="/icon-192.png" alt=""><div><b>Aymetrix</b><small>by AYEIM Ventures</small></div></div>
-{body}</main></body></html>"""
+{body}</main>{below}</div></body></html>"""
 
 
 def _error(message: str) -> str:
@@ -78,7 +95,7 @@ def register_page(error: str = "", email: str = "", needs_code: bool = False, cl
 {code}
 <label class="show"><input type="checkbox" id="show"> Show passwords</label>
 <button type="submit">Create account</button></form>
-<p class="alt">Already have an account? <a href="/login">Sign in</a></p>{_SHOW_SCRIPT}""")
+<p class="alt">Already have an account? <a href="/login">Sign in</a></p>{_SHOW_SCRIPT}""", below=DISCLAIMER)
 
 
 def notice_page(title: str, message: str, link: str = "/login", link_text: str = "Back to sign in") -> str:

@@ -135,7 +135,7 @@ code{font-family:var(--mono);background:var(--bg3);border:1px solid var(--b1);bo
 
 <script>
 const FILTERS = [['pending', 'Pending'], ['approved', 'Approved'], ['blocked', 'Blocked'], ['all', 'All']];
-const state = { users: [], counts: { pending: 0, approved: 0, blocked: 0, total: 0 }, you: null, filter: null, query: '', busy: new Set(), loaded: false };
+const state = { plans: {}, users: [], counts: { pending: 0, approved: 0, blocked: 0, total: 0 }, you: null, filter: null, query: '', busy: new Set(), loaded: false };
 
 function escapeHtml(str){
   return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -164,10 +164,17 @@ function actionsFor(u){
   return b('approved', 'plain', 'Unblock');
 }
 
+/** The plan an account is on, in words: "Basic plan · $9.99/month". Administrators aren't on a plan; they can use everything. */
+function planOf(u){
+  if(u.is_admin) return 'Administrator · full access';
+  const p = state.plans[String(u.tier)];
+  return p ? `${p.name} plan · $${Number(p.price).toFixed(2)}/month` : '';
+}
+
 function rowHtml(u){
   const reg = ago(u.created_at), last = ago(u.last_login_at);
   return `<div class="row" data-row="${u.id}">
-    <div class="who"><div class="email" title="${escapeHtml(u.email)}">${escapeHtml(u.email)}${u.is_admin ? '<span class="badge b-admin">Admin</span>' : ''}</div></div>
+    <div class="who"><div class="email" title="${escapeHtml(u.email)}">${escapeHtml(u.email)}${u.is_admin ? '<span class="badge b-admin">Admin</span>' : ''}</div><div class="sub">${escapeHtml(planOf(u))}</div></div>
     <div class="st"><span class="badge b-${escapeHtml(u.status)}">${escapeHtml(u.status)}</span></div>
     <div class="when" title="${escapeHtml(exact(u.created_at))}"><span class="lbl">Registered</span>${reg ? escapeHtml(reg) : '—'}</div>
     <div class="when" title="${escapeHtml(exact(u.last_login_at))}"><span class="lbl">Last sign-in</span>${last ? escapeHtml(last) : '<span class="sub">never</span>'}</div>
@@ -213,7 +220,7 @@ async function call(path, options = {}){
 async function load(quiet){
   try {
     const d = await call('/api/admin/users');
-    state.users = d.users; state.counts = d.counts; state.you = d.you;
+    state.users = d.users; state.counts = d.counts; state.you = d.you; state.plans = d.plans || {};
     if(!state.loaded){ state.filter = d.counts.pending ? 'pending' : 'all'; state.loaded = true; }
     render();
   } catch(e){
