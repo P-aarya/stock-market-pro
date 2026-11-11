@@ -81,16 +81,24 @@ class Migrate(unittest.TestCase):
         mu.migrate(conn)
         alters = [sql for sql, _ in conn.statements("ALTER TABLE")]
         self.assertEqual(sorted(a.split(" ADD COLUMN ")[0] + " " + a.split(" ADD COLUMN ")[1].split()[0] for a in alters),
-                         ["ALTER TABLE transactions user_id", "ALTER TABLE users reviewed_at", "ALTER TABLE users reviewed_by", "ALTER TABLE users tier"])
+                         ["ALTER TABLE transactions user_id", "ALTER TABLE users deleted_at", "ALTER TABLE users reviewed_at", "ALTER TABLE users reviewed_by", "ALTER TABLE users tier"])
 
     def test_the_plan_column_is_added_and_existing_accounts_start_on_the_basic_plan(self):
-        everything_else = {"portfolio": True, "transactions": True, **{("users", c): True for c in ("status", "is_admin", "reviewed_at", "reviewed_by")}}
+        everything_else = {"portfolio": True, "transactions": True, **{("users", c): True for c in ("status", "is_admin", "reviewed_at", "reviewed_by", "deleted_at")}}
         conn = FakeConn(has_column(everything_else))
         done = mu.migrate(conn)
         alters = [sql for sql, _ in conn.statements("ALTER TABLE")]
         self.assertEqual(alters, ["ALTER TABLE users ADD COLUMN tier TINYINT NOT NULL DEFAULT 2"])
         self.assertTrue(any("users: added tier" in line and "Basic plan" in line for line in done), done)
         self.assertEqual(mu.migrate(FakeConn(has_column({**everything_else, ("users", "tier"): True}))).count("users: approval and plan columns already there"), 1)
+
+    def test_the_deletion_column_is_added_and_the_migration_says_what_it_is_for(self):
+        everything_else = {"portfolio": True, "transactions": True, **{("users", c): True for c in ("status", "is_admin", "reviewed_at", "reviewed_by", "tier")}}
+        conn = FakeConn(has_column(everything_else))
+        done = mu.migrate(conn)
+        self.assertEqual([sql for sql, _ in conn.statements("ALTER TABLE")], ["ALTER TABLE users ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL"])
+        self.assertTrue(any("users: added deleted_at" in line and "delete and restore their own account" in line for line in done), done)
+        self.assertIn("deleted_at TIMESTAMP NULL DEFAULT NULL", mu.USERS_DDL)                      # a brand-new table has it too
 
     def test_a_brand_new_users_table_has_the_plan_column(self):
         self.assertIn("tier TINYINT NOT NULL DEFAULT 2", mu.USERS_DDL)
@@ -212,16 +220,16 @@ class CommandLine(unittest.TestCase):
         self.assertTrue(auth.verify_password(GOOD, params[0])); self.assertEqual(params[1], 5)
 
     def test_list_users(self):
-        rows = [{"a": 1, "b": "a@x.co", "s": "approved", "m": 1, "t": 2, "c": datetime(2026, 1, 2), "d": datetime(2026, 2, 3)},
-                {"a": 2, "b": "b@x.co", "s": "pending", "m": 0, "t": 2, "c": datetime(2026, 1, 5), "d": None}]
+        rows = [{"a": 1, "b": "a@x.co", "s": "approved", "m": 1, "t": 2, "c": datetime(2026, 1, 2), "d": datetime(2026, 2, 3), "x": None},
+                {"a": 2, "b": "b@x.co", "s": "pending", "m": 0, "t": 2, "c": datetime(2026, 1, 5), "d": None, "x": None}]
         out, _ = self.run_cli("list-users", conn=FakeConn(lambda sql, p: rows if "FROM users" in sql else []))
         self.assertIn("a@x.co", out); self.assertIn("admin", out); self.assertIn("last sign-in 2026-02-03", out)
         self.assertIn("pending", out); self.assertIn("never signed in", out)
         self.assertIn("Basic", out)                                  # each account's plan is shown
 
     def test_list_users_shows_the_longer_plan_names_in_full(self):
-        rows = [{"a": 1, "b": "a@x.co", "s": "approved", "m": 0, "t": 3, "c": datetime(2026, 1, 2), "d": None},
-                {"a": 2, "b": "b@x.co", "s": "approved", "m": 0, "t": 4, "c": datetime(2026, 1, 5), "d": None}]
+        rows = [{"a": 1, "b": "a@x.co", "s": "approved", "m": 0, "t": 3, "c": datetime(2026, 1, 2), "d": None, "x": None},
+                {"a": 2, "b": "b@x.co", "s": "approved", "m": 0, "t": 4, "c": datetime(2026, 1, 5), "d": None, "x": None}]
         out, _ = self.run_cli("list-users", conn=FakeConn(lambda sql, p: rows if "FROM users" in sql else []))
         self.assertIn("AI Stock Finder", out); self.assertIn("AI Interaction", out)
 
@@ -244,6 +252,34 @@ class CommandLine(unittest.TestCase):
         with mock.patch.object(mu, "_connect", return_value=conn), self.assertRaises(SystemExit) as cm:
             mu.main(["set-plan", "ghost@example.com", "Basic"])
         self.assertIn("No account found", str(cm.exception)); self.assertEqual(conn.statements("UPDATE"), [])
+
+    def test_list_users_says_when_a_deleted_account_goes_for_good(self):
+        rows = [{"a": 3, "b": "gone@x.co", "s": "deleted", "m": 0, "t": 2, "c": datetime(2026, 1, 2), "d": None, "x": datetime(2026, 11, 10)}]
+        out, _ = self.run_cli("list-users", conn=FakeConn(lambda sql, p: rows if "FROM users" in sql else []))
+        self.assertIn("deleted", out); self.assertIn("deleted 2026-11-10, removed for good after 30 days", out)
+
+    def test_purge_deleted_removes_only_what_the_database_says_is_past_its_30_days(self):
+        def respond(sql, params):
+            if "SELECT id FROM users WHERE status = 'deleted'" in sql:
+                return [{"id": 3}, {"id": 4}]
+            if "FOR UPDATE" in sql:
+                return [{"id": params[0]}] if params[0] == 3 else []                           # 4 was restored a moment ago
+            if "information_schema.tables" in sql:
+                return [{"n": 0}]
+            return 1 if sql.startswith("DELETE") else []
+        with mock.patch.object(auth, "now", return_value=1_800_000_000.7):
+            out, conn = self.run_cli("purge-deleted", conn=FakeConn(respond))
+        self.assertIn("Permanently removed 1 account deleted more than 30 days ago", out)
+        self.assertEqual(conn.statements("SELECT id FROM users WHERE status = 'deleted'")[0][1], (1_800_000_000 - 30 * 86400,))
+        self.assertEqual([p for s, p in conn.log if s.startswith("DELETE FROM users")], [(3,)])
+        out, _ = self.run_cli("purge-deleted", conn=FakeConn(lambda sql, p: []))
+        self.assertIn("Permanently removed 0 accounts", out)
+
+    def test_approving_an_account_also_clears_a_deletion_so_an_operator_can_restore_one(self):
+        conn = FakeConn(lambda sql, p: [{"id": 5}] if "SELECT id FROM users" in sql else [])
+        _, conn = self.run_cli("approve", "me@example.com", conn=conn)
+        (sql, params), = conn.statements("UPDATE users SET status")
+        self.assertIn("deleted_at = NULL", sql); self.assertEqual(params, ("approved", 5))
 
     def test_list_users_can_show_only_those_waiting(self):
         _, conn = self.run_cli("list-users", "--pending", conn=FakeConn(lambda sql, p: []))

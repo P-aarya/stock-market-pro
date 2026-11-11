@@ -35,6 +35,7 @@ class FakeStore:
         self.users, self.next_id = {}, 1
         self.fail_with = None            # set to an exception to make every call raise it
         self.gets = 0                    # how many times the database would have been asked for one account
+        self.purged = []                 # ids of accounts removed for good
 
     def _check(self):
         if self.fail_with:
@@ -43,7 +44,7 @@ class FakeStore:
     @staticmethod
     def _public(u):
         return {"id": u["id"], "email": u["email"], "status": u.get("status", "approved"), "is_admin": bool(u.get("is_admin", False)),
-                "tier": u.get("tier", FULL_TIER), "created_at": u.get("created_at")}
+                "tier": u.get("tier", FULL_TIER), "created_at": u.get("created_at"), "deleted_at": u.get("deleted_at")}
 
     def create(self, email, password_hash, status="pending", is_admin=False):
         self._check()
@@ -52,7 +53,7 @@ class FakeStore:
         user_id, self.next_id = self.next_id, self.next_id + 1
         self.users[user_id] = {"id": user_id, "email": email, "password_hash": password_hash, "status": status, "is_admin": is_admin,
                                "tier": tiers.account_tier(),      # what the real table's column default gives a new sign-up
-                               "created_at": 1_700_000_000 + user_id, "last_login_at": None, "reviewed_at": None}
+                               "created_at": 1_700_000_000 + user_id, "last_login_at": None, "reviewed_at": None, "deleted_at": None}
         return user_id
 
     def find_by_email(self, email):
@@ -68,8 +69,8 @@ class FakeStore:
 
     def list_users(self):
         self._check()
-        return [{**self._public(u), "created_at": u.get("created_at"), "last_login_at": u.get("last_login_at"), "reviewed_at": u.get("reviewed_at")}
-                for u in sorted(self.users.values(), key=lambda u: -u["id"])]
+        return [{**self._public(u), "created_at": u.get("created_at"), "last_login_at": u.get("last_login_at"), "reviewed_at": u.get("reviewed_at"),
+                 "deleted_at": u.get("deleted_at")} for u in sorted(self.users.values(), key=lambda u: -u["id"])]
 
     def set_status(self, user_id, status, reviewed_by):
         self._check()
@@ -81,6 +82,39 @@ class FakeStore:
         self._check()
         self.users[user_id]["last_login_at"] = 1_800_000_000
 
+    def mark_deleted(self, user_id, when):
+        self._check()
+        u = self.users.get(user_id)
+        if not u or u["status"] != "approved":
+            return False
+        u["status"], u["deleted_at"] = "deleted", when
+        return True
+
+    def restore(self, user_id):
+        self._check()
+        u = self.users.get(user_id)
+        if not u or u["status"] != "deleted":
+            return False
+        u["status"], u["deleted_at"] = "approved", None
+        return True
+
+    def other_admins(self, user_id):
+        self._check()
+        return sum(1 for u in self.users.values() if u["is_admin"] and u["status"] == "approved" and u["id"] != user_id)
+
+    def purge_if_expired(self, user_id, cutoff):
+        self._check()
+        u = self.users.get(user_id)
+        if not u or u["status"] != "deleted" or u.get("deleted_at") is None or u["deleted_at"] > cutoff:
+            return False
+        del self.users[user_id]
+        self.purged.append(user_id)
+        return True
+
+    def purge_expired(self, cutoff):
+        self._check()
+        return sum(1 for user_id in list(self.users) if self.purge_if_expired(user_id, cutoff))
+
 
 auth.store = FakeStore()
 
@@ -91,7 +125,7 @@ def add_user(email, status="approved", is_admin=False, user_id=None, tier=FULL_T
     uid = user_id or store.next_id
     store.next_id = max(store.next_id, uid + 1)
     store.users[uid] = {"id": uid, "email": email, "password_hash": "", "status": status, "is_admin": is_admin, "tier": tier,
-                        "created_at": 1_700_000_000 + uid, "last_login_at": None, "reviewed_at": None}
+                        "created_at": 1_700_000_000 + uid, "last_login_at": None, "reviewed_at": None, "deleted_at": None}
     auth.access_cache.invalidate(uid)
     return uid
 

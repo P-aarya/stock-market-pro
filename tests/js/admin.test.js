@@ -65,6 +65,30 @@ function pageEnv({ replies = {}, confirmAnswer = true } = {}) {
     assert.deepStrictEqual(acts(USERS[3]), []); assert(api.actionsFor(USERS[3]).includes('Administrator'));
   });
 
+  await t('an account its owner deleted has no buttons, says when it goes for good, and has its own filter', () => {
+    const { api } = pageEnv();
+    const gone = { id: 8, email: 'gone@x.co', status: 'deleted', is_admin: false, tier: 2, created_at: 1000, last_login_at: 2000, deleted_at: Date.UTC(2026, 10, 10, 12) / 1000 };
+    const out = api.rowHtml(gone);
+    assert(!/data-act=/.test(out), 'nothing to approve or block');
+    assert(out.includes('b-deleted') && out.includes('>deleted<'));
+    assert(/Removed for good Dec 10, 2026/.test(out), 'the date is the day it was deleted plus 30 days');
+    api.state.graceDays = 14; assert(/Removed for good Nov 24, 2026/.test(api.rowHtml(gone)), 'the grace period comes from the server');
+    assert.strictEqual(api.actionsFor({ ...gone, deleted_at: null }), '', 'a deleted account with no date says nothing rather than something wrong');
+    assert.strictEqual(api.actionsFor({ ...gone, is_admin: true }).includes('data-act='), false, 'not even for a deleted administrator');
+    api.state.users = [...USERS, gone]; api.state.counts = { pending: 1, approved: 2, blocked: 1, deleted: 1, total: 5 };
+    api.state.filter = 'deleted'; api.state.query = '';
+    assert.deepStrictEqual(api.visibleUsers().map(u => u.id), [8]);
+    api.state.filter = 'all'; assert.strictEqual(api.visibleUsers().length, 5);
+    api.state.users = USERS; api.state.filter = 'deleted'; assert.strictEqual(api.emptyMessage(), 'No deleted accounts.');
+  });
+
+  await t('the tabs include Deleted with its count, and the grace period is read from the server', async () => {
+    const { api, els } = pageEnv({ replies: { 'GET /api/admin/users': ok({ status: 'success', users: USERS, counts: { pending: 1, approved: 2, blocked: 1, deleted: 3, total: 7 }, you: 1, grace_days: 21 }) } });
+    await api.load();
+    assert.strictEqual(api.state.graceDays, 21);
+    assert(/data-filter="deleted"[^>]*>Deleted<span class="n">3<\/span>/.test(els.tabs.innerHTML), els.tabs.innerHTML);
+  });
+
   await t('filters and search narrow the list', async () => {
     const { api } = pageEnv();
     api.state.users = USERS;

@@ -172,6 +172,7 @@ _RULES = [
     ("GET",  r"/", NO_FEATURE), ("GET", r"/dashboard\.html", NO_FEATURE), ("GET", r"/logout", NO_FEATURE),
     ("GET",  r"/api/auth/status", NO_FEATURE), ("GET", r"/health", NO_FEATURE), ("*", r"/admin", NO_FEATURE),
     ("GET",  r"/api/profile", NO_FEATURE),                     # a person's own profile and the plan comparison: every account has one
+    ("POST", r"/api/profile/delete", NO_FEATURE),              # deleting your own account (asks for the password again)
     ("*",    r"/api/admin/.*", NO_FEATURE),                    # these also demand an administrator, checked separately
     ("GET",  r"/api/public/stocks", _INITIAL),
     # the parts the plan table puts on a plan of their own

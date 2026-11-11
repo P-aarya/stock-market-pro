@@ -62,7 +62,7 @@ POST /api/alerts/create
 POST /api/portfolio/add
 POST /api/transactions/add
 """.split("\n")
-ONLY_TIERS = ["GET /api/public/stocks", "GET /api/profile"]        # the Free tier's price list, and the signed-in profile page (tiers.py)
+ONLY_TIERS = ["GET /api/public/stocks", "GET /api/profile", "POST /api/profile/delete", "POST /restore"]   # the Free tier's price list, the signed-in profile page and deleting / restoring an account
 SHARED_ROUTES = 51      # routes both of you had (market data, stocks, news, login ...), plus one Aarya added after the merge
 
 

@@ -198,9 +198,9 @@ class AdminApi(AccountsTestCase, unittest.TestCase):
     def test_the_list_has_everyone_newest_first_with_counts_and_no_secrets(self):
         d = self.a.get("/api/admin/users").json()
         self.assertEqual([u["id"] for u in d["users"]], [4, 3, 2, 1])
-        self.assertEqual(d["counts"], {"pending": 1, "approved": 2, "blocked": 1, "total": 4}); self.assertEqual(d["you"], self.admin)
+        self.assertEqual(d["counts"], {"pending": 1, "approved": 2, "blocked": 1, "deleted": 0, "total": 4}); self.assertEqual(d["you"], self.admin)
         for u in d["users"]:
-            self.assertEqual(set(u), {"id", "email", "status", "is_admin", "tier", "created_at", "last_login_at", "reviewed_at"})
+            self.assertEqual(set(u), {"id", "email", "status", "is_admin", "tier", "created_at", "last_login_at", "reviewed_at", "deleted_at"})
         self.assertNotIn("password", self.a.get("/api/admin/users").text.lower())
 
     def test_the_summary_counts_those_waiting(self):

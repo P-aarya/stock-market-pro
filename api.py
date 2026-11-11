@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 import mysql.connector
 import yfinance as yf
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 import hashlib
 import hmac
@@ -67,8 +67,11 @@ _APP_ASSETS = {
     "/favicon.png": ("favicon.png", "image/png"),
     "/favicon.ico": ("favicon.png", "image/png"),
     "/logo.svg": ("logo.svg", "image/svg+xml"),
+    # The pictures behind the sign-in and sign-up pages (drawn artwork, nothing private), fetched before anyone is signed in
+    "/bg-login.svg": ("bg-login.svg", "image/svg+xml"),
+    "/bg-register.svg": ("bg-register.svg", "image/svg+xml"),
 }
-_OPEN_PATHS = {"/login", "/register", "/logout", "/health", "/api/auth/status", "/favicon.ico"} | set(_APP_ASSETS)
+_OPEN_PATHS = {"/login", "/register", "/restore", "/logout", "/health", "/api/auth/status", "/favicon.ico"} | set(_APP_ASSETS)
 # The Free tier is a visitor with no account (tiers.py). They may load "/", which shows them only the public page (the price
 # list and a read-only portfolio page), and that list's own feed. Everything else still needs a sign-in.
 _ANONYMOUS_PATHS = {"/", "/api/public/stocks"}
@@ -186,7 +189,7 @@ def login_page(request: Request):
                 return RedirectResponse("/", status_code=303)
         except Exception:
             return RedirectResponse("/", status_code=303)      # the database hiccuped: don't sign anyone out for that
-    response = HTMLResponse(auth_pages.login_page(signup_open=ALLOW_SIGNUP))
+    response = HTMLResponse(auth_pages.login_page(signup_open=ALLOW_SIGNUP, notice=request.query_params.get("notice", "")))
     if cookie:
         response.delete_cookie(SESSION_COOKIE)                # expired, forged, blocked, or for an account that no longer exists
     return response
@@ -208,12 +211,39 @@ async def login(request: Request):
         _login_by_email.clear(email)
         if user["status"] == "pending":
             return HTMLResponse(auth_pages.pending_page(user["email"]), status_code=403)
+        if user["status"] == "deleted":                       # the owner deleted it less than 30 days ago: offer to bring it back
+            deleted_at = user["deleted_at"]
+            page = auth_pages.restore_page(user["email"], auth.make_restore_token(user["id"]), _fmt_date(deleted_at),
+                                           _fmt_date(deleted_at + auth.grace_seconds()), auth.days_left(deleted_at))
+            return HTMLResponse(page, headers={"Cache-Control": "no-store"})
         if user["status"] != "approved":
             return HTMLResponse(auth_pages.blocked_page(), status_code=403)
         return _start_session(request, user["id"])
     _login_by_client.record(client)
     _login_by_email.record(email)
     return HTMLResponse(auth_pages.login_page("That email or password isn't right.", email, ALLOW_SIGNUP), status_code=401)
+
+
+def _fmt_date(seconds) -> str:
+    """'Dec 10, 2026' (UTC)."""
+    d = datetime.fromtimestamp(seconds, timezone.utc)
+    return f"{d:%b} {d.day}, {d.year}"
+
+
+@app.post("/restore")
+async def restore(request: Request):
+    """The "Restore my account" button. It carries a token that only a correct password for that deleted account can produce."""
+    form = await _read_form(request)
+    user_id = auth.read_restore_token(form.get("token", ""))
+    if user_id is None:
+        return HTMLResponse(auth_pages.login_page("That restore link has expired. Please sign in again.", "", ALLOW_SIGNUP), status_code=400)
+    try:
+        user = await run_in_threadpool(auth.restore_account, user_id)
+    except auth.AuthError as e:
+        return HTMLResponse(auth_pages.login_page(e.message, "", ALLOW_SIGNUP), status_code=e.status)
+    except auth.AccountsNotSetUp:
+        return HTMLResponse(auth_pages.notice_page("Accounts aren't set up yet", "The site owner needs to run: python manage_users.py migrate"), status_code=503)
+    return _start_session(request, user["id"])
 
 
 @app.get("/register", response_class=HTMLResponse)
@@ -292,7 +322,8 @@ def get_profile(request: Request, response: Response, user_id: int = Depends(cur
     plan = {"level": None, "name": "Administrator", "price": None} if admin else tiers.describe(user.get("tier"))
     features = tiers.ADMIN_FEATURES if admin else tiers.features_for(plan["level"])
     return {"status": "success", "email": user["email"], "joined_at": user.get("created_at"), "admin": admin, "plan": plan,
-            "included": tiers.feature_list(features), "plans": tiers.catalog(), "upgrade_contact": UPGRADE_CONTACT or None}
+            "included": tiers.feature_list(features), "plans": tiers.catalog(), "upgrade_contact": UPGRADE_CONTACT or None,
+            "grace_days": auth.DELETION_GRACE_DAYS}
 
 
 # ── Serve dashboard.html directly from port 8000 ──
@@ -386,6 +417,40 @@ def public_stocks(request: Request, response: Response):
     response.headers["Cache-Control"] = "public, max-age=30"
     return {"fields": ["ticker", "company_name", "sector", "current_price", "price_change_pct"],
             "stocks": [tiers.public_stock_row(r) for r in rows], "updated": _directory_cache["at"] or None}
+
+
+# ── removing deleted accounts for good ──
+# An account its owner deleted is locked at once and kept for auth.DELETION_GRACE_DAYS days (so signing in can restore it). Past
+# that it can't be restored whether or not it has been cleaned up yet; this sweep does the cleaning: when the server starts and
+# every few hours after. Signing in or signing up with the address also removes it, and so does `manage_users.py purge-deleted`.
+ACCOUNT_CLEANUP = os.getenv("ACCOUNT_CLEANUP", "true").strip().lower() not in ("false", "0", "no")
+ACCOUNT_CLEANUP_EVERY = 6 * 3600
+
+
+def run_account_cleanup() -> int:
+    """One sweep. Returns how many accounts were removed; never raises."""
+    try:
+        removed = auth.purge_expired()
+        if removed:
+            log.info("Permanently removed %d deleted account(s) past their %d days", removed, auth.DELETION_GRACE_DAYS)
+        return removed
+    except auth.AccountsNotSetUp:
+        log.warning("Account clean-up skipped: the accounts tables need a database update (python manage_users.py migrate)")
+    except Exception:
+        log.exception("Account clean-up failed")
+    return 0
+
+
+def _account_cleanup_loop():
+    while True:
+        run_account_cleanup()
+        time.sleep(ACCOUNT_CLEANUP_EVERY)
+
+
+@app.on_event("startup")
+def start_account_cleanup():
+    if ACCOUNT_CLEANUP:
+        threading.Thread(target=_account_cleanup_loop, name="account-cleanup", daemon=True).start()
 
 
 @app.get("/health")
@@ -2093,6 +2158,44 @@ def admin_page(request: Request):
         return HTMLResponse(f.read(), headers={"Cache-Control": "private, no-store"})
 
 
+# ── Deleting your own account ──
+
+class DeleteAccountBody(BaseModel):
+    password: str = Field(min_length=1, max_length=256)
+
+
+def require_fetch_header(request: Request):
+    """Deleting an account must come from the app's own script, which sends this header; another site can't add it without the
+    browser asking this server's permission first. (The password is needed as well.)"""
+    if request.headers.get("x-requested-with") != "fetch":
+        raise HTTPException(status_code=403, detail="This action must be made from the app itself.")
+
+
+@app.post("/api/profile/delete")
+def delete_profile(request: Request, body: DeleteAccountBody, user_id: int = Depends(current_user_id), _fetch: None = Depends(require_fetch_header)):
+    """Delete the signed-in person's own account, after they confirm with their password. The account is locked at once and kept
+    for 30 days, during which signing in offers to restore it; after that it is removed for good (see auth.py)."""
+    client, who = _client_id(request), f"uid:{user_id}"
+    if _login_by_client.blocked(client) or _login_by_email.blocked(who):             # guessing the password here is as bad as at sign-in
+        return agent_error(429, "Too many wrong passwords. Please wait a few minutes and try again.")
+    try:
+        result = auth.delete_own_account(user_id, body.password)
+    except auth.WrongPassword as e:
+        _login_by_client.record(client); _login_by_email.record(who)
+        return agent_error(e.status, e.message)
+    except auth.AuthError as e:
+        return agent_error(e.status, e.message)
+    except auth.AccountsNotSetUp:
+        return agent_error(503, "The accounts tables need a database update. Ask the site owner to run: python manage_users.py migrate")
+    except Exception:
+        log.exception("Deleting an account failed")
+        return agent_error(500, "Something went wrong, and your account was not deleted. Please try again.")
+    _login_by_client.clear(client); _login_by_email.clear(who)
+    response = JSONResponse({"status": "success", **result, "grace_days": auth.DELETION_GRACE_DAYS})
+    response.delete_cookie(SESSION_COOKIE)                                           # signed out on this device straight away
+    return response
+
+
 class StatusBody(BaseModel):
     status: Literal["approved", "blocked"]
 
@@ -2100,7 +2203,7 @@ class StatusBody(BaseModel):
 @app.get("/api/admin/users")
 def admin_list_users(admin_id: int = Depends(require_admin)):
     try:
-        return {"status": "success", "you": admin_id, **auth.list_users(),
+        return {"status": "success", "you": admin_id, "grace_days": auth.DELETION_GRACE_DAYS, **auth.list_users(),
                 "plans": {str(n): {"name": t.name, "price": t.price} for n, t in tiers.TIERS.items() if n >= tiers.account_tier()}}
     except Exception:
         log.exception("Listing users failed")

@@ -391,14 +391,30 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 .ntab.is-locked::after,.fstab.is-locked::after{content:"";position:absolute;top:4px;right:5px;width:9px;height:9px;background:currentColor;
   -webkit-mask:var(--lock-icon) center/contain no-repeat;mask:var(--lock-icon) center/contain no-repeat}
 :root{--lock-icon:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'><rect x='4' y='11' width='16' height='10' rx='2'/><path d='M8 11V8a4 4 0 0 1 8 0v3'/></svg>")}
-#up-modal{position:fixed;inset:0;z-index:100001;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.62)}
-#up-modal.open{display:flex}
+#up-modal,#del-modal{position:fixed;inset:0;z-index:100001;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.62)}
+#up-modal.open,#del-modal.open{display:flex}
 .up-box{width:100%;max-width:380px;background:var(--bg2);border:1px solid var(--b3);border-radius:14px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
 .up-box h3{margin:0 0 8px;font-size:17px;font-weight:800}
 .up-box p{margin:0 0 18px;color:var(--t2);font-size:14px;line-height:1.5}
 .up-box .btn{width:100%;min-height:42px;justify-content:center}
 .up-box .btn+.btn{margin-top:8px}
 .up-box .btns{background:var(--bg3);color:var(--t1);border:1px solid var(--b2)}
+#del-modal .up-box{max-width:440px;max-height:100%;overflow:auto}
+.del-list{margin:0 0 14px;padding-left:18px;color:var(--t2);font-size:13px;line-height:1.5}
+.del-list li+li{margin-top:6px}
+.del-lbl{display:block;margin:0 0 6px;font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:1px}
+.del-input{width:100%;min-height:42px;padding:0 12px;border-radius:8px;border:1px solid var(--b2);background:var(--bg3);color:var(--t1);font-size:16px;font-family:var(--sans)}
+.del-input:focus{outline:2px solid var(--blue);outline-offset:1px}
+.del-error{margin:8px 0 0;color:var(--red);font-size:13px;font-weight:700;line-height:1.4}
+.del-error:empty{display:none}
+#del-modal .up-box>.btn:first-of-type{margin-top:16px}
+.btnd{background:#d63a3a;color:#fff}
+.btnd:hover:not(:disabled){background:#bb2f2f}
+.btnd:disabled{opacity:.45;cursor:not-allowed}
+.prof-danger{border-color:rgba(255,68,68,.35)}
+.prof-danger-text{margin:0 0 14px;color:var(--t2);font-size:13px;line-height:1.55}
+.prof-btn.danger{background:transparent;border-color:rgba(255,68,68,.6);color:#ff7b7b}
+.prof-btn.danger:hover{background:rgba(255,68,68,.12);border-color:#ff4444}
 /* ── Profile ── */
 .prof-card,.prof-sec{max-width:1000px;margin-left:auto;margin-right:auto}
 .prof-top{display:flex;align-items:center;gap:16px}
@@ -1432,7 +1448,7 @@ function closeUpgrade(){
   const m=document.getElementById('up-modal');if(m)m.classList.remove('open');
   if(upFocus&&upFocus.focus)upFocus.focus();upFocus=null;
 }
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeUpgrade();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeUpgrade();if(typeof closeDelete==='function')closeDelete();}});
 document.addEventListener('DOMContentLoaded',applyPlan);
 // Administrators get a link to the user-access page, with the number of people waiting for approval
 function addAdminLink(nav){
@@ -1485,6 +1501,7 @@ function profilePlanCard(d,p){
 }
 /** The whole profile page for the data from /api/profile; `open` says whether the plan comparison is showing. */
 function profileHtml(d,open){
+  const days=Number(d.grace_days)||30;
   const top=d.plans.length&&d.plan.level!=null&&d.plan.level>=Math.max(...d.plans.map(p=>p.level));
   const canUpgrade=!d.admin&&!top;
   const label=open?'Hide plans':canUpgrade?'Upgrade plan':'View plans';
@@ -1508,7 +1525,11 @@ function profileHtml(d,open){
       <div class="info-note">${contactNote}</div>
       <div class="plans-grid">${d.plans.map(p=>profilePlanCard(d,p)).join('')}</div>
       <div class="prof-howto" id="prof-howto" role="status"></div></div>
-  </section>`;
+  </section>
+  <div class="card prof-sec prof-danger"><div class="chdr"><div class="ctitle">Delete account</div></div>
+    <p class="prof-danger-text">Delete your account and sign out. Your portfolio, transactions, watchlist and price alerts are kept for ${days} days in case you change your mind: sign in again within ${days} days and choose Restore to get everything back. After that they are permanently deleted.</p>
+    <button type="button" class="prof-btn danger" id="prof-delete" onclick="openDelete()">Delete my account</button>
+  </div>`;
 }
 function renderProfile(){
   const body=document.getElementById('prof-body');if(!body||!profileData)return;
@@ -1536,6 +1557,39 @@ function profileHowToUpgrade(level){
   const p=profileData&&profileData.plans.find(x=>x.level===level),el=document.getElementById('prof-howto');if(!p||!el)return;
   el.textContent='To switch to '+p.name+' ('+profilePrice(p.price)+' a month), ask an administrator to move '+profileData.email+' to that plan.';
 }
+// ── Deleting your account ──
+// A box asks for the password. The server locks the account at once and keeps it for 30 days (signing in then offers to restore it).
+let delTrigger=null,delBusy=false;
+const delEl=id=>document.getElementById(id);
+function delSync(){const go=delEl('del-go'),pw=delEl('del-password');if(go&&pw)go.disabled=delBusy||!pw.value;}
+function delError(msg){const e=delEl('del-error');if(e)e.textContent=msg||'';}
+function openDelete(){
+  const box=delEl('del-modal');if(!box||!profileData)return;
+  const days=Number(profileData.grace_days)||30;
+  delEl('del-email').textContent=profileData.email;
+  delEl('del-keep').textContent='For '+days+' days you can change your mind: sign in with your email and password, choose Restore, and everything comes back as it was.';
+  delEl('del-gone').textContent='After '+days+' days your account, portfolio, transactions, watchlist and price alerts are permanently deleted and can’t be recovered.';
+  delEl('del-password').value='';delError('');delSync();
+  delTrigger=document.activeElement;box.classList.add('open');delEl('del-password').focus();
+}
+function closeDelete(){
+  const box=delEl('del-modal');if(!box||delBusy||!box.classList.contains('open'))return;
+  box.classList.remove('open');delEl('del-password').value='';delError('');
+  if(delTrigger&&delTrigger.focus)delTrigger.focus();delTrigger=null;
+}
+async function confirmDelete(){
+  const pw=delEl('del-password'),go=delEl('del-go');
+  if(delBusy||!pw||!pw.value)return;
+  delBusy=true;delSync();go.textContent='Deleting…';delError('');
+  try{
+    const r=await fetch(API+'/api/profile/delete',{method:'POST',headers:{'Content-Type':'application/json','X-Requested-With':'fetch'},body:JSON.stringify({password:pw.value})});
+    let d=null;try{d=await r.json();}catch(e){}
+    if(r.ok&&d&&d.status==='success'){pw.value='';location.href='/login?notice=deleted';return;}      // signed out: stay busy while the page changes
+    delError((d&&d.message)||'Something went wrong, and your account was not deleted. Please try again.');
+  }catch(e){delError('We couldn’t reach the server, so your account was not deleted. Please try again.');}
+  delBusy=false;go.textContent='Yes, delete my account';delSync();pw.focus();
+}
+
 /** The padlock message's "See plans": open the profile with the comparison showing. */
 function seePlans(){
   closeUpgrade();
@@ -7162,6 +7216,18 @@ initWatchlist();
   <div id="nt-alerts" style="display:none"></div>
 </div>
 <div id="nt-toasts"></div>
+<div id="del-modal" role="dialog" aria-modal="true" aria-labelledby="del-title" aria-describedby="del-desc" onclick="if(event.target===this)closeDelete()">
+  <div class="up-box">
+    <h3 id="del-title">Delete your account?</h3>
+    <p id="del-desc">This signs you out right now and deletes the account <b id="del-email"></b>.</p>
+    <ul class="del-list"><li id="del-keep"></li><li id="del-gone"></li></ul>
+    <label class="del-lbl" for="del-password">Enter your password to confirm</label>
+    <input type="password" class="del-input" id="del-password" autocomplete="current-password" oninput="delSync()" onkeydown="if(event.key==='Enter')confirmDelete()">
+    <div class="del-error" id="del-error" role="alert"></div>
+    <button type="button" class="btn btnp" id="del-cancel" onclick="closeDelete()">Keep my account</button>
+    <button type="button" class="btn btnd" id="del-go" onclick="confirmDelete()" disabled>Yes, delete my account</button>
+  </div>
+</div>
 <div id="up-modal" role="dialog" aria-modal="true" aria-labelledby="up-title" onclick="if(event.target===this)closeUpgrade()">
   <div class="up-box">
     <h3 id="up-title">Not in your plan</h3>

@@ -18,15 +18,19 @@ const PLANS = [
 const data = (over = {}) => ({ status: 'success', email: 'abheek@example.com', joined_at: Date.UTC(2026, 10, 5, 12) / 1000, admin: false,
   plan: { level: 2, name: 'Basic', price: 9.99 }, included: [INITIAL, MGT], plans: PLANS, upgrade_contact: null, ...over });
 
+const DELETE_IDS = ['del-modal', 'del-email', 'del-keep', 'del-gone', 'del-password', 'del-error', 'del-go', 'del-cancel', 'prof-delete'];
+
 /** The profile code running against a fake page. */
 function profile({ fetchImpl, signedOut = () => false } = {}) {
-  const page = new FakePage(['prof-body']), calls = [];
+  const page = new FakePage(['prof-body', ...DELETE_IDS]), calls = [], requests = [];
   const document = { ...page.document, activeElement: null };
-  const ctx = { document, API: '', console, signedOut, closeUpgrade: () => calls.push('closeUpgrade'), showPage: (n, b) => calls.push(['showPage', n, b && b.id]),
-    fetch: fetchImpl || (async () => ok(data())), encodeURIComponent, Math, Date, Intl };
+  const location = { href: '' };
+  const ctx = { document, location, API: '', console, signedOut, closeUpgrade: () => calls.push('closeUpgrade'), showPage: (n, b) => calls.push(['showPage', n, b && b.id]),
+    fetch: async (url, opts) => { requests.push({ url, opts }); return (fetchImpl || (async () => ok(data())))(url, opts); }, encodeURIComponent, Math, Date, Intl, JSON };
   vm.createContext(ctx);
   vm.runInContext(SHARED + '\n' + code, ctx);
-  return { ctx, page, calls, body: () => page.registry['prof-body'].innerHTML, run: s => vm.runInContext(s, ctx) };
+  const el = id => page.registry[id];
+  return { ctx, page, calls, requests, location, document, el, body: () => page.registry['prof-body'].innerHTML, run: s => vm.runInContext(s, ctx) };
 }
 
 (async () => {
@@ -147,6 +151,125 @@ function profile({ fetchImpl, signedOut = () => false } = {}) {
     assert.strictEqual(p.run('profilePlansOpen'), true);
     await p.ctx.loadProfile(); assert(!/prof-plans"[^>]* hidden>/.test(p.body()), 'and it is open when the data arrives');
     const none = profile(); none.run('seePlans()'); assert.deepStrictEqual(none.calls, ['closeUpgrade'], 'no tab, no error');
+  });
+
+  await t('the profile has a Delete account section that says how long they can change their mind, using the server\'s number of days', () => {
+    const ctx = profile().ctx;
+    const section = h => h.slice(h.indexOf('prof-danger'));
+    const normal = section(ctx.profileHtml(data({ grace_days: 30 }), false));
+    assert(normal.includes('Delete account') && normal.includes('id="prof-delete"') && normal.includes('onclick="openDelete()"') && normal.includes('Delete my account'));
+    assert(normal.includes('kept for 30 days') && normal.includes('sign in again within 30 days and choose Restore') && normal.includes('permanently deleted'));
+    assert(section(ctx.profileHtml(data({ grace_days: 14 }), false)).includes('kept for 14 days'));
+    assert(section(ctx.profileHtml(data(), false)).includes('kept for 30 days'), 'a missing number falls back to 30');
+    for (const d of [data({ admin: true, plan: { level: null, name: 'Administrator', price: null } }), data({ plan: { level: 6, name: 'Premier', price: 49.99 } })])
+      assert(ctx.profileHtml(d, true).includes('id="prof-delete"'), 'every account can delete itself (the server decides)');
+  });
+
+  await t('opening the box shows whose account it is and what will happen, with an empty password and the delete button off', () => {
+    const p = profile(); p.run('profileData = ' + JSON.stringify(data({ grace_days: 30 })));
+    p.el('del-password').value = 'left over'; p.el('del-error').textContent = 'old error';
+    const opener = { focus() { this.focused = true; } }; p.document.activeElement = opener;
+    let focused = false; p.el('del-password').focus = () => { focused = true; };
+    p.run('openDelete()');
+    assert(p.el('del-modal').classList.contains('open'));
+    assert.strictEqual(p.el('del-email').textContent, 'abheek@example.com');
+    assert(p.el('del-keep').textContent.includes('For 30 days you can change your mind') && p.el('del-keep').textContent.includes('choose Restore'));
+    assert(p.el('del-gone').textContent.includes('After 30 days') && p.el('del-gone').textContent.includes('permanently deleted'));
+    assert.strictEqual(p.el('del-password').value, ''); assert.strictEqual(p.el('del-error').textContent, '');
+    assert.strictEqual(p.el('del-go').disabled, true); assert(focused, 'the password box is focused');
+    p.run('closeDelete()'); assert(opener.focused, 'focus goes back to the button that opened it');
+    const none = profile(); none.run('openDelete()'); assert(!none.el('del-modal').classList.contains('open'), 'nothing to confirm until the profile has loaded');
+  });
+
+  await t('the account name is put in as text, never as markup', () => {
+    assert(/delEl\('del-email'\)\.textContent=profileData\.email/.test(code) && !/del-email[^;]*innerHTML/.test(code));
+    const p = profile(); p.run('profileData = ' + JSON.stringify(data({ email: '<img src=x onerror=alert(1)>@x.co' }))); p.run('openDelete()');
+    assert.strictEqual(p.el('del-email').textContent, '<img src=x onerror=alert(1)>@x.co');
+  });
+
+  await t('the delete button only works once a password is typed, and never while a delete is under way', () => {
+    const p = profile(); p.run('profileData = ' + JSON.stringify(data())); p.run('openDelete()');
+    assert.strictEqual(p.el('del-go').disabled, true);
+    p.el('del-password').value = 'x'; p.run('delSync()'); assert.strictEqual(p.el('del-go').disabled, false);
+    p.el('del-password').value = ''; p.run('delSync()'); assert.strictEqual(p.el('del-go').disabled, true);
+    p.el('del-password').value = 'x'; p.run('delBusy = true; delSync()'); assert.strictEqual(p.el('del-go').disabled, true);
+  });
+
+  await t('confirming sends the password to the server with the header that proves it came from the app, then goes to the sign-in page', async () => {
+    const p = profile({ fetchImpl: async () => ok({ status: 'success', deleted_at: 1, remove_at: 2, grace_days: 30 }) });
+    p.run('profileData = ' + JSON.stringify(data())); p.run('openDelete()');
+    await p.ctx.confirmDelete(); assert.strictEqual(p.requests.length, 0, 'no password, no request');
+    p.el('del-password').value = 'my secret';
+    await p.ctx.confirmDelete();
+    assert.strictEqual(p.requests.length, 1);
+    const { url, opts } = p.requests[0];
+    assert.strictEqual(url, '/api/profile/delete'); assert.strictEqual(opts.method, 'POST');
+    assert.strictEqual(opts.headers['X-Requested-With'], 'fetch'); assert.strictEqual(opts.headers['Content-Type'], 'application/json');
+    assert.deepStrictEqual(JSON.parse(opts.body), { password: 'my secret' });
+    assert.strictEqual(p.location.href, '/login?notice=deleted');
+    assert.strictEqual(p.el('del-password').value, '', 'the password is not left in the page');
+    assert.strictEqual(p.el('del-go').disabled, true, 'still busy while the page changes');
+    await p.ctx.confirmDelete(); assert.strictEqual(p.requests.length, 1, 'a second press does nothing');
+  });
+
+  await t('pressing it twice quickly sends one request', async () => {
+    let release; const gate = new Promise(r => { release = r; });
+    const p = profile({ fetchImpl: async () => { await gate; return ok({ status: 'success' }); } });
+    p.run('profileData = ' + JSON.stringify(data())); p.run('openDelete()'); p.el('del-password').value = 'pw';
+    const first = p.ctx.confirmDelete(), second = p.ctx.confirmDelete();
+    assert.strictEqual(p.el('del-go').textContent, 'Deleting…'); assert.strictEqual(p.requests.length, 1);
+    release(); await Promise.all([first, second]); assert.strictEqual(p.requests.length, 1);
+  });
+
+  await t('a refusal is shown in the box, nothing is deleted, and they can try again', async () => {
+    for (const reply of [ok({ status: 'error', message: 'That password isn\'t right.' }, 403), ok({ status: 'error', message: 'You are the only administrator.' }, 409)]) {
+      const p = profile({ fetchImpl: async () => reply });
+      p.run('profileData = ' + JSON.stringify(data())); p.run('openDelete()'); p.el('del-password').value = 'wrong';
+      let refocused = false; p.el('del-password').focus = () => { refocused = true; };
+      await p.ctx.confirmDelete();
+      assert.strictEqual(p.el('del-error').textContent, reply.json ? (await reply.json()).message : '');
+      assert.strictEqual(p.location.href, '', 'not signed out');
+      assert.strictEqual(p.el('del-go').textContent, 'Yes, delete my account'); assert.strictEqual(p.el('del-go').disabled, false);
+      assert(refocused, 'the cursor is back in the password box');
+      assert(p.el('del-modal').classList.contains('open'), 'the box stays open');
+    }
+  });
+
+  await t('an unreadable answer or a dead connection says the account was not deleted', async () => {
+    const garbled = profile({ fetchImpl: async () => ({ ok: false, status: 502, json: async () => { throw new Error('not json'); } }) });
+    garbled.run('profileData = ' + JSON.stringify(data())); garbled.run('openDelete()'); garbled.el('del-password').value = 'pw';
+    await garbled.ctx.confirmDelete();
+    assert(garbled.el('del-error').textContent.includes('your account was not deleted')); assert.strictEqual(garbled.location.href, '');
+    const offline = profile({ fetchImpl: async () => { throw new Error('Failed to fetch'); } });
+    offline.run('profileData = ' + JSON.stringify(data())); offline.run('openDelete()'); offline.el('del-password').value = 'pw';
+    await offline.ctx.confirmDelete();
+    assert(offline.el('del-error').textContent.includes('couldn’t reach the server') && offline.el('del-error').textContent.includes('not deleted'));
+    assert.strictEqual(offline.el('del-go').disabled, false);
+    const odd = profile({ fetchImpl: async () => ok({ status: 'error' }, 200) });                    // a 200 that is not a success is not a success
+    odd.run('profileData = ' + JSON.stringify(data())); odd.run('openDelete()'); odd.el('del-password').value = 'pw';
+    await odd.ctx.confirmDelete(); assert.strictEqual(odd.location.href, '');
+  });
+
+  await t('Cancel and Escape close the box and wipe the password, but not while a delete is under way', () => {
+    const p = profile(); p.run('profileData = ' + JSON.stringify(data())); p.run('openDelete()');
+    p.el('del-password').value = 'typed'; p.el('del-error').textContent = 'x';
+    p.run('closeDelete()');
+    assert(!p.el('del-modal').classList.contains('open')); assert.strictEqual(p.el('del-password').value, ''); assert.strictEqual(p.el('del-error').textContent, '');
+    p.run('openDelete()'); p.run('delBusy = true'); p.run('closeDelete()');
+    assert(p.el('del-modal').classList.contains('open'), 'it cannot be dismissed half-way through');
+    assert(/Escape'\)\{closeUpgrade\(\);if\(typeof closeDelete==='function'\)closeDelete\(\);\}/.test(html), 'Escape closes it, and the plan code works without it');
+    assert(html.includes('<div id="del-modal" role="dialog" aria-modal="true" aria-labelledby="del-title" aria-describedby="del-desc" onclick="if(event.target===this)closeDelete()">'), 'a click outside closes it');
+  });
+
+  await t('the box is built for the job: a password field, Keep as the main button and Delete as the red one that starts off', () => {
+    const box = html.slice(html.indexOf('<div id="del-modal"'), html.indexOf('<div id="up-modal"'));
+    assert(/<input type="password" class="del-input" id="del-password" autocomplete="current-password"/.test(box));
+    assert(/class="btn btnp" id="del-cancel" onclick="closeDelete\(\)">Keep my account</.test(box));
+    assert(/class="btn btnd" id="del-go" onclick="confirmDelete\(\)" disabled>Yes, delete my account</.test(box));
+    assert(box.indexOf('id="del-cancel"') > 0 && box.indexOf('id="del-cancel"') < box.indexOf('id="del-go"'), 'the safe choice comes first');
+    assert(/onkeydown="if\(event\.key==='Enter'\)confirmDelete\(\)"/.test(box) && /oninput="delSync\(\)"/.test(box));
+    assert(/role="alert"/.test(box.slice(box.indexOf('id="del-error"') - 40, box.indexOf('id="del-error"') + 40)));
+    assert(/\.del-input\{[^}]*font-size:16px/.test(html), '16px so a phone does not zoom in');
   });
 
   await t('the page, the tab and the message are wired up: tab, page, loader and See plans button exist, and showPage loads the profile', () => {

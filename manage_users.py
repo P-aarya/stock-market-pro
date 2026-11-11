@@ -10,6 +10,7 @@ Account administration. Run it from the project folder with the virtual environm
     python manage_users.py claim-legacy EMAIL       give the portfolio, transactions and price alerts saved before accounts existed to EMAIL
     python manage_users.py set-password EMAIL       reset someone's password (there is no "forgot password" email)
     python manage_users.py set-plan EMAIL PLAN      move an account to a plan: 2 or Basic, 3 or "AI Stock Finder", 4, 5 or Deluxe, 6 or Premier
+    python manage_users.py purge-deleted            permanently remove accounts that people deleted more than 30 days ago (the app also does this by itself)
     python manage_users.py list-users [--pending]
     python manage_users.py delete-user EMAIL --yes  delete an account together with its holdings, transactions, price alerts and watchlist
 
@@ -22,6 +23,7 @@ import sys
 
 import auth
 import tiers
+from account_data import OPTIONAL_PERSONAL_TABLES, PERSONAL_TABLES, _has_table, delete_account, owned_tables, purge_expired  # noqa: F401  (they live in account_data.py; the app shares them)
 
 DEFAULT_TIER = tiers.account_tier()      # the plan every account is on until it is moved
 
@@ -36,6 +38,7 @@ USERS_DDL = f"""CREATE TABLE IF NOT EXISTS users (
   last_login_at TIMESTAMP NULL DEFAULT NULL,
   reviewed_at TIMESTAMP NULL DEFAULT NULL,
   reviewed_by INT NULL,
+  deleted_at TIMESTAMP NULL DEFAULT NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uq_users_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""
@@ -48,9 +51,6 @@ WATCHLIST_DDL = """CREATE TABLE IF NOT EXISTS watchlist (
   PRIMARY KEY (user_id, ticker)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"""
 
-PERSONAL_TABLES = ("portfolio", "transactions")      # tables whose rows belong to one account
-OPTIONAL_PERSONAL_TABLES = ("price_alerts",)         # the same, but the app creates them on first use, so they may not exist yet
-
 # Columns added to a users table made before approval existed. Accounts that already exist were let in when they
 # registered, so they are filled in as approved; the default for NEW rows is then switched to pending.
 USERS_COLUMNS = (
@@ -59,23 +59,13 @@ USERS_COLUMNS = (
     ("reviewed_at", "TIMESTAMP NULL DEFAULT NULL"),
     ("reviewed_by", "INT NULL"),
     ("tier", f"TINYINT NOT NULL DEFAULT {DEFAULT_TIER}"),      # the subscription plan (tiers.py); existing accounts start on the lowest account plan
+    ("deleted_at", "TIMESTAMP NULL DEFAULT NULL"),             # when the person deleted their own account (it is removed for good after the grace period)
 )
 
 
 def _has_column(cur, table, column):
     cur.execute("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = %s AND column_name = %s", (table, column))
     return bool(cur.fetchone()[0])
-
-
-def _has_table(cur, table):
-    cur.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = %s", (table,))
-    row = cur.fetchone()
-    return bool(row and row[0])
-
-
-def owned_tables(cur):
-    """Every personal table that exists right now, required ones first."""
-    return [*PERSONAL_TABLES, *(t for t in OPTIONAL_PERSONAL_TABLES if _has_table(cur, t))]
 
 
 def add_user_id_column(cur, table):
@@ -105,7 +95,7 @@ def migrate(conn):
     cur.execute(WATCHLIST_DDL)
     done = ["users table ready", "watchlist table ready"]
     added = add_users_columns(cur)
-    notes = (["existing accounts are approved"] if "status" in added else []) + ([f"existing accounts are on the {tiers.TIERS[DEFAULT_TIER].name} plan"] if "tier" in added else [])
+    notes = (["existing accounts are approved"] if "status" in added else []) + ([f"existing accounts are on the {tiers.TIERS[DEFAULT_TIER].name} plan"] if "tier" in added else []) + (["people can now delete and restore their own account"] if "deleted_at" in added else [])
     done.append("users: added " + ", ".join(added) + (f" ({'; '.join(notes)})" if notes else "") if added else "users: approval and plan columns already there")
     for table in PERSONAL_TABLES:
         done.append(f"{table}: added user_id column" if add_user_id_column(cur, table) else f"{table}: user_id column already there")
@@ -129,19 +119,6 @@ def claim_legacy(conn, user_id):
     return claimed
 
 
-def delete_account(conn, user_id):
-    """Remove an account and everything it owns, all or nothing."""
-    cur = conn.cursor()
-    try:
-        for table in (*owned_tables(cur), "watchlist"):
-            cur.execute(f"DELETE FROM {table} WHERE user_id = %s", (user_id,))
-        cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-
-
 def _connect():
     from screener import get_db_connection
     return get_db_connection()
@@ -158,7 +135,7 @@ def _user_id(conn, email):
 
 def set_status(conn, user_id, status):
     cur = conn.cursor()
-    cur.execute("UPDATE users SET status = %s, reviewed_at = NOW() WHERE id = %s", (status, user_id))
+    cur.execute("UPDATE users SET status = %s, reviewed_at = NOW(), deleted_at = NULL WHERE id = %s", (status, user_id))     # approving a deleted account restores it
     conn.commit()
 
 
@@ -216,6 +193,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="Aymetrix account administration")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("migrate")
+    sub.add_parser("purge-deleted")
     lu = sub.add_parser("list-users")
     lu.add_argument("--pending", action="store_true", help="only accounts waiting for approval")
     sp = sub.add_parser("set-plan")
@@ -254,11 +232,16 @@ def main(argv=None):
             print("✓ Password changed. Any browser that is signed in stays signed in until its session expires.")
         elif args.cmd == "list-users":
             cur = conn.cursor()
-            cur.execute("SELECT id, email, status, is_admin, tier, created_at, last_login_at FROM users" + (" WHERE status = 'pending'" if args.pending else "") + " ORDER BY id")
-            for uid, email, status, admin, tier, created, last in cur.fetchall():
+            cur.execute("SELECT id, email, status, is_admin, tier, created_at, last_login_at, deleted_at FROM users" + (" WHERE status = 'pending'" if args.pending else "") + " ORDER BY id")
+            for uid, email, status, admin, tier, created, last, deleted in cur.fetchall():
                 role = "admin" if admin else ""
                 seen = f"last sign-in {last:%Y-%m-%d}" if last else "never signed in"
+                if status == "deleted" and deleted:
+                    seen = f"deleted {deleted:%Y-%m-%d}, removed for good after {auth.DELETION_GRACE_DAYS} days"
                 print(f"#{uid:<4} {email:<38} {status:<9} {role:<6} {tiers.resolve(tier).name:<15} created {created:%Y-%m-%d}   {seen}")
+        elif args.cmd == "purge-deleted":
+            removed = purge_expired(conn, int(auth.now()) - auth.DELETION_GRACE_DAYS * 86400)
+            print(f"✓ Permanently removed {removed} account{'s' if removed != 1 else ''} deleted more than {auth.DELETION_GRACE_DAYS} days ago")
         elif args.cmd == "set-plan":
             plan = parse_plan(" ".join(args.plan))
             set_plan(conn, _user_id(conn, args.email), plan)

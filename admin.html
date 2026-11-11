@@ -67,6 +67,7 @@ h1{font-size:22px;letter-spacing:-.4px}
 .b-pending{color:var(--yellow);background:rgba(255,200,0,.1);border-color:rgba(255,200,0,.25)}
 .b-approved{color:var(--green);background:rgba(0,230,118,.1);border-color:rgba(0,230,118,.25)}
 .b-blocked{color:var(--red);background:rgba(255,68,68,.1);border-color:rgba(255,68,68,.25)}
+.b-deleted{color:var(--t3);background:rgba(138,155,176,.1);border-color:rgba(138,155,176,.25)}
 .b-admin{color:var(--cyan);background:rgba(0,212,255,.1);border-color:rgba(0,212,255,.25);margin-left:6px;vertical-align:1px}
 
 .btn{border:1px solid var(--b2);background:var(--bg3);color:var(--t1);font-size:12px;font-weight:800;padding:8px 14px;border-radius:7px;min-height:36px}
@@ -134,8 +135,8 @@ code{font-family:var(--mono);background:var(--bg3);border:1px solid var(--b1);bo
 <div class="toast" id="toast" role="status"></div>
 
 <script>
-const FILTERS = [['pending', 'Pending'], ['approved', 'Approved'], ['blocked', 'Blocked'], ['all', 'All']];
-const state = { plans: {}, users: [], counts: { pending: 0, approved: 0, blocked: 0, total: 0 }, you: null, filter: null, query: '', busy: new Set(), loaded: false };
+const FILTERS = [['pending', 'Pending'], ['approved', 'Approved'], ['blocked', 'Blocked'], ['deleted', 'Deleted'], ['all', 'All']];
+const state = { plans: {}, users: [], counts: { pending: 0, approved: 0, blocked: 0, deleted: 0, total: 0 }, graceDays: 30, you: null, filter: null, query: '', busy: new Set(), loaded: false };
 
 function escapeHtml(str){
   return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -150,6 +151,7 @@ function ago(seconds, now = Date.now()){
   for(const [name, size] of units){ const n = Math.floor(s / size); if(n >= 1) return `${n} ${name}${n === 1 ? '' : 's'} ago`; }
 }
 function exact(seconds){ return seconds ? new Date(seconds * 1000).toLocaleString() : ''; }
+function day(seconds){ return new Date(seconds * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
 
 function visibleUsers(){
   const q = state.query.trim().toLowerCase();
@@ -157,6 +159,9 @@ function visibleUsers(){
 }
 
 function actionsFor(u){
+  if(u.status === 'deleted'){          // deleted by its owner: nothing for an administrator to do, it is removed for good by itself
+    return u.deleted_at ? `<span class="sub" title="Deleted ${escapeHtml(day(u.deleted_at))}. The owner can restore it by signing in until then.">Removed for good ${escapeHtml(day(u.deleted_at + state.graceDays * 86400))}</span>` : '';
+  }
   if(u.is_admin) return '<span class="sub">Administrator</span>';
   const b = (act, cls, text) => `<button class="btn ${cls}" type="button" data-id="${u.id}" data-act="${act}"${state.busy.has(u.id) ? ' disabled' : ''}>${text}</button>`;
   if(u.status === 'pending') return b('approved', 'go', 'Approve') + b('blocked', 'no', 'Decline');
@@ -184,7 +189,7 @@ function rowHtml(u){
 
 function emptyMessage(){
   if(state.query.trim()) return 'No accounts match that search.';
-  return { pending: 'No one is waiting. You are all caught up. ✓', approved: 'No approved accounts yet.', blocked: 'No blocked accounts.', all: 'No accounts yet.' }[state.filter];
+  return { pending: 'No one is waiting. You are all caught up. ✓', approved: 'No approved accounts yet.', blocked: 'No blocked accounts.', deleted: 'No deleted accounts.', all: 'No accounts yet.' }[state.filter];
 }
 
 function render(){
@@ -220,7 +225,7 @@ async function call(path, options = {}){
 async function load(quiet){
   try {
     const d = await call('/api/admin/users');
-    state.users = d.users; state.counts = d.counts; state.you = d.you; state.plans = d.plans || {};
+    state.users = d.users; state.counts = d.counts; state.you = d.you; state.plans = d.plans || {}; state.graceDays = d.grace_days || 30;
     if(!state.loaded){ state.filter = d.counts.pending ? 'pending' : 'all'; state.loaded = true; }
     render();
   } catch(e){
