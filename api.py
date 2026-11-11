@@ -4,7 +4,7 @@
 from fastapi import Depends, FastAPI, Body, HTTPException, Request
 from starlette.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 import mysql.connector
 import yfinance as yf
 import pandas as pd
@@ -15,7 +15,10 @@ import hmac
 import os
 import json
 import secrets
+import threading
 import time
+import re
+from pydantic import BaseModel, Field
 import urllib.parse
 from collections import defaultdict, deque
 from dotenv import load_dotenv
@@ -64,7 +67,7 @@ _APP_ASSETS = {
     "/favicon.ico": ("favicon.png", "image/png"),
     "/logo.svg": ("logo.svg", "image/svg+xml"),
 }
-_OPEN_PATHS = {"/login", "/register", "/logout", "/forgot-password", "/reset-password", "/health", "/api/auth/status", "/favicon.ico"} | set(_APP_ASSETS)
+_OPEN_PATHS = {"/login", "/register", "/logout", "/forgot-password", "/reset-password", "/confirm-email", "/health", "/api/auth/status", "/favicon.ico"} | set(_APP_ASSETS)
 
 
 _SETUP_HINT = "The accounts tables need a database update. Run: python manage_users.py migrate"
@@ -609,6 +612,35 @@ def stock_directory():
             "brands": _SEARCH_ALIASES}
 
 
+_QUOTE_TICKER = re.compile(r"^\^?[A-Z0-9][A-Z0-9.\-=]{0,14}$")
+MAX_QUOTES = 100
+
+
+@app.get("/api/stocks/quotes")
+def stock_quotes(tickers: str = ""):
+    """Name, sector, price and today's change for several stocks in ONE quick database read: the Watchlist table
+    and Home's Top 5 Saved Stocks. (Asking /api/stocks/{ticker} for each one, one after another, was slow.)
+    ?tickers=AAPL,MSFT,... → {"quotes": [...]}, in the order asked; a ticker we have no data for is left out."""
+    wanted = []
+    for t in str(tickers or "").split(","):
+        t = t.strip().upper()
+        if t and _QUOTE_TICKER.match(t) and t not in wanted:
+            wanted.append(t)
+    wanted = wanted[:MAX_QUOTES]
+    if not wanted:
+        return {"quotes": []}
+    try:
+        rows = query("SELECT ticker, company_name, sector, current_price, price_change_pct FROM stocks_live WHERE ticker IN ("
+                     + ", ".join(["%s"] * len(wanted)) + ")", wanted) or []
+    except Exception:
+        log.exception("Reading watchlist prices failed")
+        return JSONResponse({"error": "Prices couldn't be loaded just now."}, status_code=503)
+    found = {str(r.get("ticker") or "").upper(): r for r in rows}
+    return {"quotes": [{"ticker": t, "company_name": found[t].get("company_name"), "sector": found[t].get("sector"),
+                        "current_price": found[t].get("current_price"), "price_change_pct": found[t].get("price_change_pct")}
+                       for t in wanted if t in found]}
+
+
 @app.get("/api/stocks/search")
 def search_stocks(q: str = "", limit: int = 10):
     """Search stocks by ticker or company name (one letter is enough), answered from the in-memory stock list."""
@@ -700,6 +732,156 @@ def get_intraday(ticker: str):
         }
     except Exception as e:
         return {"data":[],"market_status":"error","message":str(e)}
+
+# ── Analyst ratings for the Buy vs Sell bar (the card under the price chart) ──
+_BUYSELL_TTL = 600
+_buysell_cache = {}                     # ticker -> (time, result)
+_buysell_lock = threading.Lock()
+
+
+def _analyst_counts(t):
+    """How many analysts rate the stock Strong buy … Strong sell this month (Yahoo), or None."""
+    try:
+        rec = t.recommendations
+        if rec is None or getattr(rec, "empty", True):
+            return None
+        row = rec.iloc[0]                                  # the newest period ("0m" = this month)
+        keys = (("strong_buy", "strongBuy"), ("buy", "buy"), ("hold", "hold"), ("sell", "sell"), ("strong_sell", "strongSell"))
+        counts = {k: int(row.get(col, 0) or 0) for k, col in keys}
+        total = sum(counts.values())
+        return {**counts, "total": total} if total else None
+    except Exception:                                      # noqa: BLE001 - shown as "not available"
+        return None
+
+
+@app.get("/api/stocks/{ticker}/buy-sell")
+def get_buy_sell(ticker: str):
+    """How many analysts rate the stock buy / hold / sell (the page combines this with the 52-week range). Kept for 10
+    minutes per stock."""
+    key = ticker.upper().strip()[:20]
+    now = time.time()
+    with _buysell_lock:
+        hit = _buysell_cache.get(key)
+        if hit and now - hit[0] < _BUYSELL_TTL:
+            return hit[1]
+    t = yf.Ticker(key)
+    result = {"ticker": key, "analysts": _analyst_counts(t)}
+    with _buysell_lock:
+        if len(_buysell_cache) > 500:
+            _buysell_cache.clear()
+        _buysell_cache[key] = (now, result)
+    return result
+
+
+# ── Insider deals and SEC filings (stock popup) ──
+import company_info  # noqa: E402
+
+
+@app.get("/api/stocks/{ticker}/insiders")
+def get_insider_deals(ticker: str):
+    """Shares bought or sold by the company's own people in the last 12 months (Yahoo, from SEC Form 4)."""
+    return company_info.insider_deals(ticker)
+
+
+@app.get("/api/stocks/{ticker}/filings")
+def get_filings(ticker: str):
+    """Annual reports, shareholder meeting notices and announcements from the SEC (cached for 6 hours)."""
+    return company_info.filings(ticker)
+
+
+_SAFE_NAME = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+@app.get("/api/stocks/{ticker}/filings/download")
+def download_filing(ticker: str, accession: str = ""):
+    """Download one of the filings listed for this stock (only those, so this can't fetch anything else)."""
+    if not re.fullmatch(r"\d{10}-\d{2}-\d{6}", accession or ""):
+        return agent_error(400, "That isn't a filing number.")
+    entry = company_info.find_document(ticker, accession)
+    if not entry:
+        return agent_error(404, "That filing isn't in this company's list.")
+    try:
+        upstream = company_info.open_document(entry["url"])
+    except Exception:
+        log.exception("Downloading a filing from the SEC failed")
+        return agent_error(502, "The SEC site didn't send the file just now. Please try again, or use View.")
+    ext = entry["url"].rsplit(".", 1)[-1].lower() if "." in entry["url"].rsplit("/", 1)[-1] else "htm"
+    name = _SAFE_NAME.sub("-", f"{ticker.upper()}-{entry['form']}-{entry['date']}") + "." + _SAFE_NAME.sub("", ext)[:5]
+    kind = upstream.headers.get("Content-Type") or "application/octet-stream"
+
+    def chunks():
+        try:
+            for part in upstream.iter_content(64 * 1024):
+                if part:
+                    yield part
+        finally:
+            upstream.close()
+    return StreamingResponse(chunks(), media_type=kind, headers={"Content-Disposition": f'attachment; filename="{name}"',
+                                                                 "X-Content-Type-Options": "nosniff"})
+
+
+# ── Learn tab ──
+import learn  # noqa: E402
+
+
+def _learn_call(fn):
+    try:
+        return fn()
+    except learn.LearnError as e:
+        return agent_error(e.status, e.message)
+    except Exception:
+        log.exception("Learn tab action failed")
+        return agent_error(500, "Something went wrong. Please try again.")
+
+
+class LearnItemBody(BaseModel):
+    kind: str = Field(default="", max_length=10)
+    title: str = Field(default="", max_length=1000)
+    url: str = Field(default="", max_length=1000)
+    source: str = Field(default="", max_length=500)
+    body: str = Field(default="", max_length=2000)
+
+
+class LearnMoveBody(BaseModel):
+    direction: str = Field(max_length=10)
+
+
+@app.get("/api/learn")
+def get_learn():
+    return _learn_call(lambda: {"status": "success", **learn.listing()})
+
+
+@app.post("/api/admin/learn")
+def admin_add_learn(body: LearnItemBody, admin_id: int = Depends(require_admin_action)):
+    def work():
+        item = learn.add_item(body.kind, body.title, body.url, body.source, body=body.body)
+        auth.log_event("learn_changed", None, admin_id, f"Added {item['kind']}: {item['title'][:80]}")
+        return {"status": "success", "item": item, "message": "Added to the Learn tab."}
+    return _learn_call(work)
+
+
+@app.put("/api/admin/learn/{item_id}")
+def admin_edit_learn(item_id: int, body: LearnItemBody, admin_id: int = Depends(require_admin_action)):
+    def work():
+        item = learn.edit_item(item_id, body.title, body.url, body.source, body=body.body)
+        auth.log_event("learn_changed", None, admin_id, f"Edited {item['kind']}: {item['title'][:80]}")
+        return {"status": "success", "item": item, "message": "Saved."}
+    return _learn_call(work)
+
+
+@app.delete("/api/admin/learn/{item_id}")
+def admin_delete_learn(item_id: int, admin_id: int = Depends(require_admin_action)):
+    def work():
+        row = learn.remove_item(item_id)
+        auth.log_event("learn_changed", None, admin_id, f"Removed {row['kind']}: {str(row['title'])[:80]}")
+        return {"status": "success", "message": "Removed from the Learn tab."}
+    return _learn_call(work)
+
+
+@app.post("/api/admin/learn/{item_id}/move")
+def admin_move_learn(item_id: int, body: LearnMoveBody, admin_id: int = Depends(require_admin_action)):
+    return _learn_call(lambda: {"status": "success", **learn.move_item(item_id, body.direction)})
+
 
 # ======================================================
 # MARKET
@@ -1099,155 +1281,262 @@ def get_currencies():
             result.append({"pair": name, "ticker": ticker, "rate": None, "change_pct": None})
     return result
 
+# ── Commodity prices (Commodities tab and the Home tab) ──
+# About 100 of them. Asking Yahoo one by one took 30 seconds to over a minute per page view, so now:
+#   - all of them are fetched in ONE batch request (a few seconds), any it misses are asked for separately, in parallel;
+#   - the answer is kept for COMMODITY_TTL seconds, so everyone opening the page meanwhile gets it at once;
+#   - once it is older than that, people still get the kept prices at once while new ones load in the background;
+#   - the first fetch starts when the server starts, so the first visitor doesn't wait for it either.
+COMMODITIES = [
+    # -- PRECIOUS METALS --
+    {"ticker": "GC=F",  "name": "Gold",              "category": "precious_metals"},
+    {"ticker": "SI=F",  "name": "Silver",             "category": "precious_metals"},
+    {"ticker": "PL=F",  "name": "Platinum",           "category": "precious_metals"},
+    {"ticker": "PA=F",  "name": "Palladium",          "category": "precious_metals"},
+    {"ticker": "MGC=F", "name": "Micro Gold",         "category": "precious_metals"},
+    {"ticker": "SIL=F", "name": "Micro Silver",       "category": "precious_metals"},
+    # -- INDUSTRIAL METALS --
+    {"ticker": "HG=F",  "name": "Copper",             "category": "metals"},
+    {"ticker": "ALI=F", "name": "Aluminium",          "category": "metals"},
+    {"ticker": "ZN=F",  "name": "Zinc",               "category": "metals"},
+    {"ticker": "PB=F",  "name": "Lead",               "category": "metals"},
+    {"ticker": "NI=F",  "name": "Nickel",             "category": "metals"},
+    {"ticker": "TIN=F", "name": "Tin",                "category": "metals"},
+    {"ticker": "STEEL", "name": "Steel",              "category": "metals"},
+    {"ticker": "IRN=F", "name": "Iron Ore",           "category": "metals"},
+    # -- ENERGY --
+    {"ticker": "CL=F",  "name": "Crude Oil (WTI)",    "category": "energy"},
+    {"ticker": "BZ=F",  "name": "Brent Crude",        "category": "energy"},
+    {"ticker": "NG=F",  "name": "Natural Gas",        "category": "energy"},
+    {"ticker": "RB=F",  "name": "Gasoline (RBOB)",    "category": "energy"},
+    {"ticker": "HO=F",  "name": "Heating Oil",        "category": "energy"},
+    {"ticker": "QM=F",  "name": "E-mini Crude Oil",   "category": "energy"},
+    {"ticker": "NG=F",  "name": "Henry Hub Gas",      "category": "energy"},
+    {"ticker": "TTF=F", "name": "EU Natural Gas",     "category": "energy"},
+    {"ticker": "XRB=F", "name": "RBOB Gasoline",      "category": "energy"},
+    # -- AGRICULTURE  GRAINS --
+    {"ticker": "ZC=F",  "name": "Corn",               "category": "agriculture"},
+    {"ticker": "ZW=F",  "name": "Wheat",              "category": "agriculture"},
+    {"ticker": "ZS=F",  "name": "Soybeans",           "category": "agriculture"},
+    {"ticker": "ZM=F",  "name": "Soybean Meal",       "category": "agriculture"},
+    {"ticker": "ZL=F",  "name": "Soybean Oil",        "category": "agriculture"},
+    {"ticker": "ZR=F",  "name": "Rough Rice",         "category": "agriculture"},
+    {"ticker": "ZO=F",  "name": "Oats",               "category": "agriculture"},
+    {"ticker": "KE=F",  "name": "Hard Red Wheat",     "category": "agriculture"},
+    {"ticker": "MWE=F", "name": "Spring Wheat",       "category": "agriculture"},
+    # -- AGRICULTURE  SOFT COMMODITIES --
+    {"ticker": "KC=F",  "name": "Coffee (Arabica)",   "category": "softs"},
+    {"ticker": "SB=F",  "name": "Sugar No. 11",       "category": "softs"},
+    {"ticker": "CT=F",  "name": "Cotton",             "category": "softs"},
+    {"ticker": "CC=F",  "name": "Cocoa",              "category": "softs"},
+    {"ticker": "OJ=F",  "name": "Orange Juice",       "category": "softs"},
+    {"ticker": "LBS=F", "name": "Lumber",             "category": "softs"},
+    {"ticker": "RC=F",  "name": "Coffee (Robusta)",   "category": "softs"},
+    {"ticker": "RS=F",  "name": "Canola",             "category": "softs"},
+    # -- LIVESTOCK --
+    {"ticker": "LE=F",  "name": "Live Cattle",        "category": "livestock"},
+    {"ticker": "GF=F",  "name": "Feeder Cattle",      "category": "livestock"},
+    {"ticker": "HE=F",  "name": "Lean Hogs",          "category": "livestock"},
+    {"ticker": "DA=F",  "name": "Class III Milk",     "category": "livestock"},
+    # -- CRYPTO --
+    {"ticker": "BTC=F", "name": "Bitcoin Futures",    "category": "crypto"},
+    {"ticker": "ETH=F", "name": "Ethereum Futures",   "category": "crypto"},
+    {"ticker": "MBT=F", "name": "Micro Bitcoin",      "category": "crypto"},
+    {"ticker": "MET=F", "name": "Micro Ether",        "category": "crypto"},
+    # -- ENERGY  CLEAN/RENEWABLES (ETF proxies) --
+    {"ticker": "UNG",   "name": "Natural Gas ETF",    "category": "clean_energy"},
+    {"ticker": "URA",   "name": "Uranium ETF",        "category": "clean_energy"},
+    {"ticker": "ICLN",  "name": "Clean Energy ETF",   "category": "clean_energy"},
+    {"ticker": "FSLR",  "name": "Solar (First Solar)","category": "clean_energy"},
+    {"ticker": "PLUG",  "name": "Hydrogen (Plug Power)","category": "clean_energy"},
+    {"ticker": "LIT",   "name": "Lithium ETF",        "category": "clean_energy"},
+    {"ticker": "REMX",  "name": "Rare Earth ETF",     "category": "clean_energy"},
+    # -- INDICES (commodity related) --
+    {"ticker": "DJP",   "name": "Bloomberg Commodity","category": "indices"},
+    {"ticker": "GSG",   "name": "S&P GSCI Commodity", "category": "indices"},
+    {"ticker": "PDBC",  "name": "Commodity Index ETF","category": "indices"},
+    {"ticker": "DBC",   "name": "DB Commodity ETF",   "category": "indices"},
+    {"ticker": "COMT",  "name": "iShares Commodity",  "category": "indices"},
+    # -- AGRICULTURE  FERTILIZERS --
+    {"ticker": "MOS",   "name": "Mosaic (Fertilizer)","category": "agriculture"},
+    {"ticker": "NTR",   "name": "Nutrien (Potash)",   "category": "agriculture"},
+    {"ticker": "CF",    "name": "CF Industries (N)",  "category": "agriculture"},
+    {"ticker": "IPI",   "name": "Intrepid Potash",    "category": "agriculture"},
+    # -- WATER --
+    {"ticker": "PHO",   "name": "Water ETF",          "category": "water"},
+    {"ticker": "AWK",   "name": "American Water Works","category": "water"},
+    {"ticker": "XYL",   "name": "Xylem (Water Tech)", "category": "water"},
+    {"ticker": "WTRG",  "name": "Essential Utilities","category": "water"},
+    {"ticker": "WM",    "name": "Waste Management",   "category": "water"},
+    # -- TIMBER & PAPER --
+    {"ticker": "LBS=F", "name": "Lumber Futures",     "category": "timber"},
+    {"ticker": "WOOD",  "name": "Timber ETF",         "category": "timber"},
+    {"ticker": "PCH",   "name": "PotlatchDeltic",     "category": "timber"},
+    {"ticker": "RYN",   "name": "Rayonier (Timber)",  "category": "timber"},
+    {"ticker": "WY",    "name": "Weyerhaeuser",        "category": "timber"},
+    # -- SHIPPING & FREIGHT --
+    {"ticker": "BDRY",  "name": "Dry Bulk Shipping",  "category": "shipping"},
+    {"ticker": "ZIM",   "name": "ZIM Shipping",        "category": "shipping"},
+    {"ticker": "SBLK",  "name": "Star Bulk Carriers", "category": "shipping"},
+    {"ticker": "GOGL",  "name": "Golden Ocean Group", "category": "shipping"},
+    {"ticker": "DHT",   "name": "DHT Holdings",        "category": "shipping"},
+    # -- CARBON & SUSTAINABILITY --
+    {"ticker": "KRBN",  "name": "Carbon Credits ETF", "category": "carbon"},
+    {"ticker": "KCCA",  "name": "California Carbon",  "category": "carbon"},
+    {"ticker": "NETZ",  "name": "Net Zero ETF",        "category": "carbon"},
+    {"ticker": "SMOG",  "name": "Clean Cars ETF",      "category": "carbon"},
+    # -- PHYSICAL AI & ROBOTICS --
+    {"ticker": "BOTZ",  "name": "Robotics & AI ETF",  "category": "physical_ai"},
+    {"ticker": "ROBO",  "name": "Robo Global ETF",    "category": "physical_ai"},
+    {"ticker": "IRBO",  "name": "iShares Robotics",   "category": "physical_ai"},
+    {"ticker": "ARKQ",  "name": "ARK Autonomous ETF", "category": "physical_ai"},
+    {"ticker": "ISRG",  "name": "Intuitive Surgical", "category": "physical_ai"},
+    {"ticker": "ABB",   "name": "ABB Robotics",        "category": "physical_ai"},
+    {"ticker": "TER",   "name": "Teradyne (Robots)",  "category": "physical_ai"},
+    {"ticker": "CGNX",  "name": "Cognex (Machine Vision)","category": "physical_ai"},
+    # -- FOOD & BEVERAGE --
+    {"ticker": "CORN",  "name": "Corn ETF",            "category": "food"},
+    {"ticker": "WEAT",  "name": "Wheat ETF",           "category": "food"},
+    {"ticker": "SOYB",  "name": "Soybean ETF",         "category": "food"},
+    {"ticker": "CANE",  "name": "Sugar ETF",           "category": "food"},
+    {"ticker": "JO",    "name": "Coffee ETF",          "category": "food"},
+    {"ticker": "NIB",   "name": "Cocoa ETF",           "category": "food"},
+    {"ticker": "BAL",   "name": "Cotton ETF",          "category": "food"},
+]
+COMMODITY_TTL = 120                  # seconds the prices are kept before a background refresh
+COMMODITY_RETRY = 30                 # after a failed fetch, try again this soon
+_com_cache = {"data": None, "at": 0.0, "ok": False}
+_com_lock = threading.Lock()          # guards _com_cache and _com_refreshing
+_com_fetch_lock = threading.Lock()    # only one fetch from Yahoo at a time
+_com_refreshing = [False]
+
+
+def _com_row(com, closes):
+    """One commodity as the page expects it, from its recent daily closing prices (oldest first)."""
+    closes = [float(x) for x in closes if x is not None and x == x]       # drop missing values (NaN)
+    if not closes:
+        return None
+    latest = closes[-1]
+    prev = closes[-2] if len(closes) > 1 else latest
+    change = latest - prev
+    return {"ticker": com["ticker"], "name": com["name"], "category": com["category"], "price": round(latest, 2),
+            "change": round(change, 2), "change_pct": round(change / prev * 100, 2) if prev > 0 else 0,
+            "updated": datetime.now().strftime("%H:%M")}
+
+
+def _com_empty(com):
+    return {"ticker": com["ticker"], "name": com["name"], "category": com["category"], "price": None, "change": None,
+            "change_pct": None, "updated": "--"}
+
+
+def _com_closes_from_batch(df, ticker):
+    """The Close column for one ticker out of a yf.download() table, whichever way round its columns are."""
+    try:
+        cols = df.columns
+        if getattr(cols, "nlevels", 1) < 2:
+            return list(df["Close"]) if "Close" in cols else []
+        if ticker in cols.get_level_values(0):
+            return list(df[ticker]["Close"])
+        if ticker in cols.get_level_values(1):
+            return list(df.xs(ticker, axis=1, level=1)["Close"])
+    except Exception:                                           # noqa: BLE001 - treated as missing, asked for separately
+        pass
+    return []
+
+
+def _com_one(com):
+    """The old way, for a ticker the batch didn't return."""
+    try:
+        hist = yf.Ticker(com["ticker"]).history(period="5d")
+        if hist is not None and not hist.empty:
+            return _com_row(com, list(hist["Close"]))
+    except Exception:                                           # noqa: BLE001
+        pass
+    return None
+
+
+def _fetch_commodities():
+    """Every commodity, in the listed order. Never raises: a price that can't be had is None."""
+    from concurrent.futures import ThreadPoolExecutor
+    tickers = list(dict.fromkeys(c["ticker"] for c in COMMODITIES))
+    rows = {}
+    try:
+        df = yf.download(tickers, period="5d", interval="1d", group_by="ticker", threads=True, progress=False, auto_adjust=False)
+        if df is not None and not df.empty:
+            for com in COMMODITIES:
+                if com["ticker"] not in rows:
+                    row = _com_row(com, _com_closes_from_batch(df, com["ticker"]))
+                    if row:
+                        rows[com["ticker"]] = row
+    except Exception:                                           # noqa: BLE001 - fall back to asking one by one
+        log.exception("Batch download of commodity prices failed")
+    missing = [c for c in {c["ticker"]: c for c in COMMODITIES}.values() if c["ticker"] not in rows]
+    if missing:
+        with ThreadPoolExecutor(max_workers=12) as pool:
+            for com, row in zip(missing, pool.map(_com_one, missing)):
+                if row:
+                    rows[com["ticker"]] = row
+    # Keep each entry's own name (one ticker can be listed twice under two names)
+    return [({**rows[c["ticker"]], "name": c["name"], "category": c["category"]} if c["ticker"] in rows else _com_empty(c)) for c in COMMODITIES]
+
+
+def _store_new_commodities():
+    """Fetch and keep new prices (call with _com_fetch_lock held). If nothing at all came back (Yahoo down), the
+    prices kept before stay and another try is made after COMMODITY_RETRY seconds."""
+    data = _fetch_commodities()
+    ok = any(r["price"] is not None for r in data)
+    with _com_lock:
+        if ok or not _com_cache["data"]:
+            _com_cache.update(data=data, ok=ok)
+        _com_cache["at"] = time.time() if ok else time.time() - COMMODITY_TTL + COMMODITY_RETRY
+
+
+def _refresh_commodities():
+    """The background refresh."""
+    try:
+        with _com_fetch_lock:
+            _store_new_commodities()
+    except Exception:                                           # noqa: BLE001 - tried again on a later visit
+        log.exception("Refreshing commodity prices failed")
+    finally:
+        with _com_lock:
+            _com_refreshing[0] = False
+
+
+def _refresh_commodities_soon():
+    """Start a background refresh unless one is already running."""
+    with _com_lock:
+        if _com_refreshing[0]:
+            return
+        _com_refreshing[0] = True
+    threading.Thread(target=_refresh_commodities, daemon=True, name="commodities").start()
+
+
+@app.on_event("startup")
+def _warm_commodities():
+    """Fetch the prices as the server starts, so the first visitor gets them at once."""
+    if os.getenv("AYM_NO_WARMUP", "").lower() not in ("1", "true", "yes"):
+        _refresh_commodities_soon()
+
+
 @app.get("/api/market/commodities")
 def get_commodities():
-    """Fetch live commodity prices  100 commodities across all categories."""
-    commodities = [
-        # -- PRECIOUS METALS --
-        {"ticker": "GC=F",  "name": "Gold",              "category": "precious_metals"},
-        {"ticker": "SI=F",  "name": "Silver",             "category": "precious_metals"},
-        {"ticker": "PL=F",  "name": "Platinum",           "category": "precious_metals"},
-        {"ticker": "PA=F",  "name": "Palladium",          "category": "precious_metals"},
-        {"ticker": "MGC=F", "name": "Micro Gold",         "category": "precious_metals"},
-        {"ticker": "SIL=F", "name": "Micro Silver",       "category": "precious_metals"},
-        # -- INDUSTRIAL METALS --
-        {"ticker": "HG=F",  "name": "Copper",             "category": "metals"},
-        {"ticker": "ALI=F", "name": "Aluminium",          "category": "metals"},
-        {"ticker": "ZN=F",  "name": "Zinc",               "category": "metals"},
-        {"ticker": "PB=F",  "name": "Lead",               "category": "metals"},
-        {"ticker": "NI=F",  "name": "Nickel",             "category": "metals"},
-        {"ticker": "TIN=F", "name": "Tin",                "category": "metals"},
-        {"ticker": "STEEL", "name": "Steel",              "category": "metals"},
-        {"ticker": "IRN=F", "name": "Iron Ore",           "category": "metals"},
-        # -- ENERGY --
-        {"ticker": "CL=F",  "name": "Crude Oil (WTI)",    "category": "energy"},
-        {"ticker": "BZ=F",  "name": "Brent Crude",        "category": "energy"},
-        {"ticker": "NG=F",  "name": "Natural Gas",        "category": "energy"},
-        {"ticker": "RB=F",  "name": "Gasoline (RBOB)",    "category": "energy"},
-        {"ticker": "HO=F",  "name": "Heating Oil",        "category": "energy"},
-        {"ticker": "QM=F",  "name": "E-mini Crude Oil",   "category": "energy"},
-        {"ticker": "NG=F",  "name": "Henry Hub Gas",      "category": "energy"},
-        {"ticker": "TTF=F", "name": "EU Natural Gas",     "category": "energy"},
-        {"ticker": "XRB=F", "name": "RBOB Gasoline",      "category": "energy"},
-        # -- AGRICULTURE  GRAINS --
-        {"ticker": "ZC=F",  "name": "Corn",               "category": "agriculture"},
-        {"ticker": "ZW=F",  "name": "Wheat",              "category": "agriculture"},
-        {"ticker": "ZS=F",  "name": "Soybeans",           "category": "agriculture"},
-        {"ticker": "ZM=F",  "name": "Soybean Meal",       "category": "agriculture"},
-        {"ticker": "ZL=F",  "name": "Soybean Oil",        "category": "agriculture"},
-        {"ticker": "ZR=F",  "name": "Rough Rice",         "category": "agriculture"},
-        {"ticker": "ZO=F",  "name": "Oats",               "category": "agriculture"},
-        {"ticker": "KE=F",  "name": "Hard Red Wheat",     "category": "agriculture"},
-        {"ticker": "MWE=F", "name": "Spring Wheat",       "category": "agriculture"},
-        # -- AGRICULTURE  SOFT COMMODITIES --
-        {"ticker": "KC=F",  "name": "Coffee (Arabica)",   "category": "softs"},
-        {"ticker": "SB=F",  "name": "Sugar No. 11",       "category": "softs"},
-        {"ticker": "CT=F",  "name": "Cotton",             "category": "softs"},
-        {"ticker": "CC=F",  "name": "Cocoa",              "category": "softs"},
-        {"ticker": "OJ=F",  "name": "Orange Juice",       "category": "softs"},
-        {"ticker": "LBS=F", "name": "Lumber",             "category": "softs"},
-        {"ticker": "RC=F",  "name": "Coffee (Robusta)",   "category": "softs"},
-        {"ticker": "RS=F",  "name": "Canola",             "category": "softs"},
-        # -- LIVESTOCK --
-        {"ticker": "LE=F",  "name": "Live Cattle",        "category": "livestock"},
-        {"ticker": "GF=F",  "name": "Feeder Cattle",      "category": "livestock"},
-        {"ticker": "HE=F",  "name": "Lean Hogs",          "category": "livestock"},
-        {"ticker": "DA=F",  "name": "Class III Milk",     "category": "livestock"},
-        # -- CRYPTO --
-        {"ticker": "BTC=F", "name": "Bitcoin Futures",    "category": "crypto"},
-        {"ticker": "ETH=F", "name": "Ethereum Futures",   "category": "crypto"},
-        {"ticker": "MBT=F", "name": "Micro Bitcoin",      "category": "crypto"},
-        {"ticker": "MET=F", "name": "Micro Ether",        "category": "crypto"},
-        # -- ENERGY  CLEAN/RENEWABLES (ETF proxies) --
-        {"ticker": "UNG",   "name": "Natural Gas ETF",    "category": "clean_energy"},
-        {"ticker": "URA",   "name": "Uranium ETF",        "category": "clean_energy"},
-        {"ticker": "ICLN",  "name": "Clean Energy ETF",   "category": "clean_energy"},
-        {"ticker": "FSLR",  "name": "Solar (First Solar)","category": "clean_energy"},
-        {"ticker": "PLUG",  "name": "Hydrogen (Plug Power)","category": "clean_energy"},
-        {"ticker": "LIT",   "name": "Lithium ETF",        "category": "clean_energy"},
-        {"ticker": "REMX",  "name": "Rare Earth ETF",     "category": "clean_energy"},
-        # -- INDICES (commodity related) --
-        {"ticker": "DJP",   "name": "Bloomberg Commodity","category": "indices"},
-        {"ticker": "GSG",   "name": "S&P GSCI Commodity", "category": "indices"},
-        {"ticker": "PDBC",  "name": "Commodity Index ETF","category": "indices"},
-        {"ticker": "DBC",   "name": "DB Commodity ETF",   "category": "indices"},
-        {"ticker": "COMT",  "name": "iShares Commodity",  "category": "indices"},
-        # -- AGRICULTURE  FERTILIZERS --
-        {"ticker": "MOS",   "name": "Mosaic (Fertilizer)","category": "agriculture"},
-        {"ticker": "NTR",   "name": "Nutrien (Potash)",   "category": "agriculture"},
-        {"ticker": "CF",    "name": "CF Industries (N)",  "category": "agriculture"},
-        {"ticker": "IPI",   "name": "Intrepid Potash",    "category": "agriculture"},
-        # -- WATER --
-        {"ticker": "PHO",   "name": "Water ETF",          "category": "water"},
-        {"ticker": "AWK",   "name": "American Water Works","category": "water"},
-        {"ticker": "XYL",   "name": "Xylem (Water Tech)", "category": "water"},
-        {"ticker": "WTRG",  "name": "Essential Utilities","category": "water"},
-        {"ticker": "WM",    "name": "Waste Management",   "category": "water"},
-        # -- TIMBER & PAPER --
-        {"ticker": "LBS=F", "name": "Lumber Futures",     "category": "timber"},
-        {"ticker": "WOOD",  "name": "Timber ETF",         "category": "timber"},
-        {"ticker": "PCH",   "name": "PotlatchDeltic",     "category": "timber"},
-        {"ticker": "RYN",   "name": "Rayonier (Timber)",  "category": "timber"},
-        {"ticker": "WY",    "name": "Weyerhaeuser",        "category": "timber"},
-        # -- SHIPPING & FREIGHT --
-        {"ticker": "BDRY",  "name": "Dry Bulk Shipping",  "category": "shipping"},
-        {"ticker": "ZIM",   "name": "ZIM Shipping",        "category": "shipping"},
-        {"ticker": "SBLK",  "name": "Star Bulk Carriers", "category": "shipping"},
-        {"ticker": "GOGL",  "name": "Golden Ocean Group", "category": "shipping"},
-        {"ticker": "DHT",   "name": "DHT Holdings",        "category": "shipping"},
-        # -- CARBON & SUSTAINABILITY --
-        {"ticker": "KRBN",  "name": "Carbon Credits ETF", "category": "carbon"},
-        {"ticker": "KCCA",  "name": "California Carbon",  "category": "carbon"},
-        {"ticker": "NETZ",  "name": "Net Zero ETF",        "category": "carbon"},
-        {"ticker": "SMOG",  "name": "Clean Cars ETF",      "category": "carbon"},
-        # -- PHYSICAL AI & ROBOTICS --
-        {"ticker": "BOTZ",  "name": "Robotics & AI ETF",  "category": "physical_ai"},
-        {"ticker": "ROBO",  "name": "Robo Global ETF",    "category": "physical_ai"},
-        {"ticker": "IRBO",  "name": "iShares Robotics",   "category": "physical_ai"},
-        {"ticker": "ARKQ",  "name": "ARK Autonomous ETF", "category": "physical_ai"},
-        {"ticker": "ISRG",  "name": "Intuitive Surgical", "category": "physical_ai"},
-        {"ticker": "ABB",   "name": "ABB Robotics",        "category": "physical_ai"},
-        {"ticker": "TER",   "name": "Teradyne (Robots)",  "category": "physical_ai"},
-        {"ticker": "CGNX",  "name": "Cognex (Machine Vision)","category": "physical_ai"},
-        # -- FOOD & BEVERAGE --
-        {"ticker": "CORN",  "name": "Corn ETF",            "category": "food"},
-        {"ticker": "WEAT",  "name": "Wheat ETF",           "category": "food"},
-        {"ticker": "SOYB",  "name": "Soybean ETF",         "category": "food"},
-        {"ticker": "CANE",  "name": "Sugar ETF",           "category": "food"},
-        {"ticker": "JO",    "name": "Coffee ETF",          "category": "food"},
-        {"ticker": "NIB",   "name": "Cocoa ETF",           "category": "food"},
-        {"ticker": "BAL",   "name": "Cotton ETF",          "category": "food"},
-    ]
-    result = []
-    for com in commodities:
-        try:
-            t = yf.Ticker(com["ticker"])
-            hist = t.history(period="2d")
-            if hist is not None and not hist.empty:
-                latest = float(hist['Close'].iloc[-1])
-                prev = float(hist['Close'].iloc[-2]) if len(hist) > 1 else latest
-                change = latest - prev
-                change_pct = (change / prev * 100) if prev > 0 else 0
-                result.append({
-                    "ticker": com["ticker"],
-                    "name": com["name"],
-                    "category": com["category"],
-                    "price": round(latest, 2),
-                    "change": round(change, 2),
-                    "change_pct": round(change_pct, 2),
-                    "updated": datetime.now().strftime("%H:%M")
-                })
-        except:
-            result.append({
-                "ticker": com["ticker"],
-                "name": com["name"],
-                "category": com["category"],
-                "price": None,
-                "change": None,
-                "change_pct": None,
-                "updated": "--"
-            })
-    return result
+    """Live commodity prices, about 100 across all categories (see the notes above COMMODITIES)."""
+    with _com_lock:
+        data, age = _com_cache["data"], time.time() - _com_cache["at"]
+    if data is not None:
+        if age >= COMMODITY_TTL:
+            _refresh_commodities_soon()                 # this visitor still gets the kept prices straight away
+        return data
+    # Nothing kept yet (the very first request): wait for the fetch. If the start-up fetch is already running, this
+    # waits for it and uses its answer instead of asking Yahoo a second time.
+    with _com_fetch_lock:
+        with _com_lock:
+            have = _com_cache["data"] is not None
+        if not have:
+            _store_new_commodities()
+    with _com_lock:
+        return _com_cache["data"] or [_com_empty(c) for c in COMMODITIES]
 
 @app.get("/api/market/macro")
 def get_macro():
@@ -1545,7 +1834,11 @@ def get_earnings(limit: int=500):
         WHERE l.current_price IS NOT NULL AND l.last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY)
         AND (l.sector!='Indices' OR l.sector IS NULL)
         AND (e.next_earnings_date IS NOT NULL OR e.eps_actual IS NOT NULL)
-        ORDER BY e.next_earnings_date ASC,l.market_cap DESC LIMIT %s
+        ORDER BY e.next_earnings_date IS NULL,                          -- stocks with no date go last
+                 e.next_earnings_date < CURDATE(),                      -- upcoming (today on) first, then ones already reported
+                 CASE WHEN e.next_earnings_date >= CURDATE() THEN e.next_earnings_date END ASC,   -- upcoming: soonest first
+                 e.next_earnings_date DESC,                             -- reported: newest first
+                 l.market_cap DESC LIMIT %s
     """, [limit])
 
 def _json_safe(v):
@@ -2179,7 +2472,9 @@ def get_account(user_id: int = Depends(current_user_id)):
         if not profile:
             raise auth.AuthError("That account no longer exists.", 404)
         return {"status": "success", "account": {**profile, **auth.get_details(user_id)},
-                "choices": {"genders": auth.GENDERS, "professions": auth.PROFESSIONS}}
+                "choices": {"genders": auth.GENDERS, "professions": auth.PROFESSIONS, "invest_ranges": auth.INVEST_RANGES,
+                            "purposes": auth.PURPOSES, "follows": auth.FOLLOWS, "sectors": auth.INTEREST_SECTORS,
+                            "commodities": auth.INTEREST_COMMODITIES}}
     return _account_call(work)
 
 
@@ -2189,17 +2484,28 @@ class ProfileBody(BaseModel):
     birth_date: str = Field(default="", max_length=20)
     gender: str = Field(default="", max_length=20)
     profession: str = Field(default="", max_length=200)
+    invest_range: str = Field(default="", max_length=20)
+    purposes: List[str] = Field(default_factory=list, max_length=20)
+    follows: str = Field(default="", max_length=20)
+    sectors: List[str] = Field(default_factory=list, max_length=30)
+    commodities: List[str] = Field(default_factory=list, max_length=30)
+    purposes_other: str = Field(default="", max_length=200)
+    sectors_other: str = Field(default="", max_length=200)
+    commodities_other: str = Field(default="", max_length=200)
 
 
-class DeleteBody(BaseModel):
+class EmailChangeBody(BaseModel):
+    email: str = Field(max_length=300)
     password: str = Field(max_length=200)
-    confirm: str = Field(max_length=20)
 
 
 @app.put("/api/account/profile")
 def save_account_profile(body: ProfileBody, user_id: int = Depends(require_fetch)):
-    """Name plus the optional details: region / city, date of birth, gender, profession."""
-    return _account_call(lambda: {"status": "success", "profile": auth.save_profile(user_id, body.name, body.city, body.birth_date, body.gender, body.profession)})
+    """Name plus the optional details: region / city, date of birth, gender, profession, and the investing profile."""
+    return _account_call(lambda: {"status": "success", "profile": auth.save_profile(
+        user_id, body.name, body.city, body.birth_date, body.gender, body.profession, invest_range=body.invest_range,
+        purposes=body.purposes, follows=body.follows, sectors=body.sectors, commodities=body.commodities,
+        others={"purposes_other": body.purposes_other, "sectors_other": body.sectors_other, "commodities_other": body.commodities_other})})
 
 
 @app.get("/api/account/notifications")
@@ -2234,24 +2540,95 @@ def export_my_data(user_id: int = Depends(current_user_id)):
     return _xlsx(data, f"aymetrix-my-data-{datetime.now():%Y-%m-%d}.xlsx")
 
 
-@app.post("/api/account/delete")
-def delete_my_account(body: DeleteBody, user_id: int = Depends(require_fetch)):
-    """Delete your account and everything in it. Needs your password and the word DELETE."""
+# ── Recently viewed stocks (Market page strip) ──
+class RecentBody(BaseModel):
+    ticker: str = Field(max_length=20)
+
+
+@app.get("/api/account/recent")
+def get_recent_stocks(user_id: int = Depends(current_user_id)):
+    return _account_call(lambda: {"status": "success", "tickers": auth.recent_stocks(user_id)})
+
+
+@app.post("/api/account/recent")
+def add_recent_stock(body: RecentBody, user_id: int = Depends(require_fetch)):
+    return _account_call(lambda: {"status": "success", "tickers": auth.add_recent_stock(user_id, body.ticker)})
+
+
+@app.delete("/api/account/recent/{ticker}")
+def remove_recent_stock(ticker: str, user_id: int = Depends(require_fetch)):
+    """The × on a Recently Viewed stock: takes just that one off the list."""
+    return _account_call(lambda: {"status": "success", "tickers": auth.remove_recent_stock(user_id, ticker)})
+
+
+@app.delete("/api/account/recent")
+def clear_recent_stocks(user_id: int = Depends(require_fetch)):
+    return _account_call(lambda: {"status": "success", "tickers": auth.clear_recent_stocks(user_id)})
+
+
+_email_changes = auth.RateLimiter(5, 3600)          # new-email confirmation links per account in an hour
+
+
+@app.post("/api/account/email")
+def change_my_email(request: Request, body: EmailChangeBody, user_id: int = Depends(require_fetch)):
+    """Start changing your email: a link goes to the new address, and the change happens when it is clicked."""
     key = f"user:{user_id}"
     if _password_changes.blocked(key):
         return agent_error(429, "Too many wrong passwords. Please wait 15 minutes and try again.")
+    if _email_changes.blocked(key):
+        return agent_error(429, "Too many requests. Please wait an hour and try again, or raise a ticket in Help Desk.")
+    base = _email_base(request)
+    if not mailer.configured() or not base:
+        return agent_error(503, "Email changes aren't available just now. Please raise a ticket in Help Desk and we'll change it for you.")
     try:
-        auth.delete_own_account(user_id, body.password, body.confirm)
+        user, new_email, token = auth.start_email_change(user_id, body.password, body.email)
     except auth.AuthError as e:
         if e.status == 403:
             _password_changes.record(key)
         return agent_error(e.status, e.message)
     except Exception:
-        log.exception("Deleting an account failed")
-        return agent_error(500, "Something went wrong. Your account was not deleted.")
-    response = JSONResponse({"status": "success", "message": "Your account and all its data have been deleted."})
-    response.delete_cookie(SESSION_COOKIE)
-    return response
+        log.exception("Starting an email change failed")
+        return agent_error(500, "Something went wrong. Your email wasn't changed.")
+    _email_changes.record(key)
+    mailer.confirm_new_email(new_email, f"{base}/confirm-email?token={urllib.parse.quote(token)}", auth.EMAIL_CHANGE_MINUTES, base)
+    return {"status": "success", "message": f"We've sent a link to {new_email}. Click it within {auth.EMAIL_CHANGE_MINUTES} minutes to finish. "
+                                            "Until then, keep using your current email."}
+
+
+@app.get("/confirm-email", response_class=HTMLResponse)
+def confirm_email_page(token: str = ""):
+    try:
+        rec = auth.check_email_change_token(token)
+    except Exception:
+        log.exception("Checking an email confirmation link failed")
+        return HTMLResponse(auth_pages.notice_page("Something went wrong", "We couldn't check this link just now. Please try again in a few minutes."),
+                            status_code=503, headers=_NO_REFERRER)
+    if not rec:
+        return HTMLResponse(auth_pages.email_link_expired_page(), status_code=410, headers=_NO_REFERRER)
+    return HTMLResponse(auth_pages.confirm_email_page(token, rec["new_email"]), headers=_NO_REFERRER)
+
+
+@app.post("/confirm-email")
+async def confirm_email(request: Request):
+    form = await _read_form(request)
+    token = form.get("token", "")
+    client = _client_id(request)
+    if _reset_tries.blocked(client):
+        return HTMLResponse(auth_pages.notice_page("Too many attempts", "Please wait a while and try again."), status_code=429, headers=_NO_REFERRER)
+    _reset_tries.record(client)
+    try:
+        done = await run_in_threadpool(auth.finish_email_change, token)
+    except auth.AuthError as e:
+        if e.status == 410:
+            return HTMLResponse(auth_pages.email_link_expired_page(), status_code=410, headers=_NO_REFERRER)
+        rec = auth.check_email_change_token(token)
+        return HTMLResponse(auth_pages.confirm_email_page(token, rec["new_email"] if rec else "", e.message), status_code=e.status, headers=_NO_REFERRER)
+    except Exception:
+        log.exception("Finishing an email change failed")
+        return HTMLResponse(auth_pages.notice_page("Something went wrong", "Your email wasn't changed. Please try again in a few minutes."),
+                            status_code=503, headers=_NO_REFERRER)
+    mailer.email_changed(done["old_email"], done["new_email"], False, _email_base(request))
+    return HTMLResponse(auth_pages.email_changed_page(done["new_email"]), headers=_NO_REFERRER)
 
 
 @app.put("/api/account/name")
@@ -2408,7 +2785,8 @@ def admin_export_users(admin_id: int = Depends(require_admin)):
     """Every account with its profile details, plus a summary sheet, as one Excel file."""
     try:
         import exports
-        data = exports.users_workbook(auth.list_users()["users"], auth.store.all_details(), auth.GENDERS, auth.age_on)
+        listing = auth.list_users()
+        data = exports.users_workbook(listing["users"], auth.store.all_details(), auth.GENDERS, auth.age_on)
     except Exception:
         log.exception("Making the users download failed")
         return agent_error(500, "Something went wrong making the file. Please try again.")
@@ -2435,6 +2813,20 @@ def admin_set_rights(user_id: int, body: AdminRightsBody, admin_id: int = Depend
     except Exception:
         log.exception("Changing admin rights failed")
         return agent_error(500, "Something went wrong saving that change.")
+
+
+class AdminEmailBody(BaseModel):
+    email: str = Field(max_length=300)
+
+
+@app.post("/api/admin/users/{user_id}/email")
+def admin_change_email(request: Request, user_id: int, body: AdminEmailBody, admin_id: int = Depends(require_admin_action)):
+    """Change someone's email (they asked in a Help Desk ticket). Both the old and the new address are told."""
+    def work():
+        done = auth.admin_change_email(admin_id, user_id, body.email)
+        mailer.email_changed(done["old_email"], done["new_email"], True, _email_base(request))
+        return {"status": "success", "message": f"Email changed from {done['old_email']} to {done['new_email']}. Both addresses were told."}
+    return _account_call(work)
 
 
 @app.post("/api/admin/users/{user_id}/send-reset")

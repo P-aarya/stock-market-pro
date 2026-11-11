@@ -143,3 +143,30 @@ def reset_done_page() -> str:
     return _page("Password changed", """<h1>Password changed</h1>
 <p class="ok" role="status">Your new password is saved. You've been signed out everywhere.</p>
 <p class="alt"><a href="/login">Sign in</a></p>""")
+
+
+# ── email changes ──
+
+def confirm_email_page(token: str, new_email: str, error: str = "") -> str:
+    """The link in the confirmation email opens this page; the change happens when the button is pressed (email
+    programs that open links to scan them can't change anything by doing so)."""
+    return _page("Confirm new email", f"""<h1>Confirm your new email</h1>
+<p class="sub">Your Aymetrix account will use <b>{html.escape(new_email)}</b> from now on. Your portfolio, transactions and settings stay as they are.</p>
+{_error(error)}
+<form method="post" action="/confirm-email">
+<input type="hidden" name="token" value="{html.escape(token, quote=True)}">
+<button type="submit">Confirm new email</button></form>
+<p class="alt"><a href="/">Back to the dashboard</a></p>""")
+
+
+def email_link_expired_page() -> str:
+    return _page("Link expired", """<h1>This link has expired</h1>
+<p class="sub">Email confirmation links work for a limited time and only once. You can ask for a new one in Settings → Account.</p>
+<p class="alt"><a href="/settings#account">Open Settings</a> &nbsp;·&nbsp; <a href="/login">Sign in</a></p>""")
+
+
+def email_changed_page(new_email: str) -> str:
+    return _page("Email changed", f"""<h1>Email changed</h1>
+<p class="ok" role="status">Your account now uses {html.escape(new_email)}. Use it next time you sign in.</p>
+<p class="alt"><a href="/">Go to the dashboard</a></p>""")
+

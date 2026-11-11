@@ -134,7 +134,7 @@ def delete_account(conn, user_id):
         if _has_table(cur, "support_tickets"):
             cur.execute("DELETE FROM support_messages WHERE ticket_id IN (SELECT id FROM support_tickets WHERE user_id = %s)", (user_id,))
             cur.execute("DELETE FROM support_tickets WHERE user_id = %s", (user_id,))
-        for table in ("user_notifications", "password_resets", "user_profiles"):
+        for table in ("user_notifications", "password_resets", "email_changes", "restore_links", "user_profiles"):   # restore_links: left from the removed account deletion
             if _has_table(cur, table):
                 cur.execute(f"DELETE FROM {table} WHERE user_id = %s", (user_id,))
         cur.execute("DELETE FROM users WHERE id = %s", (user_id,))

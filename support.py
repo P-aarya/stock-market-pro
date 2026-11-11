@@ -17,6 +17,7 @@ log = logging.getLogger("support")
 
 CATEGORIES = {
     "account": "Login / Account",
+    "email": "Change my email",
     "data": "Data issue",
     "predictions": "Predictions",
     "portfolio": "Portfolio / Transactions",

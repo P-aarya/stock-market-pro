@@ -63,15 +63,17 @@ h1{font-size:22px;letter-spacing:-.4px}
 .actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
 .lbl{display:none}
 
-.badge{display:inline-block;padding:3px 9px;border-radius:5px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;border:1px solid}
-.b-pending{color:var(--yellow);background:rgba(255,200,0,.1);border-color:rgba(255,200,0,.25)}
-.b-approved{color:var(--green);background:rgba(0,230,118,.1);border-color:rgba(0,230,118,.25)}
-.b-blocked{color:var(--red);background:rgba(255,68,68,.1);border-color:rgba(255,68,68,.25)}
-.b-admin{color:var(--cyan);background:rgba(0,212,255,.1);border-color:rgba(0,212,255,.25);margin-left:6px;vertical-align:1px}
+/* Statuses and roles: plain coloured text, normal weight (no box, background or glow) */
+.badge{display:inline-block;font-size:12px;font-weight:500;white-space:nowrap}
+.b-pending,.b-approved,.b-blocked{text-transform:capitalize}
+.b-pending{color:var(--yellow)}
+.b-approved{color:var(--green)}
+.b-blocked{color:var(--red)}
+.b-admin{color:var(--blue);margin-left:8px}
 
 /* Plain buttons: an outline and coloured text, no filled or glowing background. Green = allow, red = refuse/remove,
    yellow = admin rights, grey = everything else. */
-.btn{border:1px solid var(--b2);background:transparent;color:var(--t2);font-size:12px;font-weight:800;padding:8px 14px;border-radius:7px;min-height:36px}
+.btn{border:1px solid var(--b2);background:transparent;color:var(--t2);font-size:12px;font-weight:500;padding:8px 14px;border-radius:7px;min-height:36px}
 .btn:hover:not(:disabled){border-color:var(--t3);color:var(--t1)}
 .btn:disabled{opacity:.5;cursor:wait}
 .btn.go{color:var(--green);border-color:var(--green)}.btn.go:hover:not(:disabled){color:var(--green);border-color:var(--green);text-decoration:underline}
@@ -98,6 +100,22 @@ code{font-family:var(--mono);background:var(--bg3);border:1px solid var(--b1);bo
 .tiles.six{grid-template-columns:repeat(3,1fr)}
 .card{background:var(--bg2);border:1px solid var(--b1);border-radius:12px;padding:18px;margin-bottom:16px}
 .card h2{font-size:15px;margin-bottom:12px}
+/* Learn tab editor */
+.lf-grid{display:grid;grid-template-columns:160px 1fr;gap:12px}
+.lf-grid .full{grid-column:1/-1}
+@media(max-width:640px){.lf-grid{grid-template-columns:1fr}}
+.lf-l{display:block;font-size:11px;font-weight:700;color:var(--t3);margin-bottom:6px}
+.lf-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.lf-msg{font-size:12px;color:var(--t3)}.lf-msg.err{color:var(--red)}.lf-msg.ok{color:var(--green)}
+#lf-body{min-height:90px}
+.li{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--b1)}
+.li img{width:96px;aspect-ratio:16/9;object-fit:cover;border-radius:6px;flex:0 0 auto;background:var(--bg3)}
+.li .li-m{flex:1;min-width:0}
+.li .li-t{font-size:13px;font-weight:600;color:var(--t1);overflow-wrap:anywhere}
+.li .li-s{font-size:12px;color:var(--t3);overflow-wrap:anywhere}
+.li .li-s a{color:var(--t3)}
+.li .li-a{display:flex;gap:6px;flex:0 0 auto;flex-wrap:wrap;justify-content:flex-end}
+@media(max-width:640px){.li{flex-wrap:wrap}.li .li-a{width:100%;justify-content:flex-start}}
 .mini{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--b1);font-size:13px}
 .mini:last-child{border-bottom:0}
 .mini .e{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
@@ -105,7 +123,7 @@ code{font-family:var(--mono);background:var(--bg3);border:1px solid var(--b1);bo
 .btn.small{font-size:11px;padding:6px 10px;min-height:32px}
 .btn.gold{color:var(--yellow);border-color:var(--yellow)}.btn.gold:hover:not(:disabled){color:var(--yellow);border-color:var(--yellow);text-decoration:underline}
 /* Ticket status: just coloured text */
-.badge.s-open,.badge.s-in_progress,.badge.s-resolved{background:none;border:0;padding:0;border-radius:0}
+
 .s-open{color:var(--yellow)}.s-in_progress{color:var(--cyan)}.s-resolved{color:var(--green)}
 .thead,.trow{display:grid;grid-template-columns:70px minmax(0,2.2fr) minmax(0,1.4fr) 120px 110px;gap:12px;align-items:center;padding:12px 14px}
 .thead{font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:1.1px;border-bottom:1px solid var(--b1)}
@@ -186,6 +204,7 @@ textarea:focus,select.inp:focus,input.inp:focus{border-color:var(--blue)}
     <button class="view-btn" type="button" data-view="users">Users<span class="vn" id="vn-users"></span></button>
     <button class="view-btn" type="button" data-view="help">Help Desk<span class="vn" id="vn-help"></span></button>
     <button class="view-btn" type="button" data-view="activity">Activity</button>
+    <button class="view-btn" type="button" data-view="learn">Learn</button>
   </nav>
 
   <section class="view" id="view-overview" aria-label="Overview">
@@ -252,6 +271,36 @@ textarea:focus,select.inp:focus,input.inp:focus{border-color:var(--blue)}
     </div>
   </section>
 
+  <section class="view" id="view-learn" aria-label="Learn tab">
+    <h1>Learn tab</h1>
+    <p class="lead">The videos, podcasts and investor tips everyone sees on the dashboard's Learn tab. Changes show straight away.</p>
+    <div class="card">
+      <h2 id="lf-heading">Add an item</h2>
+      <form id="lf-form" autocomplete="off">
+        <div class="lf-grid">
+          <div><label class="lf-l" for="lf-kind">Type</label>
+            <select class="inp" id="lf-kind"><option value="video">Video (YouTube)</option><option value="podcast">Podcast</option><option value="tip">Investor tip</option></select></div>
+          <div><label class="lf-l" for="lf-url" id="lf-url-l">YouTube link</label>
+            <input class="inp" id="lf-url" type="url" maxlength="500" placeholder="https://www.youtube.com/watch?v=…" spellcheck="false"/></div>
+          <div class="full"><label class="lf-l" for="lf-title" id="lf-title-l">Title</label>
+            <input class="inp" id="lf-title" type="text" maxlength="200" placeholder="What the video is about"/></div>
+          <div class="full" id="lf-body-wrap" hidden><label class="lf-l" for="lf-body">What to do (2–3 short sentences)</label>
+            <textarea id="lf-body" maxlength="600" placeholder="Explain the tip in plain words: what to do, and why."></textarea></div>
+          <div class="full"><label class="lf-l" for="lf-source" id="lf-source-l">Channel (optional)</label>
+            <input class="inp" id="lf-source" type="text" maxlength="120" placeholder="e.g. Khan Academy"/></div>
+        </div>
+        <div class="lf-row">
+          <button class="btn go" type="submit" id="lf-save">Add</button>
+          <button class="btn" type="button" id="lf-cancel" hidden>Cancel</button>
+          <span class="lf-msg" id="lf-msg" role="status"></span>
+        </div>
+      </form>
+    </div>
+    <div class="card"><h2>Videos</h2><div id="ll-video"><div class="empty">Loading…</div></div></div>
+    <div class="card"><h2>Podcasts</h2><div id="ll-podcast"><div class="empty">Loading…</div></div></div>
+    <div class="card"><h2>Investor tips</h2><div id="ll-tip"><div class="empty">Loading…</div></div></div>
+  </section>
+
   <section class="view" id="view-activity" aria-label="Activity">
     <h1>Activity</h1>
     <p class="lead">The latest account and Help Desk events, newest first.</p>
@@ -296,14 +345,15 @@ function visibleUsers(){
 function actionsFor(u){
   const busy = state.busy.has(u.id) ? ' disabled' : '';
   const more = (what, cls, text) => `<button class="btn small ${cls}" type="button" data-id="${u.id}" data-more="${what}"${busy}>${text}</button>`;
+  const email = more('email', 'plain', 'Change email');
   if(u.is_admin){
     if(u.id === state.you) return '<span class="sub">Administrator (you)</span>' + more('reset', 'plain', 'Send reset link');
-    return '<span class="sub">Administrator</span>' + more('admin-off', 'no', 'Remove admin') + more('reset', 'plain', 'Send reset link');
+    return '<span class="sub">Administrator</span>' + more('admin-off', 'no', 'Remove admin') + more('reset', 'plain', 'Send reset link') + email;
   }
   const b = (act, cls, text) => `<button class="btn ${cls}" type="button" data-id="${u.id}" data-act="${act}"${busy}>${text}</button>`;
   if(u.status === 'pending') return b('approved', 'go', 'Approve') + b('blocked', 'no', 'Decline');
-  if(u.status === 'approved') return b('blocked', 'no', 'Block') + more('admin-on', 'gold', 'Make admin') + more('reset', 'plain', 'Send reset link');
-  return b('approved', 'go', 'Unblock');
+  if(u.status === 'approved') return b('blocked', 'no', 'Block') + more('admin-on', 'gold', 'Make admin') + more('reset', 'plain', 'Send reset link') + email;
+  return b('approved', 'go', 'Unblock') + email;
 }
 
 function rowHtml(u){
@@ -327,7 +377,7 @@ function render(){
   document.getElementById('tiles').innerHTML = [['Pending approval', c.pending, 'var(--yellow)'], ['Approved', c.approved, 'var(--green)'], ['Blocked', c.blocked, 'var(--red)'], ['All accounts', c.total, 'var(--blue)']]
     .map(([l, v, col]) => `<div class="tile" style="--c:${col}"><div class="l">${l}</div><div class="v">${v}</div></div>`).join('');
   document.getElementById('tabs').innerHTML = FILTERS.map(([key, name]) => {
-    const n = key === 'all' ? c.total : c[key];
+    const n = key === 'all' ? c.total : (c[key] || 0);
     return `<button class="tab${state.filter === key ? ' on' : ''}" type="button" role="tab" data-filter="${key}" aria-selected="${state.filter === key}">${name}<span class="n${key === 'pending' && n ? ' alert' : ''}">${n}</span></button>`;
   }).join('');
   const rows = visibleUsers();
@@ -397,7 +447,7 @@ function viewFromHash(){
   const h = (location.hash || '').slice(1);
   const m = h.match(/^ticket-(\d+)$/);
   if(m) return { view: 'help', ticket: Number(m[1]) };
-  return { view: ['overview', 'users', 'help', 'activity'].includes(h) ? h : 'overview', ticket: null };
+  return { view: ['overview', 'users', 'help', 'activity', 'learn'].includes(h) ? h : 'overview', ticket: null };
 }
 function route(){
   const { view, ticket } = viewFromHash();
@@ -410,6 +460,81 @@ function route(){
   else if(view === 'users') load(true);
   else if(view === 'help'){ if(ticket) openStaffTicket(ticket); else loadTickets(); }
   else if(view === 'activity') loadActivity();
+  else if(view === 'learn') loadLearnAdmin();
+}
+
+// ── Learn tab editor ──
+const learnState = { data: null, editing: null, busy: false };
+const LF_TEXT = {
+  video: { url: 'YouTube link', urlPh: 'https://www.youtube.com/watch?v=…', title: 'Title', titlePh: 'What the video is about', source: 'Channel (optional)', sourcePh: 'e.g. Khan Academy' },
+  podcast: { url: 'Podcast link (Apple Podcasts, Spotify or the show\'s site)', urlPh: 'https://podcasts.apple.com/…', title: 'Podcast name', titlePh: 'e.g. Motley Fool Money', source: 'Made by (optional)', sourcePh: 'e.g. The Motley Fool' },
+  tip: { url: 'Source link (recommended)', urlPh: 'https://www.investor.gov/…', title: 'Tip title', titlePh: 'e.g. Build an emergency fund before you invest', source: 'Source name (recommended)', sourcePh: 'e.g. SEC – Investor.gov' },
+};
+function lfLabels(){
+  const k = document.getElementById('lf-kind').value, t = LF_TEXT[k];
+  document.getElementById('lf-url-l').textContent = t.url; document.getElementById('lf-url').placeholder = t.urlPh;
+  document.getElementById('lf-title-l').textContent = t.title; document.getElementById('lf-title').placeholder = t.titlePh;
+  document.getElementById('lf-source-l').textContent = t.source; document.getElementById('lf-source').placeholder = t.sourcePh;
+  document.getElementById('lf-body-wrap').hidden = k !== 'tip';
+}
+function lfSay(text, kind){ const m = document.getElementById('lf-msg'); m.textContent = text || ''; m.className = 'lf-msg' + (kind ? ' ' + kind : ''); }
+async function loadLearnAdmin(){
+  try { learnState.data = await call('/api/learn'); renderLearnAdmin(); }
+  catch(e){ ['video', 'podcast', 'tip'].forEach(k => { document.getElementById('ll-' + k).innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`; }); }
+}
+function learnRow(it, i, n){
+  const link = it.url ? `<a href="${escapeHtml(it.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(it.url.length > 60 ? it.url.slice(0, 57) + '…' : it.url)}</a>` : '';
+  const sub = [it.source ? escapeHtml(it.kind === 'tip' ? 'Source: ' + it.source : it.source) : '', link].filter(Boolean).join(' · ');
+  const b = (act, text, cls, dis) => `<button class="btn small ${cls}" type="button" data-lact="${act}" data-id="${it.id}"${dis ? ' disabled' : ''}>${text}</button>`;
+  return `<div class="li">${it.thumb ? `<img src="${escapeHtml(it.thumb)}" alt="" loading="lazy">` : ''}
+    <div class="li-m"><div class="li-t">${escapeHtml(it.title)}</div>${it.body ? `<div class="li-s" style="color:var(--t2);margin:2px 0">${escapeHtml(it.body)}</div>` : ''}<div class="li-s">${sub}</div></div>
+    <div class="li-a">${b('up', '↑', 'plain', i === 0)}${b('down', '↓', 'plain', i === n - 1)}${b('edit', 'Edit', 'plain')}${b('remove', 'Remove', 'no')}</div></div>`;
+}
+function renderLearnAdmin(){
+  const d = learnState.data || { videos: [], podcasts: [], tips: [] };
+  const lists = { video: d.videos, podcast: d.podcasts, tip: d.tips };
+  Object.entries(lists).forEach(([k, items]) => {
+    document.getElementById('ll-' + k).innerHTML = items.length ? items.map((it, i) => learnRow(it, i, items.length)).join('') : '<div class="empty">Nothing here yet. Add one above.</div>';
+  });
+}
+function learnItem(id){ const d = learnState.data || {}; return [...(d.videos || []), ...(d.podcasts || []), ...(d.tips || [])].find(x => x.id === id); }
+function startLearnEdit(it){
+  learnState.editing = it.id;
+  const kind = document.getElementById('lf-kind'); kind.value = it.kind; kind.disabled = true; lfLabels();
+  document.getElementById('lf-url').value = it.url || ''; document.getElementById('lf-title').value = it.title; document.getElementById('lf-source').value = it.source || '';
+  document.getElementById('lf-body').value = it.body || '';
+  document.getElementById('lf-heading').textContent = 'Edit item'; document.getElementById('lf-save').textContent = 'Save changes';
+  document.getElementById('lf-cancel').hidden = false; lfSay('');
+  document.getElementById('lf-form').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+function resetLearnForm(){
+  learnState.editing = null;
+  document.getElementById('lf-form').reset(); document.getElementById('lf-kind').disabled = false; lfLabels();
+  document.getElementById('lf-heading').textContent = 'Add an item'; document.getElementById('lf-save').textContent = 'Add';
+  document.getElementById('lf-cancel').hidden = true;
+}
+async function saveLearn(ev){
+  ev.preventDefault();
+  if(learnState.busy) return;
+  const body = { kind: document.getElementById('lf-kind').value, url: document.getElementById('lf-url').value.trim(),
+                 title: document.getElementById('lf-title').value.trim(), source: document.getElementById('lf-source').value.trim(),
+                 body: document.getElementById('lf-kind').value === 'tip' ? document.getElementById('lf-body').value.trim() : '' };
+  const editing = learnState.editing;
+  learnState.busy = true; document.getElementById('lf-save').disabled = true; lfSay('Saving…');
+  try {
+    const d = await call(editing ? `/api/admin/learn/${editing}` : '/api/admin/learn', { method: editing ? 'PUT' : 'POST', body: JSON.stringify(body) });
+    resetLearnForm(); lfSay(d.message, 'ok'); await loadLearnAdmin();
+  } catch(e){ lfSay(e.message, 'err'); }
+  finally { learnState.busy = false; document.getElementById('lf-save').disabled = false; }
+}
+async function learnAction(id, act){
+  const it = learnItem(id); if(!it) return;
+  if(act === 'edit'){ startLearnEdit(it); return; }
+  if(act === 'remove' && !confirm(`Remove "${it.title.slice(0, 80)}" from the Learn tab?`)) return;
+  try {
+    if(act === 'remove'){ const d = await call(`/api/admin/learn/${id}`, { method: 'DELETE' }); toast(d.message, 'ok'); if(learnState.editing === id) resetLearnForm(); await loadLearnAdmin(); }
+    else { learnState.data = await call(`/api/admin/learn/${id}/move`, { method: 'POST', body: JSON.stringify({ direction: act }) }); renderLearnAdmin(); }
+  } catch(e){ toast(e.message, 'err'); }
 }
 
 function tile(label, value, color){ return `<div class="tile" style="--c:${color}"><div class="l">${escapeHtml(label)}</div><div class="v">${escapeHtml(value ?? '—')}</div></div>`; }
@@ -543,10 +668,15 @@ async function loadActivity(){
 
 // Make or remove an administrator: confirmed with your own password, typed into a proper password box.
 let pwAction = null;
-function askPassword(text, action){
+function askPassword(text, action, opts = {}){
   pwAction = action;
+  const input = document.getElementById('pw-modal-input');
+  input.type = opts.type || 'password'; input.placeholder = opts.placeholder || 'Your password';
+  input.autocomplete = opts.type === 'email' ? 'off' : 'current-password';
+  document.getElementById('pw-title').textContent = opts.title || 'Confirm with your password';
+  document.getElementById('pw-modal-ok').textContent = opts.ok || 'Confirm';
   document.getElementById('pw-text').textContent = text;
-  document.getElementById('pw-modal-input').value = '';
+  input.value = opts.value || '';
   document.getElementById('pw-modal-err').textContent = '';
   document.getElementById('pw-modal').classList.add('open');
   setTimeout(() => document.getElementById('pw-modal-input').focus(), 30);
@@ -572,6 +702,14 @@ async function moreAction(id, what){
       toast(make ? `${user.email} is now an administrator.` : `${user.email} is no longer an administrator.`, 'ok');
       await load(true);
     });
+    return;
+  }
+  if(what === 'email'){
+    askPassword(`Change the email for ${user.email}. Do this when they asked in a Help Desk ticket. Both the old and the new address get an email about it, and everything else in the account stays the same.`,
+      async (email) => {
+        const d = await call(`/api/admin/users/${id}/email`, { method: 'POST', body: JSON.stringify({ email: email.trim() }) });
+        toast(d.message, 'ok'); await load(true);
+      }, { type: 'email', placeholder: 'New email', title: 'Change email', ok: 'Change email' });
     return;
   }
   if(what === 'reset'){
@@ -612,6 +750,10 @@ document.getElementById('tk-refresh').addEventListener('click', () => loadTicket
 document.getElementById('tk-reply-form').addEventListener('submit', sendStaffReply);
 document.getElementById('tk-status-btns').addEventListener('click', e => { const b = e.target.closest('button[data-setstatus]'); if(b) setTicketStatus(b.dataset.setstatus); });
 document.getElementById('pw-modal-form').addEventListener('submit', confirmPassword);
+document.getElementById('lf-kind').addEventListener('change', lfLabels);
+document.getElementById('lf-form').addEventListener('submit', saveLearn);
+document.getElementById('lf-cancel').addEventListener('click', () => { resetLearnForm(); lfSay(''); });
+document.getElementById('view-learn').addEventListener('click', e => { const b = e.target.closest('button[data-lact]'); if(b) learnAction(Number(b.dataset.id), b.dataset.lact); });
 document.getElementById('pw-modal-cancel').addEventListener('click', closePassword);
 document.getElementById('pw-modal').addEventListener('click', e => { if(e.target.id === 'pw-modal') closePassword(); });
 document.addEventListener('keydown', e => { if(e.key === 'Escape') closePassword(); });

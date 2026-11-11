@@ -185,7 +185,8 @@ def my_data_workbook(email, holdings, summary, transactions, tx_summary, now=Non
 
 USER_COLUMNS = [("Email", 32, None), ("Name", 22, None), ("Status", 11, None), ("Admin", 8, None), ("Joined", 13, DATE),
                 ("Last sign-in", 17, "dd mmm yyyy hh:mm"), ("Region / city", 20, None), ("Date of birth", 13, DATE), ("Age", 7, None),
-                ("Gender", 16, None), ("Profession", 24, None)]
+                ("Gender", 16, None), ("Profession", 24, None), ("Investing range", 20, None), ("Main purpose", 34, None),
+                ("Follows", 13, None), ("Sectors of interest", 40, None), ("Commodities of interest", 40, None)]
 STATUS_LABELS = {"approved": "Approved", "pending": "Pending", "blocked": "Blocked"}
 
 
@@ -193,8 +194,14 @@ def _when(seconds):
     return dt.datetime.fromtimestamp(int(seconds)) if seconds else None
 
 
+def _with_other(chosen, typed):
+    """"Technology, Energy, Other: Crypto" """
+    return ", ".join(list(chosen) + ([f"Other: {typed}"] if typed else []))
+
+
 def users_workbook(users, details, genders, age_on, now=None):
     """Users sheet (one row per account, newest first) and a Summary sheet. `details` maps user id → profile details."""
+    import auth
     now = now or dt.datetime.now()
     stamp = now.strftime("%d %b %Y, %H:%M")
     wb = Workbook()
@@ -204,9 +211,12 @@ def users_workbook(users, details, genders, age_on, now=None):
     for u in users:
         d = details.get(u["id"]) or {}
         birth = d.get("birth_date")
+        it = auth.interests_from(d.get("interests"))
         values = [u["email"], u.get("full_name") or "", STATUS_LABELS.get(u["status"], u["status"]), "Yes" if u.get("is_admin") else "No",
                   _when(u.get("created_at")), _when(u.get("last_login_at")), d.get("city") or "", birth,
-                  age_on(birth) if birth else None, genders.get(d.get("gender") or "", d.get("gender") or ""), d.get("profession") or ""]
+                  age_on(birth) if birth else None, genders.get(d.get("gender") or "", d.get("gender") or ""), d.get("profession") or "",
+                  auth.INVEST_RANGES.get(d.get("invest_range") or "", ""), _with_other([auth.PURPOSES[p] for p in it["purposes"]], it["purposes_other"]),
+                  auth.FOLLOWS.get(it["follows"], ""), _with_other(it["sectors"], it["sectors_other"]), _with_other(it["commodities"], it["commodities_other"])]
         _write_row(ws, row, USER_COLUMNS, values)
         row += 1
     ws.auto_filter.ref = f"A4:{get_column_letter(len(USER_COLUMNS))}{max(4, row - 1)}"
@@ -225,9 +235,26 @@ def users_workbook(users, details, genders, age_on, now=None):
              ("New in the last 7 days", sum(1 for u in users if (u.get("created_at") or 0) >= week)),
              ("Signed in in the last 24 hours", sum(1 for u in users if (u.get("last_login_at") or 0) >= day)),
              ("Signed in in the last 7 days", sum(1 for u in users if (u.get("last_login_at") or 0) >= week)),
-             ("Filled in their profile details", sum(1 for u in users if any((details.get(u["id"]) or {}).get(k) for k in ("city", "birth_date", "gender", "profession"))))]
+             ("Filled in their profile details", sum(1 for u in users if any((details.get(u["id"]) or {}).get(k) for k in ("city", "birth_date", "gender", "profession", "invest_range"))))]
     for label, value in lines:
         s.append([label, value])
         s.cell(row=s.max_row, column=1).font = TOTAL_FONT
+
+    # How many people chose each answer (people can pick several purposes, sectors and commodities)
+    mine = [details.get(u["id"]) or {} for u in users]
+    picks = [auth.interests_from(d.get("interests")) for d in mine]
+    other = lambda key: [("Other (typed their own)", sum(1 for p in picks if p[key]))]
+    sections = [("Investing range", [(label, sum(1 for d in mine if d.get("invest_range") == key)) for key, label in auth.INVEST_RANGES.items()]),
+                ("Main purpose", [(label, sum(1 for p in picks if key in p["purposes"])) for key, label in auth.PURPOSES.items()] + other("purposes_other")),
+                ("Follows", [(label, sum(1 for p in picks if p["follows"] == key)) for key, label in auth.FOLLOWS.items()]),
+                ("Sectors of interest", [(x, sum(1 for p in picks if x in p["sectors"])) for x in auth.INTEREST_SECTORS] + other("sectors_other")),
+                ("Commodities of interest", [(x, sum(1 for p in picks if x in p["commodities"])) for x in auth.INTEREST_COMMODITIES] + other("commodities_other"))]
+    for title, counts in sections:
+        s.append([])
+        s.append([title, "People"])
+        for c in (1, 2):
+            s.cell(row=s.max_row, column=c).fill, s.cell(row=s.max_row, column=c).font = HEAD_FILL, HEAD_FONT
+        for label, n in counts:
+            s.append([label, n])
     s.column_dimensions["A"].width, s.column_dimensions["B"].width = 34, 12
     return _bytes(wb)

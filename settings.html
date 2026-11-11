@@ -63,12 +63,11 @@ textarea{min-height:120px;resize:vertical;line-height:1.5}
 .fact .l{font-size:10px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:1.1px;margin-bottom:4px}
 .fact .v{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
-.badge{display:inline-block;padding:3px 9px;border-radius:5px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;border:1px solid;white-space:nowrap}
-/* Ticket status: just coloured text */
-.badge.s-open,.badge.s-in_progress,.badge.s-resolved{background:none;border:0;padding:0;border-radius:0}
+/* Statuses and roles: plain coloured text, normal weight (no box, background or capitals) */
+.badge{display:inline-block;font-size:12px;font-weight:500;white-space:nowrap}
 .s-open{color:var(--yellow)}.s-in_progress{color:var(--cyan)}.s-resolved{color:var(--green)}
-.b-admin{color:var(--cyan);background:rgba(0,212,255,.1);border-color:rgba(0,212,255,.25)}
-.b-user{color:var(--t2);background:var(--bg3);border-color:var(--b2)}
+.b-admin{color:var(--blue)}
+.b-user{color:var(--t2)}
 
 .hd-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap}
 .hd-head h2{margin:0}
@@ -113,11 +112,21 @@ input[type=date]:focus{border-color:var(--blue)}
 .sw input:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .group{font-size:11px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:1px;margin:18px 0 2px}
 .group:first-child{margin-top:0}
-.danger{border-color:rgba(255,68,68,.35)}
-.danger h2{color:var(--red)}
-.btn.red{color:var(--red);border-color:var(--red);background:transparent}
-.btn.red:hover:not(:disabled){border-color:var(--red);text-decoration:underline}
 .btn.dl{display:inline-flex;align-items:center;gap:8px;text-decoration:none}
+input[type=email]{width:100%;padding:11px 12px;border-radius:9px;border:1px solid var(--b2);background:var(--bg3);color:var(--t1);font-size:14px;outline:none}
+.subhead{font-size:13px;font-weight:800;margin:22px 0 2px;padding-top:16px;border-top:1px solid var(--b1)}
+.subhead small{display:block;color:var(--t3);font-weight:500;font-size:12px;margin-top:2px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+#sectors-wrap>label,#coms-wrap>label{margin-top:18px}
+.chip{margin:0;display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid var(--b2);border-radius:18px;background:var(--bg3);color:var(--t2);
+  font-size:12px;font-weight:700;letter-spacing:0;text-transform:none;cursor:pointer;user-select:none}
+.chip input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.chip:has(input:checked){border-color:var(--blue);background:rgba(79,142,247,.14);color:#fff}
+.chip:has(input:checked)::before{content:'✓';color:var(--blue);font-weight:900}
+.chip:has(input:focus-visible){outline:2px solid var(--blue);outline-offset:2px}
+.email-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.email-row .cur{font-weight:700;overflow-wrap:anywhere}
+.other-box{margin-top:8px;max-width:360px}
 
 @media(max-width:760px){
   .top{padding-left:calc(16px + env(safe-area-inset-left));padding-right:calc(16px + env(safe-area-inset-right))}
@@ -168,7 +177,7 @@ input[type=date]:focus{border-color:var(--blue)}
             <div><label for="email">Email</label><input id="email" type="text" readonly/></div>
           </div>
           <div class="row2" style="margin-top:14px">
-            <div><label for="city">Region / city</label><input id="city" type="text" maxlength="80" placeholder="e.g. London" autocomplete="address-level2"/></div>
+            <div><label for="city">Region / city</label><input id="city" type="text" maxlength="80" placeholder="e.g. New York, Charlotte or Harrisburg" autocomplete="address-level2"/></div>
             <div><label for="birth">Date of birth</label><input id="birth" type="date" min="1900-01-01" autocomplete="bday"/><div class="age" id="age"></div></div>
           </div>
           <div class="row2" style="margin-top:4px">
@@ -176,13 +185,38 @@ input[type=date]:focus{border-color:var(--blue)}
             <div><label for="profession">Profession</label><select id="profession"><option value="">Choose…</option></select>
               <input id="profession-other" type="text" maxlength="60" placeholder="Your profession" style="margin-top:8px" hidden/></div>
           </div>
-          <p class="privacy">Optional. These details help us improve Aymetrix. Only you and our administrators can see them, and they are deleted if you delete your account.</p>
+          <div class="subhead">Investing profile<small>Optional. Tells us what you use Aymetrix for, so we can make it more useful to you.</small></div>
+          <div class="row2" style="margin-top:12px">
+            <div><label for="invest-range">Investing range (US $)</label><select id="invest-range"><option value="">Choose…</option></select></div>
+            <div><label for="follows">What do you follow?</label><select id="follows"><option value="">Choose…</option></select></div>
+          </div>
+          <label style="margin-top:18px">Main purpose <span style="text-transform:none;letter-spacing:0;font-weight:600">(choose any)</span></label>
+          <div class="chips" id="purposes"></div>
+          <input class="other-box" id="purposes-other" type="text" maxlength="60" placeholder="Your own answer" aria-label="Your own purpose" hidden/>
+          <div id="sectors-wrap"><label>Sectors you're interested in</label><div class="chips" id="sectors"></div>
+            <input class="other-box" id="sectors-other" type="text" maxlength="60" placeholder="e.g. Crypto, Gaming" aria-label="Other sectors" hidden/></div>
+          <div id="coms-wrap"><label>Commodities you're interested in</label><div class="chips" id="commodities"></div>
+            <input class="other-box" id="commodities-other" type="text" maxlength="60" placeholder="e.g. Lithium, Uranium" aria-label="Other commodities" hidden/></div>
+          <p class="privacy">Optional. These details help us improve Aymetrix. Only you and our administrators can see them.</p>
           <div class="actions"><button class="btn primary" type="submit" id="name-save">Save</button><span class="msg" id="name-msg" role="status"></span></div>
         </form>
       </div>
       <div class="card">
+        <h2>Email</h2>
+        <p class="lead">You sign in with this email. Changing it keeps everything else: your portfolio, transactions, watchlist and settings stay the same.</p>
+        <div class="email-row"><span class="cur" id="email-current">—</span><button class="btn" type="button" id="email-open">Change email</button></div>
+        <form id="email-form" autocomplete="off" hidden style="margin-top:16px">
+          <div class="row2">
+            <div><label for="new-email">New email</label><input id="new-email" type="email" maxlength="254" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" required/></div>
+            <div><label for="email-pw">Your password</label><input id="email-pw" type="password" autocomplete="current-password" maxlength="128" required/></div>
+          </div>
+          <p class="hint">We'll email a link to the new address. Your email changes when you click it.</p>
+          <div class="actions"><button class="btn primary" type="submit" id="email-send">Send confirmation link</button><button class="btn" type="button" id="email-cancel">Cancel</button><span class="msg" id="email-msg" role="status"></span></div>
+        </form>
+        <p class="hint" style="margin-top:14px">Can't change it yourself (for example, you no longer use the new or old address)? <a href="#help" id="email-ticket">Raise a ticket in Help Desk</a> and we'll change it for you.</p>
+      </div>
+      <div class="card">
         <h2>Account details</h2>
-        <p class="lead">To change your email, raise a ticket in Help Desk.</p>
         <div class="facts" id="facts"><div class="empty">Loading…</div></div>
       </div>
     </section>
@@ -265,17 +299,6 @@ input[type=date]:focus{border-color:var(--blue)}
         <p class="lead">One Excel file with two sheets: your <b>Portfolio</b> (holdings, current value, profit and loss) and your <b>Transactions</b> (every buy, sell and dividend).</p>
         <a class="btn primary dl" href="/api/account/export" id="export-btn" download><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download Excel</a>
       </div>
-      <div class="card danger">
-        <h2>Delete my account</h2>
-        <p class="lead">This permanently deletes your account and everything in it: portfolio, transactions, watchlist, price alerts, Help Desk tickets and profile details. It can't be undone. You may want to download your data first.</p>
-        <form id="delete-form" autocomplete="off">
-          <div class="row2">
-            <div><label for="del-password">Your password</label><input id="del-password" type="password" autocomplete="current-password" maxlength="128" required/></div>
-            <div><label for="del-confirm">Type DELETE to confirm</label><input id="del-confirm" type="text" maxlength="10" autocapitalize="characters" spellcheck="false" required placeholder="DELETE"/></div>
-          </div>
-          <div class="actions"><button class="btn red" type="submit" id="del-btn">Delete my account</button><span class="msg" id="del-msg" role="status"></span></div>
-        </form>
-      </div>
     </section>
   </main>
 </div>
@@ -342,7 +365,17 @@ function showAge(){
   const age = ageFrom(document.getElementById('birth').value);
   document.getElementById('age').textContent = age === '' ? '' : `Age ${age}`;
 }
+function chipsHtml(name, items){
+  return items.map(([value, label]) => `<label class="chip"><input type="checkbox" name="${name}" value="${escapeHtml(value)}"/>${escapeHtml(label)}</label>`).join('');
+}
 function fillChoices(choices){
+  const opts = (id, obj) => { const sel = document.getElementById(id); if(sel.options.length <= 1) Object.entries(obj || {}).forEach(([k, v]) => { const o = document.createElement('option'); o.value = k; o.textContent = v; sel.appendChild(o); }); };
+  opts('invest-range', choices.invest_ranges); opts('follows', choices.follows);
+  const fill = (id, items) => { const el = document.getElementById(id); if(!el.children.length) el.innerHTML = chipsHtml(id, items); };
+  const OTHER = ['__other', 'Other'];
+  fill('purposes', [...Object.entries(choices.purposes || {}), OTHER]);
+  fill('sectors', [...(choices.sectors || []).map(x => [x, x]), OTHER]);
+  fill('commodities', [...(choices.commodities || []).map(x => [x, x]), OTHER]);
   const g = document.getElementById('gender'), p = document.getElementById('profession');
   if(g.options.length <= 1) Object.entries(choices.genders || {}).forEach(([k, v]) => { const o = document.createElement('option'); o.value = k; o.textContent = v; g.appendChild(o); });
   if(p.options.length <= 1){
@@ -364,17 +397,36 @@ function renderProfile(){
   prof.value = !a.profession ? '' : known ? a.profession : '__other';
   document.getElementById('profession-other').value = known ? '' : (a.profession || '');
   showProfessionOther(); showAge();
+  document.getElementById('invest-range').value = a.invest_range || '';
+  document.getElementById('follows').value = a.follows || '';
+  const tick = (id, list) => document.querySelectorAll(`#${id} input`).forEach(i => { i.checked = (list || []).includes(i.value); });
+  tick('purposes', [...(a.purposes || []), ...(a.purposes_other ? ['__other'] : [])]);
+  tick('sectors', [...(a.sectors || []), ...(a.sectors_other ? ['__other'] : [])]);
+  tick('commodities', [...(a.commodities || []), ...(a.commodities_other ? ['__other'] : [])]);
+  ['purposes', 'sectors', 'commodities'].forEach(id => { document.getElementById(id + '-other').value = a[id + '_other'] || ''; showOther(id); });
+  showInterests();
+}
+// "Other" opens a box to type their own answer.
+function otherTicked(id){ return [...document.querySelectorAll(`#${id} input`)].some(i => i.value === '__other' && i.checked); }
+function showOther(id){ document.getElementById(id + '-other').hidden = !otherTicked(id); }
+function otherText(id, wrapHidden){ return !wrapHidden && otherTicked(id) ? document.getElementById(id + '-other').value.trim() : ''; }
+// Sectors are about stocks and the commodity list about commodities: show the ones that fit what they follow.
+function showInterests(){
+  const f = document.getElementById('follows').value;
+  document.getElementById('sectors-wrap').hidden = f === 'commodities';
+  document.getElementById('coms-wrap').hidden = f === 'stocks';
 }
 function renderAccount(){
   const a = state.account; if(!a) return;
   document.getElementById('email').value = a.email;
+  document.getElementById('email-current').textContent = a.email;
   document.getElementById('pw-user').value = a.email;
   const nameEl = document.getElementById('name'); if(document.activeElement !== nameEl) nameEl.value = a.name || '';
   const role = a.is_admin ? '<span class="badge b-admin">Admin</span>' : '<span class="badge b-user">User</span>';
   const facts = [['Member since', escapeHtml(dateOf(a.created_at)), exact(a.created_at)],
                  ['Last sign-in', escapeHtml(ago(a.last_login_at) || '—'), exact(a.last_login_at)],
                  ['Account type', role, ''],
-                 ['Status', a.status === 'approved' ? '<span class="badge s-resolved">Active</span>' : `<span class="badge s-open">${escapeHtml(a.status)}</span>`, '']];
+                 ['Status', a.status === 'approved' ? '<span class="badge s-resolved">Active</span>' : `<span class="badge s-open">${escapeHtml(a.status.charAt(0).toUpperCase() + a.status.slice(1))}</span>`, '']];
   document.getElementById('facts').innerHTML = facts.map(([l, v, t]) => `<div class="fact"${t ? ` title="${escapeHtml(t)}"` : ''}><div class="l">${l}</div><div class="v">${v}</div></div>`).join('');
 }
 async function loadAccount(){
@@ -389,8 +441,16 @@ function profileForm(){
   const prof = document.getElementById('profession').value;
   return { name: document.getElementById('name').value, city: document.getElementById('city').value,
            birth_date: document.getElementById('birth').value, gender: document.getElementById('gender').value,
-           profession: prof === '__other' ? document.getElementById('profession-other').value : prof };
+           profession: prof === '__other' ? document.getElementById('profession-other').value : prof,
+           invest_range: document.getElementById('invest-range').value, follows: document.getElementById('follows').value,
+           purposes: picked('purposes'),
+           sectors: document.getElementById('sectors-wrap').hidden ? [] : picked('sectors'),
+           commodities: document.getElementById('coms-wrap').hidden ? [] : picked('commodities'),
+           purposes_other: otherText('purposes', false),
+           sectors_other: otherText('sectors', document.getElementById('sectors-wrap').hidden),
+           commodities_other: otherText('commodities', document.getElementById('coms-wrap').hidden) };
 }
+function picked(id){ return [...document.querySelectorAll(`#${id} input`)].filter(i => i.checked && i.value !== '__other').map(i => i.value); }
 async function saveName(ev){
   ev.preventDefault();
   const btn = document.getElementById('name-save'); if(btn.disabled) return;
@@ -451,17 +511,28 @@ async function downloadData(ev){
   } catch(e){ toast(e.message, 'err'); }
   finally { delete btn.dataset.busy; btn.lastChild.textContent = label; }
 }
-async function deleteAccount(ev){
+// ── change email ──
+function openEmail(show){
+  document.getElementById('email-form').hidden = !show;
+  document.getElementById('email-open').hidden = show;
+  setMsg('email-msg', '');
+  if(show){ document.getElementById('email-form').reset(); setTimeout(() => document.getElementById('new-email').focus(), 30); }
+}
+async function changeEmail(ev){
   ev.preventDefault();
-  const btn = document.getElementById('del-btn'); if(btn.disabled) return;
-  const password = document.getElementById('del-password').value, confirmWord = document.getElementById('del-confirm').value.trim();
-  if(confirmWord !== 'DELETE'){ setMsg('del-msg', 'Please type DELETE in capital letters to confirm.', 'err'); return; }
-  btn.disabled = true; setMsg('del-msg', 'Deleting…');
+  const btn = document.getElementById('email-send'); if(btn.disabled) return;
+  btn.disabled = true; setMsg('email-msg', 'Sending…');
   try {
-    await call('/api/account/delete', { method: 'POST', body: JSON.stringify({ password, confirm: confirmWord }) });
-    setMsg('del-msg', 'Your account has been deleted.', 'ok');
-    setTimeout(() => { location.href = '/login'; }, 1500);
-  } catch(e){ setMsg('del-msg', e.message, 'err'); btn.disabled = false; }
+    const d = await call('/api/account/email', { method: 'POST', body: JSON.stringify({ email: document.getElementById('new-email').value.trim(), password: document.getElementById('email-pw').value }) });
+    document.getElementById('email-pw').value = '';
+    setMsg('email-msg', d.message, 'ok');
+  } catch(e){ setMsg('email-msg', e.message, 'err'); }
+  finally { btn.disabled = false; }
+}
+function emailTicket(){
+  location.hash = 'help'; showNewTicket(true);
+  const c = document.getElementById('tk-category'); if([...c.options].some(o => o.value === 'email')) c.value = 'email';
+  const sub = document.getElementById('tk-subject'); if(!sub.value) sub.value = 'Please change my email';
 }
 
 // ── security ──
@@ -563,7 +634,15 @@ document.getElementById('birth').addEventListener('input', showAge);
 document.getElementById('profession').addEventListener('change', () => { showProfessionOther(); if(!document.getElementById('profession-other').hidden) document.getElementById('profession-other').focus(); });
 document.getElementById('notify-list').addEventListener('change', e => { const i = e.target.closest('input[data-pref]'); if(i) savePref(i); });
 document.getElementById('export-btn').addEventListener('click', downloadData);
-document.getElementById('delete-form').addEventListener('submit', deleteAccount);
+document.getElementById('email-open').addEventListener('click', () => openEmail(true));
+document.getElementById('email-cancel').addEventListener('click', () => openEmail(false));
+document.getElementById('email-form').addEventListener('submit', changeEmail);
+document.getElementById('email-ticket').addEventListener('click', e => { e.preventDefault(); emailTicket(); });
+document.getElementById('follows').addEventListener('change', showInterests);
+['purposes', 'sectors', 'commodities'].forEach(id => document.getElementById(id).addEventListener('change', e => {
+  if(e.target.value !== '__other') return;
+  showOther(id); if(e.target.checked) document.getElementById(id + '-other').focus();
+}));
 document.getElementById('pw-form').addEventListener('submit', changePassword);
 document.getElementById('pw-show').addEventListener('change', e => document.querySelectorAll('input[data-pw]').forEach(i => { i.type = e.target.checked ? 'text' : 'password'; }));
 document.getElementById('new-ticket-btn').addEventListener('click', () => showNewTicket(true));

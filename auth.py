@@ -36,6 +36,7 @@ STATUSES = ("pending", "approved", "blocked")
 ACCESS_TTL = 15          # seconds an account's status is remembered before the database is asked again
 ACCESS_STALE_OK = 600    # if the database can't be reached, a status seen this recently is still trusted
 RESET_MINUTES = 30       # how long a password reset link works
+EMAIL_CHANGE_MINUTES = 60   # how long the link that confirms a new email address works
 MAX_NAME = 80
 
 
@@ -235,6 +236,11 @@ USERS_EXTRA_COLUMNS = (
     ("full_name", "VARCHAR(80) NULL DEFAULT NULL"),
     ("sessions_after", "INT NULL DEFAULT NULL"),
 )
+PROFILE_EXTRA_COLUMNS = (
+    ("invest_range", "VARCHAR(20) NULL DEFAULT NULL"),
+    ("interests", "TEXT NULL"),                       # JSON: purposes, follows, sectors, commodities
+    ("recent_stocks", "TEXT NULL"),                   # JSON list of the stocks they opened last, newest first
+)
 EXTRA_TABLES = {
     "password_resets": """CREATE TABLE IF NOT EXISTS password_resets (
   id INT NOT NULL AUTO_INCREMENT,
@@ -256,6 +262,18 @@ EXTRA_TABLES = {
   notify_prefs TEXT NULL,
   updated_at INT NOT NULL,
   PRIMARY KEY (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
+    "email_changes": """CREATE TABLE IF NOT EXISTS email_changes (
+  id INT NOT NULL AUTO_INCREMENT,
+  user_id INT NOT NULL,
+  new_email VARCHAR(254) NOT NULL,
+  token_hash CHAR(64) NOT NULL,
+  created_at INT NOT NULL,
+  expires_at INT NOT NULL,
+  used_at INT NULL DEFAULT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_email_changes_token (token_hash),
+  KEY idx_email_changes_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""",
     "account_events": """CREATE TABLE IF NOT EXISTS account_events (
   id INT NOT NULL AUTO_INCREMENT,
@@ -291,8 +309,15 @@ def ensure_schema(conn):
     for name, ddl in EXTRA_TABLES.items():
         cur.execute(ddl)
         done.append(f"{name} table ready")
+    for column, ddl in PROFILE_EXTRA_COLUMNS:
+        if _column_exists(cur, "user_profiles", column):
+            done.append(f"user_profiles: {column} column already there")
+        else:
+            cur.execute(f"ALTER TABLE user_profiles ADD COLUMN {column} {ddl}")
+            done.append(f"user_profiles: added {column} column")
     conn.commit()
     return done
+
 
 
 class MySQLStore:
@@ -470,6 +495,17 @@ class MySQLStore:
             conn.commit()
         return self._run(work)
 
+    def recent_stocks(self, user_id):
+        if not self._extras():
+            return None
+
+        def work(conn):
+            cur = conn.cursor()
+            cur.execute("SELECT recent_stocks FROM user_profiles WHERE user_id = %s", (user_id,))
+            row = cur.fetchone()
+            return row[0] if row else None
+        return self._run(work)
+
     def details(self, user_id):
         """The optional profile details and notification choices (None when never saved)."""
         if not self._extras():
@@ -477,7 +513,7 @@ class MySQLStore:
 
         def work(conn):
             cur = conn.cursor(dictionary=True)
-            cur.execute("SELECT city, birth_date, gender, profession, notify_prefs FROM user_profiles WHERE user_id = %s", (user_id,))
+            cur.execute("SELECT city, birth_date, gender, profession, notify_prefs, invest_range, interests FROM user_profiles WHERE user_id = %s", (user_id,))
             return cur.fetchone()
         return self._run(work)
 
@@ -488,15 +524,15 @@ class MySQLStore:
 
         def work(conn):
             cur = conn.cursor(dictionary=True)
-            cur.execute("SELECT user_id, city, birth_date, gender, profession FROM user_profiles")
+            cur.execute("SELECT user_id, city, birth_date, gender, profession, invest_range, interests FROM user_profiles")
             return {r["user_id"]: r for r in cur.fetchall()}
         return self._run(work)
 
     def save_details(self, user_id, fields, now):
-        """Insert or update some of: city, birth_date, gender, profession, notify_prefs."""
+        """Insert or update some of: city, birth_date, gender, profession, notify_prefs, invest_range, interests."""
         if not self._extras():
             raise AuthError("Your details can't be saved just now. Please try again in a minute.", 503)
-        allowed = ("city", "birth_date", "gender", "profession", "notify_prefs")
+        allowed = ("city", "birth_date", "gender", "profession", "notify_prefs", "invest_range", "interests", "recent_stocks")
         cols = [c for c in allowed if c in fields]
 
         def work(conn):
@@ -505,6 +541,52 @@ class MySQLStore:
             cur.execute(f"INSERT INTO user_profiles (user_id, {', '.join(cols)}, updated_at) VALUES (%s, {', '.join(['%s'] * len(cols))}, %s) "
                         f"ON DUPLICATE KEY UPDATE {sets}", (user_id, *[fields[c] for c in cols], now))
             conn.commit()
+        return self._run(work)
+
+    def set_email(self, user_id, email):
+        import mysql.connector
+
+        def work(conn):
+            cur = conn.cursor()
+            try:
+                cur.execute("UPDATE users SET email = %s WHERE id = %s", (email, user_id))
+                cur.execute("UPDATE email_changes SET used_at = UNIX_TIMESTAMP() WHERE user_id = %s AND used_at IS NULL", (user_id,))
+                conn.commit()
+            except mysql.connector.IntegrityError as e:
+                conn.rollback()
+                raise AuthError("Another account already uses that email.", 409) from e
+        return self._run(work)
+
+    def add_email_change(self, user_id, new_email, token_hash, now, expires_at):
+        """Store a link that confirms a new email. Any earlier unused link for the account stops working."""
+        if not self._extras():
+            raise AuthError("Emails can't be changed just now. Please try again in a minute.", 503)
+
+        def work(conn):
+            cur = conn.cursor()
+            cur.execute("UPDATE email_changes SET used_at = %s WHERE user_id = %s AND used_at IS NULL", (now, user_id))
+            cur.execute("DELETE FROM email_changes WHERE expires_at < %s", (now - 7 * 86400,))
+            cur.execute("INSERT INTO email_changes (user_id, new_email, token_hash, created_at, expires_at) VALUES (%s, %s, %s, %s, %s)",
+                        (user_id, new_email, token_hash, now, expires_at))
+            conn.commit()
+        return self._run(work)
+
+    def find_email_change(self, token_hash):
+        if not self._extras():
+            return None
+
+        def work(conn):
+            cur = conn.cursor(dictionary=True)
+            cur.execute("SELECT id, user_id, new_email, expires_at, used_at FROM email_changes WHERE token_hash = %s", (token_hash,))
+            return cur.fetchone()
+        return self._run(work)
+
+    def use_email_change(self, change_id, now):
+        def work(conn):
+            cur = conn.cursor()
+            cur.execute("UPDATE email_changes SET used_at = %s WHERE id = %s AND used_at IS NULL", (now, change_id))
+            conn.commit()
+            return cur.rowcount == 1
         return self._run(work)
 
     def delete_account(self, user_id):
@@ -710,7 +792,12 @@ EVENT_KINDS = {
     "reset_sent": "Password reset email sent",
     "ticket_opened": "Raised a ticket",
     "ticket_status": "Ticket status changed",
-    "account_deleted": "Deleted their own account",
+    "account_deleted": "Deleted their own account",       # older entries in the activity log
+    "account_restored": "Account restored",
+    "account_purged": "Account removed for good",
+    "learn_changed": "Learn tab changed",
+    "email_change_sent": "Asked to change their email",
+    "email_changed": "Email changed",
 }
 
 
@@ -837,6 +924,72 @@ GENDERS = {"male": "Male", "female": "Female", "other": "Other", "prefer_not": "
 PROFESSIONS = ["Student", "Salaried", "Self-employed / Business", "Finance professional", "Retired"]
 MAX_CITY, MAX_PROFESSION = 80, 60
 
+# Investing profile (all optional). Amounts are in US dollars, like the prices on the dashboard.
+INVEST_RANGES = {
+    "under_1k": "Under $1,000", "1k_10k": "$1,000 – $10,000", "10k_50k": "$10,000 – $50,000", "50k_100k": "$50,000 – $100,000",
+    "100k_500k": "$100,000 – $500,000", "over_500k": "Over $500,000", "prefer_not": "Prefer not to say",
+}
+PURPOSES = {
+    "learning": "Learning about markets", "long_term": "Long-term investing", "trading": "Short-term trading",
+    "tracking": "Tracking my portfolio", "research": "Research or work", "exploring": "Just exploring",
+}
+FOLLOWS = {"stocks": "Stocks", "commodities": "Commodities", "both": "Both"}
+INTEREST_SECTORS = ["Technology", "Communication Services", "Healthcare", "Financials", "Consumer Discretionary", "Consumer Staples",
+                    "Energy", "Industrials", "Materials", "Real Estate", "Utilities"]
+INTEREST_COMMODITIES = ["Gold", "Silver", "Platinum & palladium", "Copper & industrial metals", "Oil", "Natural gas",
+                        "Grains (corn, wheat, soybeans)", "Coffee, sugar, cotton & cocoa", "Livestock"]
+
+
+def _pick_many(raw, allowed, what):
+    """A list of choices from `allowed`, in the standard order, without repeats."""
+    if raw in (None, ""):
+        return []
+    if not isinstance(raw, (list, tuple)):
+        raise AuthError(f"Please choose {what} from the list.")
+    keys = list(allowed)
+    chosen = {str(x) for x in raw}
+    if chosen - set(keys):
+        raise AuthError(f"Please choose {what} from the list.")
+    return [k for k in keys if k in chosen]
+
+
+MAX_OTHER = 60
+OTHER_KEYS = ("purposes_other", "sectors_other", "commodities_other")
+
+
+def clean_interests(invest_range, purposes, follows, sectors, commodities, others=None):
+    """(invest_range or None, interests dict) after checking every choice is one of ours. `others` holds what the
+    person typed into the "Other" boxes ({"purposes_other": "...", ...})."""
+    others = others or {}
+    typed = {k: _clean_text(others.get(k), MAX_OTHER, "Your own answer") for k in OTHER_KEYS}
+    invest_range = str(invest_range or "").strip()
+    if invest_range and invest_range not in INVEST_RANGES:
+        raise AuthError("Please choose an investing range from the list.")
+    follows = str(follows or "").strip()
+    if follows and follows not in FOLLOWS:
+        raise AuthError("Please choose Stocks, Commodities or Both.")
+    return invest_range or None, {"purposes": _pick_many(purposes, PURPOSES, "your purpose"), "follows": follows,
+                                  "sectors": _pick_many(sectors, INTEREST_SECTORS, "sectors"),
+                                  "commodities": _pick_many(commodities, INTEREST_COMMODITIES, "commodities"), **typed}
+
+
+def interests_from(raw):
+    """The saved interests (JSON) as a dict with every key present."""
+    out = {"purposes": [], "follows": "", "sectors": [], "commodities": [], **{k: "" for k in OTHER_KEYS}}
+    if raw:
+        try:
+            saved = json.loads(raw)
+            if isinstance(saved, dict):
+                out["purposes"] = [p for p in saved.get("purposes") or [] if p in PURPOSES]
+                out["follows"] = saved.get("follows") if saved.get("follows") in FOLLOWS else ""
+                out["sectors"] = [x for x in saved.get("sectors") or [] if x in INTEREST_SECTORS]
+                out["commodities"] = [x for x in saved.get("commodities") or [] if x in INTEREST_COMMODITIES]
+                for k in OTHER_KEYS:
+                    out[k] = str(saved.get(k) or "")[:MAX_OTHER]
+        except (ValueError, TypeError, AttributeError):
+            pass
+    return out
+
 # Notification choices. Everything is on until someone turns it off.
 NOTIFY_DEFAULTS = {
     "email_ticket_replies": True,    # email when the Aymetrix team replies to a ticket or changes its status
@@ -905,11 +1058,13 @@ def get_details(user_id, today=None):
     birth = row.get("birth_date")
     return {"city": row.get("city") or "", "birth_date": birth.isoformat() if birth else "",
             "age": age_on(birth, today) if birth else None, "gender": row.get("gender") or "",
-            "profession": row.get("profession") or "", "notifications": _prefs_from(row.get("notify_prefs"))}
+            "profession": row.get("profession") or "", "invest_range": row.get("invest_range") or "",
+            **interests_from(row.get("interests")), "notifications": _prefs_from(row.get("notify_prefs"))}
 
 
-def save_profile(user_id, name, city, birth_date, gender, profession, now=None):
-    """Save the Profile card: name plus the optional details. Empty means 'not given'."""
+def save_profile(user_id, name, city, birth_date, gender, profession, now=None, invest_range=None, purposes=None, follows=None,
+                 sectors=None, commodities=None, others=None):
+    """Save the Profile card: name plus the optional details and investing profile. Empty means 'not given'."""
     now = int(time.time() if now is None else now)
     name = clean_name(name)
     city = _clean_text(city, MAX_CITY, "Region / city")
@@ -918,8 +1073,10 @@ def save_profile(user_id, name, city, birth_date, gender, profession, now=None):
     if gender and gender not in GENDERS:
         raise AuthError("Please choose a gender from the list.")
     profession = clean_profession(profession)
+    invest_range, interests = clean_interests(invest_range, purposes, follows, sectors, commodities, others)
     store.set_name(user_id, name)
-    store.save_details(user_id, {"city": city or None, "birth_date": birth, "gender": gender or None, "profession": profession or None}, now)
+    store.save_details(user_id, {"city": city or None, "birth_date": birth, "gender": gender or None, "profession": profession or None,
+                                 "invest_range": invest_range, "interests": json.dumps(interests, sort_keys=True)}, now)
     access_cache.invalidate(user_id)
     return {"name": name, **{k: v for k, v in get_details(user_id).items() if k != "notifications"}}
 
@@ -943,21 +1100,122 @@ def wants(user_id, key) -> bool:
         return NOTIFY_DEFAULTS.get(key, True)
 
 
-# ── deleting your own account ──
+# ── recently viewed stocks (the strip on the Market page) ──
 
-def delete_own_account(user_id, password, confirm_word):
-    """Delete the account and everything that belongs to it, after the person types their password and DELETE.
-    The last administrator can't delete their own account, so the app is never left without one."""
-    if str(confirm_word or "").strip() != "DELETE":
-        raise AuthError('Please type DELETE in capital letters to confirm.')
+MAX_RECENT = 15
+_TICKER_RE = re.compile(r"^\^?[A-Z0-9][A-Z0-9.\-=]{0,14}$")
+
+
+def recent_stocks(user_id):
+    """The stocks this person opened last, newest first."""
+    raw = store.recent_stocks(user_id)
+    try:
+        items = json.loads(raw) if raw else []
+    except (ValueError, TypeError):
+        items = []
+    return [t for t in items if isinstance(t, str) and _TICKER_RE.match(t)][:MAX_RECENT]
+
+
+def add_recent_stock(user_id, ticker, now=None):
+    """Put a stock at the front of the list (moving it if it's already there). Returns the new list."""
+    t = str(ticker or "").strip().upper()
+    if not _TICKER_RE.match(t):
+        raise AuthError("That isn't a stock symbol.")
+    items = [t] + [x for x in recent_stocks(user_id) if x != t]
+    items = items[:MAX_RECENT]
+    store.save_details(user_id, {"recent_stocks": json.dumps(items)}, int(time.time() if now is None else now))
+    return items
+
+
+def remove_recent_stock(user_id, ticker, now=None):
+    """Take one stock off the list (nothing changes if it isn't there). Returns the new list."""
+    t = str(ticker or "").strip().upper()
+    if not _TICKER_RE.match(t):
+        raise AuthError("That isn't a stock symbol.")
+    old = recent_stocks(user_id)
+    items = [x for x in old if x != t]
+    if items != old:
+        store.save_details(user_id, {"recent_stocks": json.dumps(items) if items else None}, int(time.time() if now is None else now))
+    return items
+
+
+def clear_recent_stocks(user_id, now=None):
+    store.save_details(user_id, {"recent_stocks": None}, int(time.time() if now is None else now))
+    return []
+
+
+# ── changing the email address ──
+
+def _email_change_hash(token: str) -> str:
+    return hashlib.sha256(("email|" + str(token)).encode("utf-8")).hexdigest()
+
+
+def _check_new_email(user, new_email):
+    """The cleaned new address, or AuthError. An address any other account uses is refused."""
+    email = normalize_email(new_email)
+    check_email(email)
+    if email == user["email"]:
+        raise AuthError("That is already your email.")
+    other = store.find_by_email(email)
+    if other and other["id"] != user["id"]:
+        raise AuthError("Another account already uses that email.", 409)
+    return email
+
+
+def start_email_change(user_id, password, new_email, now=None):
+    """Settings: the person types a new email and their password. Nothing changes until they click the link sent to
+    the new address (which proves it is theirs). Returns (account, new_email, token)."""
+    now = int(time.time() if now is None else now)
     if not verify_password(password or "", store.password_hash(user_id) or ""):
-        raise AuthError("That isn't your password. Nothing was deleted.", 403)
+        raise AuthError("That isn't your password. Your email wasn't changed.", 403)
     user = store.get(user_id)
     if not user:
         raise AuthError("That account no longer exists.", 404)
-    if user.get("is_admin") and not any(u["is_admin"] and u["status"] == "approved" and u["id"] != user_id for u in store.list_users()):
-        raise AuthError("You're the only administrator, so this account can't be deleted. Make someone else an administrator first.", 409)
-    store.delete_account(user_id)
+    email = _check_new_email(user, new_email)
+    token = secrets.token_urlsafe(32)
+    store.add_email_change(user_id, email, _email_change_hash(token), now, now + EMAIL_CHANGE_MINUTES * 60)
+    log_event("email_change_sent", user_id, user_id, email)
+    return user, email, token
+
+
+def check_email_change_token(token, now=None):
+    now = int(time.time() if now is None else now)
+    if not token or len(str(token)) > 200:
+        return None
+    rec = store.find_email_change(_email_change_hash(token))
+    if not rec or rec.get("used_at") or int(rec["expires_at"]) < now:
+        return None
+    return rec
+
+
+def finish_email_change(token, now=None):
+    """The link in the email was clicked: switch the account to the new address. Everything else (portfolio,
+    transactions, tickets, settings) stays, because it belongs to the account, not to the email.
+    Returns {"id", "old_email", "new_email"}."""
+    now = int(time.time() if now is None else now)
+    expired = AuthError("This link has expired or was already used. You can ask for a new one in Settings.", 410)
+    rec = check_email_change_token(token, now)
+    if not rec:
+        raise expired
+    user = store.get(rec["user_id"])
+    if not user:
+        raise expired
+    email = _check_new_email(user, rec["new_email"])
+    if not store.use_email_change(rec["id"], now):
+        raise expired
+    store.set_email(user["id"], email)
+    access_cache.invalidate(user["id"])
+    log_event("email_changed", user["id"], user["id"], f"{user['email']} to {email}")
+    return {"id": user["id"], "old_email": user["email"], "new_email": email}
+
+
+def admin_change_email(admin_id, user_id, new_email):
+    """An administrator changes someone's email (when they asked through a Help Desk ticket)."""
+    user = store.get(user_id)
+    if not user:
+        raise AuthError("That account no longer exists.", 404)
+    email = _check_new_email(user, new_email)
+    store.set_email(user_id, email)
     access_cache.invalidate(user_id)
-    log_event("account_deleted", None, None, user["email"])
-    return user["email"]
+    log_event("email_changed", user_id, admin_id, f"{user['email']} to {email}")
+    return {"id": user_id, "old_email": user["email"], "new_email": email}
