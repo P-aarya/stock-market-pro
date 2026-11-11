@@ -2,12 +2,14 @@
 import threading
 import time
 import unittest
+from unittest import mock
 
 from fastapi.testclient import TestClient
 
 import _path  # noqa: F401
 import api
 import auth
+import support
 from _accounts import AccountsTestCase, add_user, signed_in_client
 
 GOOD = "correct horse battery"
@@ -78,7 +80,8 @@ class ACookieDoesNotOutliveApproval(AccountsTestCase, unittest.TestCase):
             uid = add_user(f"{status}@example.com", status)
             c = signed_in_client(uid, follow_redirects=False)
             self.assertEqual(c.get("/api/portfolio").status_code, 401, status)
-            page = c.get("/"); self.assertEqual((page.status_code, page.headers["location"]), (302, "/login"), status)
+            dash = c.get("/dashboard.html"); self.assertEqual((dash.status_code, dash.headers["location"]), (302, "/login"), status)
+            self.assertNotIn('id="page-market"', c.get("/").text, status)               # they see the public price list, never the dashboard
             self.assertEqual(c.get("/admin").status_code, 302, status)
             st = c.get("/api/auth/status").json(); self.assertEqual((st["signed_in"], st["user"], st["admin"]), (False, None, False), status)
 
@@ -197,15 +200,20 @@ class AdminApi(AccountsTestCase, unittest.TestCase):
     def test_the_list_has_everyone_newest_first_with_counts_and_no_secrets(self):
         d = self.a.get("/api/admin/users").json()
         self.assertEqual([u["id"] for u in d["users"]], [4, 3, 2, 1])
-        self.assertEqual(d["counts"], {"pending": 1, "approved": 2, "blocked": 1, "total": 4}); self.assertEqual(d["you"], self.admin)
+        self.assertEqual(d["counts"], {"pending": 1, "approved": 2, "blocked": 1, "deleted": 0, "total": 4}); self.assertEqual(d["you"], self.admin)
         for u in d["users"]:
-            self.assertEqual(set(u), {"id", "email", "status", "is_admin", "created_at", "last_login_at", "reviewed_at"})
+            self.assertEqual(set(u), {"id", "email", "status", "is_admin", "tier", "created_at", "last_login_at", "reviewed_at", "deleted_at"})
         self.assertNotIn("password", self.a.get("/api/admin/users").text.lower())
 
-    def test_the_summary_counts_those_waiting(self):
-        self.assertEqual(self.a.get("/api/admin/summary").json(), {"status": "success", "pending": 1})
-        add_user("another@example.com", "pending")
-        self.assertEqual(self.a.get("/api/admin/summary").json()["pending"], 2)
+    def test_the_summary_counts_those_waiting_and_the_open_tickets(self):
+        with mock.patch.object(support, "open_count", return_value=3):
+            self.assertEqual(self.a.get("/api/admin/summary").json(), {"status": "success", "pending": 1, "open_tickets": 3})
+            add_user("another@example.com", "pending")
+            self.assertEqual(self.a.get("/api/admin/summary").json()["pending"], 2)
+
+    def test_the_summary_still_answers_when_the_tickets_cannot_be_counted(self):
+        with mock.patch.object(support, "open_count", side_effect=RuntimeError("db down")), self.assertLogs("uvicorn.error", level="ERROR"):
+            self.assertEqual(self.a.get("/api/admin/summary").json(), {"status": "success", "pending": 1, "open_tickets": 0})
 
     def test_approving_lets_that_person_in_straight_away(self):
         waiting = signed_in_client(self.pending)

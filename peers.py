@@ -387,15 +387,46 @@ def build_comparison(tickers):
 
 _price_cache = {}
 PRICE_CACHE_TTL = 1800
+MAX_CACHED_SERIES = 100        # comparisons kept in memory
+MAX_CHART_POINTS = 400         # points sent to the chart; the change over the period always counts every trading day
+LATE_START_DAYS = 10           # a first price this many days after the period begins means a stock was not trading yet
 
 
-def rebased_prices(tickers, period="1y"):
+def _one_year_back(today):
+    try:
+        return today.replace(year=today.year - 1)
+    except ValueError:                                  # 29 February
+        return today.replace(year=today.year - 1, day=28)
+
+
+def _no_prices(missing, start, end):
+    return {"dates": [], "series": {}, "changes": {}, "missing": missing, "start": None, "end": None,
+            "requested_start": start.isoformat() if start else None, "requested_end": end.isoformat(), "starts_late": False, "limited_by": []}
+
+
+def rebased_prices(tickers, start=None, end=None, to_max=False, today=None):
     """
-    Daily closes for each ticker over `period`, rebased so every line starts at 100 on the first day they all have data.
-    Returns {"dates": [...], "series": {ticker: [...]}, "missing": [...]}.
+    Closing prices of each ticker over a period (adjusted for splits and dividends), rebased so every line starts at 100 on the
+    first day they all have prices. The period is `start` to `end`, the last year when neither is given, or everything there is
+    when `to_max`. Raises stock_period.PeriodError for dates that make no sense.
+
+    Returns {"dates", "series", "changes" (percent change over the period), "missing", "start", "end" (first and last day
+    charted), "requested_start", "requested_end", "starts_late", "limited_by"}. When a stock began trading after the period
+    began, the chart starts on the first day they all have prices and `limited_by` names the stock that decided it.
     """
+    import pandas as pd
+    import stock_period
     from concurrent.futures import ThreadPoolExecutor
-    import yfinance as yf
+
+    today = today or date.today()
+    if to_max:
+        req_start, req_end = None, today
+    elif start is None and end is None:
+        req_start, req_end = _one_year_back(today), today
+    elif start is None or end is None:
+        raise stock_period.PeriodError("Give both a start date and an end date.")
+    else:
+        req_start, req_end = stock_period.validate_dates(start, end, today)
 
     wanted = []
     for t in tickers:
@@ -406,35 +437,61 @@ def rebased_prices(tickers, period="1y"):
     tracked = {r["ticker"] for r in _query("SELECT ticker FROM stocks_live WHERE ticker IN (%s)" % ",".join(["%s"] * len(wanted)), wanted)} if wanted else set()
     unknown = [t for t in wanted if t not in tracked]
     wanted = [t for t in wanted if t in tracked][:MAX_STOCKS]
-    key = (tuple(wanted), period)
+    key = (tuple(wanted), req_start, req_end, to_max)
     hit = _price_cache.get(key)
     if hit and hit["expires"] > time.time():
         return hit["value"]
 
-    def closes(t):
+    def history(t):
         try:
-            c = yf.Ticker(t).history(period=period, timeout=15)["Close"].dropna()
-            c.index = [str(x)[:10] for x in c.index]
-            return c if len(c) > 20 else None
+            return stock_period.full_history(t)         # downloaded once per stock and kept, so changing the period is instant
         except Exception as e:
             print(f"Price history failed for {t}: {e}")
             return None
 
     with ThreadPoolExecutor(max_workers=max(1, len(wanted))) as pool:
-        histories = dict(zip(wanted, pool.map(closes, wanted)))
-    have = {t: c for t, c in histories.items() if c is not None}
+        histories = dict(zip(wanted, pool.map(history, wanted)))
+    low, high = (pd.Timestamp(req_start) if req_start else None), pd.Timestamp(req_end)
+    have = {}
+    for t, h in histories.items():
+        if h is None:
+            continue
+        c = (h.loc[low:high] if low is not None else h.loc[:high]).dropna()
+        if len(c) >= 2:
+            have[t] = c
     missing = unknown + [t for t in wanted if t not in have]
-    if len(have) < 1:
-        return {"dates": [], "series": {}, "missing": missing}
+    if not have:
+        return _no_prices(missing, req_start, req_end)
 
     common = None
     for c in have.values():
         common = set(c.index) if common is None else common & set(c.index)
     dates = sorted(common or [])
-    if len(dates) < 20:
-        return {"dates": [], "series": {}, "missing": missing + [t for t in have]}
-    series = {t: [round(float(c[d]) / float(c[dates[0]]) * 100, 2) for d in dates] for t, c in have.items()}
-    value = {"dates": dates, "series": series, "missing": missing}
+    if len(dates) < 2:
+        return _no_prices(missing + list(have), req_start, req_end)
+
+    index = pd.DatetimeIndex(dates)
+    full = {}
+    for t, c in have.items():
+        values = c.reindex(index).to_numpy(dtype=float)
+        full[t] = values / values[0] * 100
+    changes = {t: round(float(v[-1]) - 100, 2) for t, v in full.items()}
+    step = max(1, math.ceil(len(dates) / MAX_CHART_POINTS))
+    keep = list(range(0, len(dates), step))
+    if keep[-1] != len(dates) - 1:
+        keep.append(len(dates) - 1)                      # a thinned chart still ends on the last day
+    series = {t: [round(float(v[i]), 2) for i in keep] for t, v in full.items()}
+    shown = [dates[i].strftime("%Y-%m-%d") for i in keep]
+
+    firsts = {t: c.index[0] for t, c in have.items()}
+    reference = pd.Timestamp(req_start) if req_start else min(firsts.values())
+    starts_late = (dates[0] - reference).days > LATE_START_DAYS
+    latest = max(firsts.values())
+    value = {"dates": shown, "series": series, "changes": changes, "missing": missing, "start": shown[0], "end": shown[-1],
+             "requested_start": req_start.isoformat() if req_start else None, "requested_end": req_end.isoformat(),
+             "starts_late": bool(starts_late), "limited_by": sorted(t for t, f in firsts.items() if f == latest) if starts_late else []}
+    if len(_price_cache) >= MAX_CACHED_SERIES:           # forget the oldest comparison
+        del _price_cache[min(_price_cache, key=lambda k: _price_cache[k]["expires"])]
     _price_cache[key] = {"value": value, "expires": time.time() + PRICE_CACHE_TTL}
     return value
 

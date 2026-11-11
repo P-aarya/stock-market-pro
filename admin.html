@@ -65,10 +65,11 @@ h1{font-size:22px;letter-spacing:-.4px}
 
 /* Statuses and roles: plain coloured text, normal weight (no box, background or glow) */
 .badge{display:inline-block;font-size:12px;font-weight:500;white-space:nowrap}
-.b-pending,.b-approved,.b-blocked{text-transform:capitalize}
+.b-pending,.b-approved,.b-blocked,.b-deleted{text-transform:capitalize}
 .b-pending{color:var(--yellow)}
 .b-approved{color:var(--green)}
 .b-blocked{color:var(--red)}
+.b-deleted{color:var(--t3)}
 .b-admin{color:var(--blue);margin-left:8px}
 
 /* Plain buttons: an outline and coloured text, no filled or glowing background. Green = allow, red = refuse/remove,
@@ -320,8 +321,8 @@ textarea:focus,select.inp:focus,input.inp:focus{border-color:var(--blue)}
 <div class="toast" id="toast" role="status"></div>
 
 <script>
-const FILTERS = [['pending', 'Pending'], ['approved', 'Approved'], ['blocked', 'Blocked'], ['all', 'All']];
-const state = { users: [], counts: { pending: 0, approved: 0, blocked: 0, total: 0 }, you: null, filter: null, query: '', busy: new Set(), loaded: false };
+const FILTERS = [['pending', 'Pending'], ['approved', 'Approved'], ['blocked', 'Blocked'], ['deleted', 'Deleted'], ['all', 'All']];
+const state = { plans: {}, users: [], counts: { pending: 0, approved: 0, blocked: 0, deleted: 0, total: 0 }, graceDays: 30, you: null, filter: null, query: '', busy: new Set(), loaded: false };
 
 function escapeHtml(str){
   return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -336,6 +337,7 @@ function ago(seconds, now = Date.now()){
   for(const [name, size] of units){ const n = Math.floor(s / size); if(n >= 1) return `${n} ${name}${n === 1 ? '' : 's'} ago`; }
 }
 function exact(seconds){ return seconds ? new Date(seconds * 1000).toLocaleString() : ''; }
+function day(seconds){ return new Date(seconds * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
 
 function visibleUsers(){
   const q = state.query.trim().toLowerCase();
@@ -346,6 +348,9 @@ function actionsFor(u){
   const busy = state.busy.has(u.id) ? ' disabled' : '';
   const more = (what, cls, text) => `<button class="btn small ${cls}" type="button" data-id="${u.id}" data-more="${what}"${busy}>${text}</button>`;
   const email = more('email', 'plain', 'Change email');
+  if(u.status === 'deleted'){          // deleted by its owner: nothing for an administrator to do, it is removed for good by itself
+    return u.deleted_at ? `<span class="sub" title="Deleted ${escapeHtml(day(u.deleted_at))}. The owner can restore it by signing in until then.">Removed for good ${escapeHtml(day(u.deleted_at + state.graceDays * 86400))}</span>` : '';
+  }
   if(u.is_admin){
     if(u.id === state.you) return '<span class="sub">Administrator (you)</span>' + more('reset', 'plain', 'Send reset link');
     return '<span class="sub">Administrator</span>' + more('admin-off', 'no', 'Remove admin') + more('reset', 'plain', 'Send reset link') + email;
@@ -356,10 +361,17 @@ function actionsFor(u){
   return b('approved', 'go', 'Unblock') + email;
 }
 
+/** The plan an account is on, in words: "Basic plan · $9.99/month". Administrators aren't on a plan; they can use everything. */
+function planOf(u){
+  if(u.is_admin) return 'Administrator · full access';
+  const p = state.plans[String(u.tier)];
+  return p ? `${p.name} plan · $${Number(p.price).toFixed(2)}/month` : '';
+}
+
 function rowHtml(u){
   const reg = ago(u.created_at), last = ago(u.last_login_at);
   return `<div class="row" data-row="${u.id}">
-    <div class="who"><div class="email" title="${escapeHtml(u.email)}">${escapeHtml(u.email)}${u.is_admin ? '<span class="badge b-admin">Admin</span>' : ''}</div>${u.full_name ? `<div class="sub">${escapeHtml(u.full_name)}</div>` : ''}</div>
+    <div class="who"><div class="email" title="${escapeHtml(u.email)}">${escapeHtml(u.email)}${u.is_admin ? '<span class="badge b-admin">Admin</span>' : ''}</div>${u.full_name ? `<div class="sub">${escapeHtml(u.full_name)}</div>` : ''}<div class="sub">${escapeHtml(planOf(u))}</div></div>
     <div class="st"><span class="badge b-${escapeHtml(u.status)}">${escapeHtml(u.status)}</span></div>
     <div class="when" title="${escapeHtml(exact(u.created_at))}"><span class="lbl">Registered</span>${reg ? escapeHtml(reg) : '—'}</div>
     <div class="when" title="${escapeHtml(exact(u.last_login_at))}"><span class="lbl">Last sign-in</span>${last ? escapeHtml(last) : '<span class="sub">never</span>'}</div>
@@ -369,7 +381,7 @@ function rowHtml(u){
 
 function emptyMessage(){
   if(state.query.trim()) return 'No accounts match that search.';
-  return { pending: 'No one is waiting. You are all caught up. ✓', approved: 'No approved accounts yet.', blocked: 'No blocked accounts.', all: 'No accounts yet.' }[state.filter];
+  return { pending: 'No one is waiting. You are all caught up. ✓', approved: 'No approved accounts yet.', blocked: 'No blocked accounts.', deleted: 'No deleted accounts.', all: 'No accounts yet.' }[state.filter];
 }
 
 function render(){
@@ -406,7 +418,7 @@ async function call(path, options = {}){
 async function load(quiet){
   try {
     const d = await call('/api/admin/users');
-    state.users = d.users; state.counts = d.counts; state.you = d.you;
+    state.users = d.users; state.counts = d.counts; state.you = d.you; state.plans = d.plans || {}; state.graceDays = d.grace_days || 30;
     if(!state.loaded){ state.filter = d.counts.pending ? 'pending' : 'all'; state.loaded = true; }
     render();
   } catch(e){

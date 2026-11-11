@@ -59,7 +59,7 @@ class Serving(unittest.TestCase):
             self.assertEqual(r.status_code, 200, path)
             self.assertTrue(r.headers["content-type"].startswith(media_type), path)
             self.assertTrue(r.content, path)
-        self.assertEqual(c.get("/manifest.webmanifest").json()["short_name"], "Stock Pro")
+        self.assertEqual(c.get("/manifest.webmanifest").json()["short_name"], "Aymetrix")
         self.assertEqual(c.get("/apple-touch-icon.png").content[:4], b"\x89PNG")
 
     def test_reachable_without_signing_in(self):
@@ -68,7 +68,9 @@ class Serving(unittest.TestCase):
         for path in api._APP_ASSETS:
             self.assertEqual(c.get(path).status_code, 200, path)
         self.assertEqual(c.get("/api/portfolio").status_code, 401)   # the data stays locked
-        self.assertEqual(c.get("/").status_code, 302)
+        front = c.get("/")                                           # a visitor sees the public price page (the Free plan), not the dashboard
+        self.assertEqual(front.status_code, 200); self.assertNotIn('id="page-market"', front.text)
+        self.assertEqual(c.get("/dashboard.html").status_code, 302)   # the dashboard itself still needs a sign-in
 
     def test_the_dashboard_links_to_them(self):
         with open(os.path.join(_path.ROOT, "dashboard.html"), encoding="utf-8") as f:
