@@ -65,10 +65,11 @@ h1{font-size:22px;letter-spacing:-.4px}
 
 /* Statuses and roles: plain coloured text, normal weight (no box, background or glow) */
 .badge{display:inline-block;font-size:12px;font-weight:500;white-space:nowrap}
-.b-pending,.b-approved,.b-blocked{text-transform:capitalize}
+.b-pending,.b-approved,.b-blocked,.b-deleted{text-transform:capitalize}
 .b-pending{color:var(--yellow)}
 .b-approved{color:var(--green)}
 .b-blocked{color:var(--red)}
+.b-deleted{color:var(--t3)}
 .b-admin{color:var(--blue);margin-left:8px}
 
 /* Plain buttons: an outline and coloured text, no filled or glowing background. Green = allow, red = refuse/remove,
@@ -106,6 +107,13 @@ code{font-family:var(--mono);background:var(--bg3);border:1px solid var(--b1);bo
 @media(max-width:640px){.lf-grid{grid-template-columns:1fr}}
 .lf-l{display:block;font-size:11px;font-weight:700;color:var(--t3);margin-bottom:6px}
 .lf-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+/* View plan */
+.pv-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.pv-pick{flex:1 1 240px;max-width:340px}
+.pv-state{margin-top:12px;font-size:13px;color:var(--t2)}.pv-state.err{color:var(--red)}
+.pv-sub{font-size:11px;font-weight:800;color:var(--t3);text-transform:uppercase;letter-spacing:1.1px;margin:18px 0 8px}
+.pv-chips{list-style:none;display:flex;flex-wrap:wrap;gap:6px}
+.pv-chips li{background:var(--bg3);border:1px solid var(--b2);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:600;color:var(--t2)}
 .lf-msg{font-size:12px;color:var(--t3)}.lf-msg.err{color:var(--red)}.lf-msg.ok{color:var(--green)}
 #lf-body{min-height:90px}
 .li{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--b1)}
@@ -205,6 +213,7 @@ textarea:focus,select.inp:focus,input.inp:focus{border-color:var(--blue)}
     <button class="view-btn" type="button" data-view="help">Help Desk<span class="vn" id="vn-help"></span></button>
     <button class="view-btn" type="button" data-view="activity">Activity</button>
     <button class="view-btn" type="button" data-view="learn">Learn</button>
+    <button class="view-btn" type="button" data-view="plan">View plan</button>
   </nav>
 
   <section class="view" id="view-overview" aria-label="Overview">
@@ -301,6 +310,23 @@ textarea:focus,select.inp:focus,input.inp:focus{border-color:var(--blue)}
     <div class="card"><h2>Investor tips</h2><div id="ll-tip"><div class="empty">Loading…</div></div></div>
   </section>
 
+  <section class="view" id="view-plan" aria-label="View plan">
+    <h1>View plan</h1>
+    <p class="lead">See the dashboard the way a plan sees it, without an account for each plan and without running set-plan. You get that plan's tabs, padlocks and refusals; only your own view changes, and no account is touched.</p>
+    <div class="card">
+      <h2>View the dashboard as</h2>
+      <div class="pv-row">
+        <div class="pv-pick"><label class="lf-l" for="pv-plan">Plan</label><select class="inp" id="pv-plan"><option>Loading…</option></select></div>
+        <button class="btn go" type="button" id="pv-open">View dashboard as this plan</button>
+        <button class="btn" type="button" id="pv-stop" hidden>Stop viewing as a plan</button>
+      </div>
+      <p class="pv-state" id="pv-state" role="status"></p>
+      <h3 class="pv-sub">This plan includes</h3>
+      <ul class="pv-chips" id="pv-included" aria-live="polite"></ul>
+    </div>
+    <p class="note">The choice is yours alone. It ends when you sign out, when you press Exit preview on the dashboard, or after 8 hours. While it is on, the dashboard shows a small bar to switch plan or stop, and this Admin Center keeps working as usual.</p>
+  </section>
+
   <section class="view" id="view-activity" aria-label="Activity">
     <h1>Activity</h1>
     <p class="lead">The latest account and Help Desk events, newest first.</p>
@@ -320,8 +346,8 @@ textarea:focus,select.inp:focus,input.inp:focus{border-color:var(--blue)}
 <div class="toast" id="toast" role="status"></div>
 
 <script>
-const FILTERS = [['pending', 'Pending'], ['approved', 'Approved'], ['blocked', 'Blocked'], ['all', 'All']];
-const state = { users: [], counts: { pending: 0, approved: 0, blocked: 0, total: 0 }, you: null, filter: null, query: '', busy: new Set(), loaded: false };
+const FILTERS = [['pending', 'Pending'], ['approved', 'Approved'], ['blocked', 'Blocked'], ['deleted', 'Deleted'], ['all', 'All']];
+const state = { plans: {}, users: [], counts: { pending: 0, approved: 0, blocked: 0, deleted: 0, total: 0 }, graceDays: 30, you: null, filter: null, query: '', busy: new Set(), loaded: false };
 
 function escapeHtml(str){
   return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -336,6 +362,7 @@ function ago(seconds, now = Date.now()){
   for(const [name, size] of units){ const n = Math.floor(s / size); if(n >= 1) return `${n} ${name}${n === 1 ? '' : 's'} ago`; }
 }
 function exact(seconds){ return seconds ? new Date(seconds * 1000).toLocaleString() : ''; }
+function day(seconds){ return new Date(seconds * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
 
 function visibleUsers(){
   const q = state.query.trim().toLowerCase();
@@ -346,6 +373,9 @@ function actionsFor(u){
   const busy = state.busy.has(u.id) ? ' disabled' : '';
   const more = (what, cls, text) => `<button class="btn small ${cls}" type="button" data-id="${u.id}" data-more="${what}"${busy}>${text}</button>`;
   const email = more('email', 'plain', 'Change email');
+  if(u.status === 'deleted'){          // deleted by its owner: nothing for an administrator to do, it is removed for good by itself
+    return u.deleted_at ? `<span class="sub" title="Deleted ${escapeHtml(day(u.deleted_at))}. The owner can restore it by signing in until then.">Removed for good ${escapeHtml(day(u.deleted_at + state.graceDays * 86400))}</span>` : '';
+  }
   if(u.is_admin){
     if(u.id === state.you) return '<span class="sub">Administrator (you)</span>' + more('reset', 'plain', 'Send reset link');
     return '<span class="sub">Administrator</span>' + more('admin-off', 'no', 'Remove admin') + more('reset', 'plain', 'Send reset link') + email;
@@ -356,10 +386,17 @@ function actionsFor(u){
   return b('approved', 'go', 'Unblock') + email;
 }
 
+/** The plan an account is on, in words: "Basic plan · $9.99/month". Administrators aren't on a plan; they can use everything. */
+function planOf(u){
+  if(u.is_admin) return 'Administrator · full access';
+  const p = state.plans[String(u.tier)];
+  return p ? `${p.name} plan · $${Number(p.price).toFixed(2)}/month` : '';
+}
+
 function rowHtml(u){
   const reg = ago(u.created_at), last = ago(u.last_login_at);
   return `<div class="row" data-row="${u.id}">
-    <div class="who"><div class="email" title="${escapeHtml(u.email)}">${escapeHtml(u.email)}${u.is_admin ? '<span class="badge b-admin">Admin</span>' : ''}</div>${u.full_name ? `<div class="sub">${escapeHtml(u.full_name)}</div>` : ''}</div>
+    <div class="who"><div class="email" title="${escapeHtml(u.email)}">${escapeHtml(u.email)}${u.is_admin ? '<span class="badge b-admin">Admin</span>' : ''}</div>${u.full_name ? `<div class="sub">${escapeHtml(u.full_name)}</div>` : ''}<div class="sub">${escapeHtml(planOf(u))}</div></div>
     <div class="st"><span class="badge b-${escapeHtml(u.status)}">${escapeHtml(u.status)}</span></div>
     <div class="when" title="${escapeHtml(exact(u.created_at))}"><span class="lbl">Registered</span>${reg ? escapeHtml(reg) : '—'}</div>
     <div class="when" title="${escapeHtml(exact(u.last_login_at))}"><span class="lbl">Last sign-in</span>${last ? escapeHtml(last) : '<span class="sub">never</span>'}</div>
@@ -369,7 +406,7 @@ function rowHtml(u){
 
 function emptyMessage(){
   if(state.query.trim()) return 'No accounts match that search.';
-  return { pending: 'No one is waiting. You are all caught up. ✓', approved: 'No approved accounts yet.', blocked: 'No blocked accounts.', all: 'No accounts yet.' }[state.filter];
+  return { pending: 'No one is waiting. You are all caught up. ✓', approved: 'No approved accounts yet.', blocked: 'No blocked accounts.', deleted: 'No deleted accounts.', all: 'No accounts yet.' }[state.filter];
 }
 
 function render(){
@@ -406,7 +443,7 @@ async function call(path, options = {}){
 async function load(quiet){
   try {
     const d = await call('/api/admin/users');
-    state.users = d.users; state.counts = d.counts; state.you = d.you;
+    state.users = d.users; state.counts = d.counts; state.you = d.you; state.plans = d.plans || {}; state.graceDays = d.grace_days || 30;
     if(!state.loaded){ state.filter = d.counts.pending ? 'pending' : 'all'; state.loaded = true; }
     render();
   } catch(e){
@@ -447,7 +484,7 @@ function viewFromHash(){
   const h = (location.hash || '').slice(1);
   const m = h.match(/^ticket-(\d+)$/);
   if(m) return { view: 'help', ticket: Number(m[1]) };
-  return { view: ['overview', 'users', 'help', 'activity', 'learn'].includes(h) ? h : 'overview', ticket: null };
+  return { view: ['overview', 'users', 'help', 'activity', 'learn', 'plan'].includes(h) ? h : 'overview', ticket: null };
 }
 function route(){
   const { view, ticket } = viewFromHash();
@@ -461,6 +498,46 @@ function route(){
   else if(view === 'help'){ if(ticket) openStaffTicket(ticket); else loadTickets(); }
   else if(view === 'activity') loadActivity();
   else if(view === 'learn') loadLearnAdmin();
+  else if(view === 'plan') loadPreview();
+}
+
+// ── View plan: look at the dashboard the way a plan sees it ──
+const preview = { plans: [], current: null, busy: false };
+function pvSay(text, kind){ const m = document.getElementById('pv-state'); m.textContent = text || ''; m.className = 'pv-state' + (kind ? ' ' + kind : ''); }
+function pvPicked(){ const v = Number(document.getElementById('pv-plan').value); return preview.plans.find(p => p.level === v) || null; }
+function renderPreview(keepPick){
+  const sel = document.getElementById('pv-plan');
+  const wanted = keepPick && sel.value ? Number(sel.value) : (preview.current ? preview.current.level : (preview.plans[0] || {}).level);
+  sel.innerHTML = preview.plans.map(p => `<option value="${p.level}"${p.level === wanted ? ' selected' : ''}>${escapeHtml(p.name)}${p.price ? ' · $' + Number(p.price).toFixed(2) + ' a month' : ''}</option>`).join('');
+  const p = pvPicked();
+  document.getElementById('pv-included').innerHTML = p ? p.included.map(f => `<li title="${escapeHtml(f.description || '')}">${escapeHtml(f.label)}</li>`).join('') : '';
+  document.getElementById('pv-stop').hidden = !preview.current;
+  document.getElementById('pv-open').disabled = preview.busy || !p;
+  if(!preview.busy) pvSay(preview.current ? `The dashboard is showing you the ${preview.current.name} plan right now.` : 'You see everything, as an administrator.');
+}
+async function loadPreview(){
+  try {
+    const d = await call('/api/admin/preview');
+    preview.plans = d.plans || []; preview.current = d.current || null;
+    renderPreview(false);
+  } catch(e){ pvSay(e.message, 'err'); }
+}
+async function openPreview(){
+  const p = pvPicked();
+  if(!p || preview.busy) return;
+  preview.busy = true; renderPreview(true); pvSay(`Opening the dashboard as ${p.name}…`);
+  try {
+    await call('/api/admin/preview', { method: 'POST', body: JSON.stringify({ plan: p.level }) });
+    location.href = '/';
+  } catch(e){ preview.busy = false; renderPreview(true); pvSay(e.message, 'err'); toast(e.message, 'err'); }
+}
+async function stopPreview(){
+  if(preview.busy) return;
+  preview.busy = true;
+  try {
+    await call('/api/admin/preview', { method: 'POST', body: JSON.stringify({ plan: null }) });
+    preview.current = null; preview.busy = false; renderPreview(true); toast('Back to the administrator view.', 'ok');
+  } catch(e){ preview.busy = false; renderPreview(true); pvSay(e.message, 'err'); toast(e.message, 'err'); }
 }
 
 // ── Learn tab editor ──
@@ -750,6 +827,9 @@ document.getElementById('tk-refresh').addEventListener('click', () => loadTicket
 document.getElementById('tk-reply-form').addEventListener('submit', sendStaffReply);
 document.getElementById('tk-status-btns').addEventListener('click', e => { const b = e.target.closest('button[data-setstatus]'); if(b) setTicketStatus(b.dataset.setstatus); });
 document.getElementById('pw-modal-form').addEventListener('submit', confirmPassword);
+document.getElementById('pv-plan').addEventListener('change', () => renderPreview(true));
+document.getElementById('pv-open').addEventListener('click', openPreview);
+document.getElementById('pv-stop').addEventListener('click', stopPreview);
 document.getElementById('lf-kind').addEventListener('change', lfLabels);
 document.getElementById('lf-form').addEventListener('submit', saveLearn);
 document.getElementById('lf-cancel').addEventListener('click', () => { resetLearnForm(); lfSay(''); });

@@ -35,7 +35,7 @@ class FakePage {
         this.tag = tag; this.kids = []; this.parent = null; this.style = {}; this.dataset = {};
         this.value = ''; this.textContent = ''; this.checked = false; this.disabled = false; this.readOnly = false;
         this.className = ''; this.scrollTop = 0; this.scrollHeight = 0; this._html = '';
-        const sets = new Set(); this.classList = { s: sets, add: c => sets.add(c), remove: c => sets.delete(c) };
+        const sets = new Set(); this.classList = { s: sets, add: c => sets.add(c), remove: c => sets.delete(c), contains: c => sets.has(c) };
       }
       set id(v) { this._id = v; page.registry[v] = this; }
       get id() { return this._id; }

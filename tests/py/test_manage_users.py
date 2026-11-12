@@ -28,7 +28,8 @@ def has_column(done):
     return respond
 
 
-ALL_DONE = {"portfolio": True, "transactions": True, "users": True}
+ALL_DONE = {"portfolio": True, "transactions": True, "users": True, "user_profiles": True}
+SETTLED_USERS = ("status", "is_admin", "reviewed_at", "reviewed_by", "tier", "deleted_at", "full_name", "sessions_after")   # every column of users that migrate looks for
 
 
 class Migrate(unittest.TestCase):
@@ -42,7 +43,7 @@ class Migrate(unittest.TestCase):
         self.assertTrue(any(a.startswith("ALTER TABLE transactions ADD COLUMN user_id INT NULL") for a in alters))
         for column in ("status", "is_admin", "reviewed_at", "reviewed_by"):
             self.assertTrue(any(a.startswith(f"ALTER TABLE users ADD COLUMN {column} ") for a in alters), column)
-        self.assertEqual(conn.commits, 1)
+        self.assertEqual(conn.commits, 3)                                    # the accounts, the profile and reset tables, the Help Desk tables
         self.assertIn("portfolio: added user_id column", done); self.assertIn("transactions: added user_id column", done)
         self.assertTrue(any("users: added status, is_admin" in line and "existing accounts are approved" in line for line in done))
 
@@ -74,14 +75,37 @@ class Migrate(unittest.TestCase):
         conn = FakeConn(has_column(ALL_DONE))
         done = mu.migrate(conn)
         self.assertEqual(conn.statements("ALTER TABLE"), [])
-        self.assertTrue(all(("already there" in line or "not created yet" in line) for line in done[2:]))
+        self.assertTrue(all(("already there" in line or "not created yet" in line or line.endswith("table ready")) for line in done[2:]), done)   # "table ready" = CREATE TABLE IF NOT EXISTS, harmless
 
     def test_a_half_finished_earlier_run_is_completed(self):
         conn = FakeConn(has_column({"portfolio": True, ("users", "status"): True, ("users", "is_admin"): True}))
         mu.migrate(conn)
         alters = [sql for sql, _ in conn.statements("ALTER TABLE")]
         self.assertEqual(sorted(a.split(" ADD COLUMN ")[0] + " " + a.split(" ADD COLUMN ")[1].split()[0] for a in alters),
-                         ["ALTER TABLE transactions user_id", "ALTER TABLE users reviewed_at", "ALTER TABLE users reviewed_by"])
+                         ["ALTER TABLE transactions user_id", "ALTER TABLE user_profiles interests", "ALTER TABLE user_profiles invest_range", "ALTER TABLE user_profiles recent_stocks",
+                          "ALTER TABLE users deleted_at", "ALTER TABLE users full_name", "ALTER TABLE users reviewed_at", "ALTER TABLE users reviewed_by",
+                          "ALTER TABLE users sessions_after", "ALTER TABLE users tier"])
+
+    def test_the_plan_column_is_added_and_existing_accounts_start_on_the_basic_plan(self):
+        everything_else = {"portfolio": True, "transactions": True, "user_profiles": True, **{("users", c): True for c in SETTLED_USERS if c != "tier"}}
+        conn = FakeConn(has_column(everything_else))
+        done = mu.migrate(conn)
+        alters = [sql for sql, _ in conn.statements("ALTER TABLE")]
+        self.assertEqual(alters, ["ALTER TABLE users ADD COLUMN tier TINYINT NOT NULL DEFAULT 2"])                  # accounts that exist now stay on Basic
+        self.assertTrue(any("users: added tier" in line and "existing accounts stay on the Basic plan" in line and "new sign-ups start on Free" in line for line in done), done)
+        again = mu.migrate(FakeConn(has_column({**everything_else, ("users", "tier"): True})))
+        self.assertIn("users: tier column already there", again)
+
+    def test_the_deletion_column_is_added_and_the_migration_says_what_it_is_for(self):
+        everything_else = {"portfolio": True, "transactions": True, "user_profiles": True, **{("users", c): True for c in SETTLED_USERS if c != "deleted_at"}}
+        conn = FakeConn(has_column(everything_else))
+        done = mu.migrate(conn)
+        self.assertEqual([sql for sql, _ in conn.statements("ALTER TABLE")], ["ALTER TABLE users ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL"])
+        self.assertTrue(any("users: added deleted_at" in line and "delete and restore their own account" in line for line in done), done)
+        self.assertIn("deleted_at TIMESTAMP NULL DEFAULT NULL", mu.USERS_DDL)                      # a brand-new table has it too
+
+    def test_a_brand_new_users_table_has_the_plan_column_defaulting_to_free(self):
+        self.assertIn("tier TINYINT NOT NULL DEFAULT 1", mu.USERS_DDL)
 
     def test_it_only_ever_adds_never_removes_or_rewrites_data(self):
         conn = FakeConn(has_column({}))
@@ -127,9 +151,18 @@ class ClaimLegacyAlerts(unittest.TestCase):
 
 class DeleteAccount(unittest.TestCase):
     def test_price_alerts_go_with_the_account_when_the_table_exists(self):
-        conn = FakeConn(lambda sql, params: [{"n": 1}] if "information_schema.tables" in sql else [])
+        conn = FakeConn(lambda sql, params: [{"n": 1 if params[0] == "price_alerts" else 0}] if "information_schema.tables" in sql else [])
         mu.delete_account(conn, 5)
         self.assertEqual([re.search(r"FROM (\w+)", sql).group(1) for sql, _ in conn.statements("DELETE")], ["portfolio", "transactions", "price_alerts", "watchlist", "users"])
+
+    def test_the_help_desk_notifications_reset_links_and_profile_go_too_when_those_tables_exist(self):
+        conn = FakeConn(lambda sql, params: [{"n": 1}] if "information_schema.tables" in sql else [])             # every table exists
+        mu.delete_account(conn, 5)
+        deleted = [re.search(r"FROM (\w+)", sql).group(1) for sql, _ in conn.statements("DELETE")]
+        self.assertEqual(deleted, ["portfolio", "transactions", "price_alerts", "watchlist", "support_messages", "support_tickets",
+                                   "user_notifications", "password_resets", "email_changes", "restore_links", "user_profiles", "users"])
+        self.assertTrue(all(p == (5,) for _, p in conn.statements("DELETE")))
+        self.assertEqual((conn.commits, conn.rollbacks), (1, 0))
 
     def test_removes_the_account_and_everything_it_owns_in_one_transaction(self):
         conn = FakeConn()
@@ -197,14 +230,71 @@ class CommandLine(unittest.TestCase):
     def test_set_password_stores_a_new_hash(self):
         _, conn = self.run_cli("set-password", "me@example.com", passwords=[GOOD, GOOD])
         (sql, params), = conn.statements("UPDATE users SET password_hash")
-        self.assertTrue(auth.verify_password(GOOD, params[0])); self.assertEqual(params[1], 5)
+        self.assertTrue(auth.verify_password(GOOD, params[0])); self.assertEqual(params[2], 5)
+        self.assertIn("sessions_after = %s", sql); self.assertGreater(params[1], 1_700_000_000)               # other devices are signed out
 
     def test_list_users(self):
-        rows = [{"a": 1, "b": "a@x.co", "s": "approved", "m": 1, "c": datetime(2026, 1, 2), "d": datetime(2026, 2, 3)},
-                {"a": 2, "b": "b@x.co", "s": "pending", "m": 0, "c": datetime(2026, 1, 5), "d": None}]
+        rows = [{"a": 1, "b": "a@x.co", "s": "approved", "m": 1, "t": 2, "c": datetime(2026, 1, 2), "d": datetime(2026, 2, 3), "x": None},
+                {"a": 2, "b": "b@x.co", "s": "pending", "m": 0, "t": 2, "c": datetime(2026, 1, 5), "d": None, "x": None}]
         out, _ = self.run_cli("list-users", conn=FakeConn(lambda sql, p: rows if "FROM users" in sql else []))
         self.assertIn("a@x.co", out); self.assertIn("admin", out); self.assertIn("last sign-in 2026-02-03", out)
         self.assertIn("pending", out); self.assertIn("never signed in", out)
+        self.assertIn("Basic", out)                                  # each account's plan is shown
+
+    def test_list_users_shows_the_longer_plan_names_in_full(self):
+        rows = [{"a": 1, "b": "a@x.co", "s": "approved", "m": 0, "t": 3, "c": datetime(2026, 1, 2), "d": None, "x": None},
+                {"a": 2, "b": "b@x.co", "s": "approved", "m": 0, "t": 4, "c": datetime(2026, 1, 5), "d": None, "x": None}]
+        out, _ = self.run_cli("list-users", conn=FakeConn(lambda sql, p: rows if "FROM users" in sql else []))
+        self.assertIn("AI Stock Finder", out); self.assertIn("AI Interaction", out)
+
+    def test_set_plan_moves_one_account_to_the_plan_named_or_numbered(self):
+        for typed, level, name in ((["3"], 3, "AI Stock Finder"), (["Deluxe"], 5, "Deluxe"), (["ai", "stock", "finder"], 3, "AI Stock Finder"), (["premier"], 6, "Premier"),
+                                   (["1"], 1, "Free"), (["free"], 1, "Free")):
+            out, conn = self.run_cli("set-plan", "Me@Example.com", *typed)
+            (sql, params), = conn.statements("UPDATE users SET tier")
+            self.assertEqual(params, (level, 5), typed); self.assertIn(name, out); self.assertEqual(conn.commits, 1)
+
+    def test_set_plan_refuses_anything_unknown_and_changes_nothing(self):
+        for typed in ("0", "7", "gold", "AI"):
+            conn = FakeConn(lambda sql, p: [{"id": 5}] if "FROM users WHERE email" in sql else [])
+            with mock.patch.object(mu, "_connect", return_value=conn), self.assertRaises(SystemExit) as cm:
+                mu.main(["set-plan", "me@example.com", typed])
+            self.assertIn("Choose one of", str(cm.exception), typed); self.assertIn("1 = Free ($0.00)", str(cm.exception)); self.assertIn("6 = Premier ($49.99)", str(cm.exception))
+            self.assertEqual(conn.statements("UPDATE"), [], typed)
+
+    def test_set_plan_for_an_unknown_account_changes_nothing(self):
+        conn = FakeConn(lambda sql, p: [])
+        with mock.patch.object(mu, "_connect", return_value=conn), self.assertRaises(SystemExit) as cm:
+            mu.main(["set-plan", "ghost@example.com", "Basic"])
+        self.assertIn("No account found", str(cm.exception)); self.assertEqual(conn.statements("UPDATE"), [])
+
+    def test_list_users_says_when_a_deleted_account_goes_for_good(self):
+        rows = [{"a": 3, "b": "gone@x.co", "s": "deleted", "m": 0, "t": 2, "c": datetime(2026, 1, 2), "d": None, "x": datetime(2026, 11, 10)}]
+        out, _ = self.run_cli("list-users", conn=FakeConn(lambda sql, p: rows if "FROM users" in sql else []))
+        self.assertIn("deleted", out); self.assertIn("deleted 2026-11-10, removed for good after 30 days", out)
+
+    def test_purge_deleted_removes_only_what_the_database_says_is_past_its_30_days(self):
+        def respond(sql, params):
+            if "SELECT id FROM users WHERE status = 'deleted'" in sql:
+                return [{"id": 3}, {"id": 4}]
+            if "FOR UPDATE" in sql:
+                return [{"id": params[0]}] if params[0] == 3 else []                           # 4 was restored a moment ago
+            if "information_schema.tables" in sql:
+                return [{"n": 0}]
+            return 1 if sql.startswith("DELETE") else []
+        with mock.patch.object(auth, "now", return_value=1_800_000_000.7):
+            out, conn = self.run_cli("purge-deleted", conn=FakeConn(respond))
+        self.assertIn("Permanently removed 1 account deleted more than 30 days ago", out)
+        self.assertEqual(conn.statements("SELECT id FROM users WHERE status = 'deleted'")[0][1], (1_800_000_000 - 30 * 86400,))
+        self.assertEqual([p for s, p in conn.log if s.startswith("DELETE FROM users")], [(3,)])
+        out, _ = self.run_cli("purge-deleted", conn=FakeConn(lambda sql, p: []))
+        self.assertIn("Permanently removed 0 accounts", out)
+
+    def test_approving_an_account_also_clears_a_deletion_so_an_operator_can_restore_one(self):
+        conn = FakeConn(lambda sql, p: [{"id": 5}] if "SELECT id FROM users" in sql else [])
+        _, conn = self.run_cli("approve", "me@example.com", conn=conn)
+        (sql, params), = conn.statements("UPDATE users SET status")
+        self.assertIn("deleted_at = NULL", sql); self.assertEqual(params, ("approved", 5))
 
     def test_list_users_can_show_only_those_waiting(self):
         _, conn = self.run_cli("list-users", "--pending", conn=FakeConn(lambda sql, p: []))

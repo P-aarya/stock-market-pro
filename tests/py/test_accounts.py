@@ -117,12 +117,42 @@ class Registration(AccountsTestCase, unittest.TestCase):
         data = {"email": "new@example.com", "password": GOOD, "confirm": GOOD, **fields}
         return c.post("/register", data=data)
 
+    def test_the_sign_up_page_says_new_accounts_start_free(self):
+        self.assertIn("New accounts start on the free plan, which opens the Home tab.", self.client().get("/register").text)
+
     def test_the_form_is_served(self):
         r = self.client().get("/register")
         self.assertEqual(r.status_code, 200)
         for needle in ('name="email"', 'name="password"', 'name="confirm"', 'autocomplete="new-password"'):
             self.assertIn(needle, r.text)
         self.assertNotIn('name="code"', r.text)
+
+    def test_a_disclaimer_sits_below_the_sign_up_box_and_covers_the_three_points(self):
+        text = self.client().get("/register").text
+        box_ends, disclaimer = text.index("</main>"), text.index('<aside class="disclaimer"')
+        self.assertLess(text.index('<form method="post" action="/register">'), box_ends)       # the form is inside the box ...
+        self.assertGreater(disclaimer, box_ends)                                                  # ... and the disclaimer is under it, not inside
+        self.assertLess(disclaimer, text.index("</body>"))
+        notice = text[disclaimer:text.index("</aside>")]
+        self.assertIn("for information purposes only", notice)                                    # information only
+        self.assertIn("Nothing in it is financial, investment, tax or legal advice", notice)
+        self.assertIn("at your own risk", notice); self.assertIn("cannot be held accountable", notice)    # no liability for losses
+        self.assertIn("Any loss you may suffer", notice)
+        self.assertIn("US stock market only", notice); self.assertIn("other countries are not included", notice)
+        self.assertIn("By creating an account you confirm", notice)
+
+    def test_the_disclaimer_is_still_there_after_a_mistake_and_with_an_invite_code(self):
+        self.assertIn('class="disclaimer"', self.post(self.client(), confirm="different-one").text)
+        self.assertIn('class="disclaimer"', self.post(self.client(), email="nope").text)
+        api.SIGNUP_CODE = "open sesame"
+        self.assertIn('class="disclaimer"', self.client().get("/register").text)
+        self.assertIn('class="disclaimer"', self.post(self.client(), code="wrong").text)
+
+    def test_the_disclaimer_is_only_on_the_sign_up_page(self):
+        c = self.client()
+        self.assertNotIn('<aside class="disclaimer"', c.get("/login").text)
+        api.ALLOW_SIGNUP = False
+        self.assertNotIn('<aside class="disclaimer"', c.get("/register").text)                     # nothing to sign up for
 
     def test_signing_up_creates_the_account_and_signs_in(self):
         c = self.client()
@@ -269,8 +299,8 @@ class AccessControl(AccountsTestCase, unittest.TestCase):
 
     def test_strangers_are_sent_to_the_login_page_or_refused(self):
         c = TestClient(api.app, follow_redirects=False)
-        page = c.get("/"); self.assertEqual((page.status_code, page.headers["location"]), (302, "/login"))
-        self.assertEqual(c.get("/dashboard.html").status_code, 302)
+        page = c.get("/"); self.assertEqual(page.status_code, 200); self.assertNotIn('id="page-market"', page.text)     # the Free tier's public price list, not the dashboard
+        dash = c.get("/dashboard.html"); self.assertEqual((dash.status_code, dash.headers["location"]), (302, "/login"))
         for method, path in (("get", "/api/portfolio"), ("get", "/api/stocks"), ("get", "/api/watchlist"), ("put", "/api/watchlist"),
                              ("post", "/agent/recommend"), ("delete", "/api/portfolio/1"), ("post", "/api/transactions"), ("get", "/api/market/gainers")):
             r = getattr(c, method)(path); self.assertEqual(r.status_code, 401, path); self.assertEqual(r.json()["message"], "Please sign in.")
@@ -279,7 +309,8 @@ class AccessControl(AccountsTestCase, unittest.TestCase):
         c = TestClient(api.app, follow_redirects=False)
         for path in ("/login", "/register", "/health", "/api/auth/status", "/manifest.webmanifest", "/icon-192.png", "/apple-touch-icon.png"):
             self.assertEqual(c.get(path).status_code, 200, path)
-        self.assertEqual(c.get("/api/auth/status").json(), {"enabled": True, "signed_in": False, "user": None, "admin": False})
+        self.assertEqual(c.get("/api/auth/status").json(), {"enabled": True, "signed_in": False, "user": None, "admin": False,
+                                                            "plan": {"level": 1, "name": "Free", "price": 0.0}})
 
     def test_a_forged_or_edited_cookie_is_a_stranger(self):
         c = TestClient(api.app, follow_redirects=False)
@@ -303,7 +334,10 @@ class AccessControl(AccountsTestCase, unittest.TestCase):
         self.assertNotIn('"><script>x@y.co', text); self.assertIn("&quot;&gt;&lt;script&gt;x@y.co", text)
 
     def test_the_status_endpoint(self):
-        self.assertEqual(signed_in_client(1).get("/api/auth/status").json(), {"enabled": True, "signed_in": True, "user": {"id": 1, "email": "one@example.com"}, "admin": False})
+        body = signed_in_client(1).get("/api/auth/status").json()
+        self.assertEqual({k: body[k] for k in ("enabled", "signed_in", "user", "admin")},
+                         {"enabled": True, "signed_in": True, "user": {"id": 1, "email": "one@example.com"}, "admin": False})
+        self.assertIn("plan", body); self.assertIn("features", body)
         self.assertFalse(signed_in_client(77, create=False).get("/api/auth/status").json()["signed_in"])
 
     def test_ai_requests_are_limited_per_person_not_per_network(self):

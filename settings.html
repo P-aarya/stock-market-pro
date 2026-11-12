@@ -14,6 +14,9 @@
 *{box-sizing:border-box;margin:0;padding:0}
 html{-webkit-text-size-adjust:100%}
 body{background:var(--bg0);color:var(--t1);font:14px/1.45 var(--sans);min-height:100vh;min-height:100dvh}
+/* The picture behind the page. A fixed layer rather than background-attachment, which phones handle badly; it stays put while the page scrolls.
+   The cards and the section list sit on it nearly opaque, so the text stays easy to read. */
+body::before{content:"";position:fixed;inset:0;z-index:-1;background:var(--bg0) url(/bg-settings.svg) center/cover no-repeat}
 a{color:var(--cyan);text-decoration:none;font-weight:700}a:hover{text-decoration:underline}
 button,input,select,textarea{font-family:inherit}
 button{cursor:pointer;touch-action:manipulation}
@@ -28,8 +31,8 @@ button{cursor:pointer;touch-action:manipulation}
 
 .wrap{max-width:1000px;margin:0 auto;padding:24px calc(24px + env(safe-area-inset-right)) calc(40px + env(safe-area-inset-bottom)) calc(24px + env(safe-area-inset-left));
   display:grid;grid-template-columns:200px minmax(0,1fr);gap:24px;align-items:start}
-.side{position:sticky;top:84px;display:flex;flex-direction:column;gap:4px}
-.side h1{font-size:20px;letter-spacing:-.4px;margin:0 0 12px 4px}
+.side{position:sticky;top:84px;display:flex;flex-direction:column;gap:4px;background:rgba(12,12,22,.9);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border:1px solid var(--b1);border-radius:12px;padding:14px 10px}
+.side h1{font-size:20px;letter-spacing:-.4px;margin:0 0 12px 6px}
 .sec-btn{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:1px solid transparent;background:none;color:var(--t2);font-size:13px;font-weight:700;padding:10px 12px;border-radius:9px}
 .sec-btn svg{width:16px;height:16px;flex-shrink:0}
 .sec-btn:hover{background:var(--bg2);color:var(--t1)}
@@ -38,7 +41,7 @@ button{cursor:pointer;touch-action:manipulation}
 .sec-btn .dot.show{display:inline-flex}
 
 .section{display:none}.section.on{display:block}
-.card{background:var(--bg2);border:1px solid var(--b1);border-radius:12px;padding:20px;margin-bottom:16px}
+.card{background:rgba(12,12,22,.9);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border:1px solid var(--b1);border-radius:12px;padding:20px;margin-bottom:16px}
 .card h2{font-size:15px;letter-spacing:-.2px;margin-bottom:4px}
 .card .lead{color:var(--t3);font-size:13px;margin-bottom:16px}
 label{display:block;margin:14px 0 6px;color:var(--t3);font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase}
@@ -131,7 +134,7 @@ input[type=email]{width:100%;padding:11px 12px;border-radius:9px;border:1px soli
 @media(max-width:760px){
   .top{padding-left:calc(16px + env(safe-area-inset-left));padding-right:calc(16px + env(safe-area-inset-right))}
   .wrap{grid-template-columns:minmax(0,1fr);gap:14px;padding:16px calc(16px + env(safe-area-inset-right)) 32px calc(16px + env(safe-area-inset-left))}
-  .side{position:static;flex-direction:row;gap:4px;background:var(--bg2);border:1px solid var(--b1);border-radius:10px;padding:4px;overflow-x:auto;scrollbar-width:none}
+  .side{position:static;flex-direction:row;gap:4px;border-radius:10px;padding:4px;overflow-x:auto;scrollbar-width:none}
   .side::-webkit-scrollbar{display:none}
   .side h1{display:none}
   .sec-btn{justify-content:center;padding:10px 8px;font-size:12px;gap:6px;flex:1 0 auto;width:auto;white-space:nowrap}
@@ -334,7 +337,11 @@ async function call(path, options = {}){
   catch(e){ throw new Error('Could not reach the server. Check your connection.'); }
   if(res.status === 401){ location.href = '/login'; throw new Error('Please sign in.'); }
   let data = {}; try { data = await res.json(); } catch(e){}
-  if(!res.ok) throw new Error(data.message || data.detail || `Something went wrong (${res.status}).`);
+  if(!res.ok){
+    const err = new Error(data.message || data.detail || `Something went wrong (${res.status}).`);
+    err.code = data.code;                                   // "upgrade_required" when the plan doesn't include what was asked for
+    throw err;
+  }
   return data;
 }
 
@@ -572,7 +579,14 @@ async function loadTickets(){
     const sel = document.getElementById('tk-category');
     if(sel.options.length <= 1) Object.entries(state.categories).forEach(([k, v]) => { const o = document.createElement('option'); o.value = k; o.textContent = v; sel.appendChild(o); });
     renderTickets();
-  } catch(e){ document.getElementById('tickets').innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`; }
+  } catch(e){
+    if(e.code === 'upgrade_required'){                     // the Help Desk is not part of this plan: say so, and don't offer a form that can't work
+      document.getElementById('new-ticket-btn').hidden = true; document.getElementById('new-ticket').hidden = true;
+      document.getElementById('tickets').innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`;
+      return;
+    }
+    document.getElementById('tickets').innerHTML = `<div class="empty">${escapeHtml(e.message)}</div>`;
+  }
 }
 function showNewTicket(show){
   document.getElementById('new-ticket').hidden = !show;

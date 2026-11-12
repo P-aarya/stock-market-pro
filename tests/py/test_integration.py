@@ -62,7 +62,57 @@ POST /api/alerts/create
 POST /api/portfolio/add
 POST /api/transactions/add
 """.split("\n")
-SHARED_ROUTES = 50      # routes both of you had (market data, stocks, news, login ...)
+ONLY_AARYA_LATER = """
+DELETE /api/account/recent
+DELETE /api/account/recent/{ticker}
+DELETE /api/admin/learn/{item_id}
+GET /api/account
+GET /api/account/export
+GET /api/account/notifications
+GET /api/account/recent
+GET /api/admin/activity
+GET /api/admin/overview
+GET /api/admin/tickets
+GET /api/admin/tickets/{ticket_id}
+GET /api/admin/users/export
+GET /api/learn
+GET /api/portfolio/commodities
+GET /api/stocks/quotes
+GET /api/stocks/{ticker}/buy-sell
+GET /api/stocks/{ticker}/filings
+GET /api/stocks/{ticker}/filings/download
+GET /api/stocks/{ticker}/insiders
+GET /api/support/tickets
+GET /api/support/tickets/{ticket_id}
+GET /api/support/updates
+GET /confirm-email
+GET /forgot-password
+GET /reset-password
+GET /settings
+POST /api/account/email
+POST /api/account/password
+POST /api/account/recent
+POST /api/admin/learn
+POST /api/admin/learn/{item_id}/move
+POST /api/admin/tickets/{ticket_id}/reply
+POST /api/admin/tickets/{ticket_id}/status
+POST /api/admin/users/{user_id}/admin
+POST /api/admin/users/{user_id}/email
+POST /api/admin/users/{user_id}/send-reset
+POST /api/support/tickets
+POST /api/support/tickets/{ticket_id}/messages
+POST /api/support/updates/seen
+POST /confirm-email
+POST /forgot-password
+POST /reset-password
+PUT /api/account/name
+PUT /api/account/notifications
+PUT /api/account/profile
+PUT /api/admin/learn/{item_id}
+""".split("\n")       # her second round: Settings, Help Desk, forgot password, Admin Center, Learn, insider filings, recently viewed
+ONLY_TIERS = ["GET /api/public/stocks", "GET /api/profile", "POST /api/profile/delete", "POST /restore",
+              "GET /api/admin/preview", "POST /api/admin/preview"]   # the Free tier's price list, the signed-in profile page, deleting / restoring an account, and an administrator viewing the app as a plan
+SHARED_ROUTES = 51      # routes both of you had (market data, stocks, news, login ...), plus one Aarya added after the merge
 
 
 def source(name):
@@ -77,7 +127,7 @@ class NothingIsLost(unittest.TestCase):
     def test_every_endpoint_either_of_you_built_is_there_exactly_once(self):
         actual = self.routes()
         self.assertEqual(len(actual), len(set(actual)), f"registered twice (the second would never run): {sorted({r for r in actual if actual.count(r) > 1})}")
-        want = {r for r in ONLY_ABHEEK + ONLY_AARYA if r}
+        want = {r for r in ONLY_ABHEEK + ONLY_AARYA + ONLY_AARYA_LATER + ONLY_TIERS if r}
         self.assertFalse(want - set(actual), f"missing: {sorted(want - set(actual))}")
         self.assertEqual(len(set(actual)), SHARED_ROUTES + len(want), "the number of endpoints changed: something was added or lost")
 

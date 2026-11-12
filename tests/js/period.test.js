@@ -9,7 +9,7 @@ function env(handler, { ticker = 'NVDA' } = {}) {
   const requests = [], charts = {}; const quick = ['YTD', '1Y', '3Y', '5Y', '10Y', 'MAX'].map(k => { const b = new page.El('button'); b.dataset.quick = k; b.classList = { s: new Set(), add() {}, remove() {}, toggle(c, on) { on ? this.s.add(c) : this.s.delete(c); } }; return b; });
   const doc = { ...page.document, querySelectorAll: () => quick };
   const ctx = { console, Date, Number, String, Array, Object, JSON, Math, encodeURIComponent, charts, curTick: ticker, API: '', document: doc, Chart: function (c, cfg) { this.cfg = cfg; }, dc: id => { delete charts[id]; },
-    signedOut: () => false, apiMessage: (d) => (d && d.message) || 'Something went wrong. Please try again.',
+    can: () => true, signedOut: () => false, apiMessage: (d) => (d && d.message) || 'Something went wrong. Please try again.',
     fetch: async (url) => { requests.push(url); return handler(url, requests.length); } };
   vm.createContext(ctx); vm.runInContext(SHARED + FORMATTERS + code, ctx);
   return { ctx, els: page.registry, requests, charts, quick, run: s => vm.runInContext(s, ctx) };
@@ -38,6 +38,8 @@ const lastPeriod = (e) => e.requests.filter(u => u.includes('/period?')).pop(); 
   await t('Quick ranges: year to date, 1/3/5/10 years, and since listing; a young stock starts when it started', async () => {
     const e = env(std); const q = (k, today = '2026-10-13', first = '2005-03-10') => JSON.parse(JSON.stringify(e.run(`quickRange(${JSON.stringify(k)},${JSON.stringify(today)},${JSON.stringify(first)})`)));
     assert.equal(q('YTD').start, '2026-01-01'); assert.equal(q('1Y').start, '2025-10-13'); assert.equal(q('3Y').start, '2023-10-13'); assert.equal(q('5Y').start, '2021-10-13'); assert.equal(q('10Y').start, '2016-10-13');
+    assert.equal(q('1M', '2026-03-31').start, '2026-02-28'); assert.equal(q('3M', '2026-01-15').start, '2025-10-15'); assert.equal(q('6M').start, '2026-04-13');      // the peer chart's shorter presets
+    assert.equal(q('3M', '2026-10-13', '2026-09-01').start, '2026-09-01'); assert.equal(q('1M').label, 'Last month');
     assert.equal(q('MAX').start, '2005-03-10'); assert.equal(q('10Y', '2026-10-13', '2023-09-14').start, '2023-09-14'); assert.equal(q('1Y', '2024-02-29').start, '2023-02-28'); assert.equal(e.run("quickRange('nope','2026-10-13','2005-01-01')"), null);
     assert(q('5Y').end === '2026-10-13' && q('MAX').label === 'Since listing');
   });

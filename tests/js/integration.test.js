@@ -34,9 +34,9 @@ const functions = [...script.matchAll(/^(?:async\s+)?function\s+([A-Za-z_$][\w$]
   });
 
   await t('every tab in the stock view has a section to show, and every page tab has its page', () => {
-    for (const [, key] of html.matchAll(/class="fstab[^"]*" onclick="showFST\('([a-z]+)'/g)) assert(ids.has('fss-' + key), `tab '${key}' has no #fss-${key}`);
+    for (const [, key] of html.matchAll(/class="fstab[^"]*"[^>]*onclick="showFST\('([a-z]+)'/g)) assert(ids.has('fss-' + key), `tab '${key}' has no #fss-${key}`);
     for (const [, key] of html.matchAll(/class="ntab[^"]*"[^>]*onclick="showPage\('([a-z]+)'/g)) assert(ids.has('page-' + key), `tab '${key}' has no #page-${key}`);
-    const tabs = [...html.matchAll(/class="fstab[^"]*" onclick="showFST\('([a-z]+)'/g)].map(m => m[1]);
+    const tabs = [...html.matchAll(/class="fstab[^"]*"[^>]*onclick="showFST\('([a-z]+)'/g)].map(m => m[1]);
     assert.deepStrictEqual(tabs, ['overview', 'charts', 'company', 'peers', 'financials', 'intelligence', 'earnings', 'dividends', 'news']);
   });
 

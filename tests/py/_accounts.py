@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 import _path  # noqa: F401
 import api
 import auth
+import tiers
 import watchlist
 
 
@@ -21,6 +22,12 @@ import mysql.connector
 mysql.connector.connect = _no_database
 
 
+# A stand-in for the top plan. Ordinary tests use accounts on it so the plan limits don't get in their way; the tests about
+# the plans themselves (test_tiers.py) ask for the real tiers explicitly and take this one out while they run.
+FULL_TIER = 99
+tiers.TIERS[FULL_TIER] = tiers.Tier(FULL_TIER, "Everything", 0.0, tuple(tiers.FEATURES))
+
+
 class FakeStore:
     """Stands in for auth.MySQLStore. Same methods, kept in a dict."""
 
@@ -28,6 +35,8 @@ class FakeStore:
         self.users, self.next_id = {}, 1
         self.fail_with = None            # set to an exception to make every call raise it
         self.gets = 0                    # how many times the database would have been asked for one account
+        self.purged = []                 # ids of accounts removed for good
+        self.events = []                 # what the admin page's activity list would show: (kind, user_id, actor_id, detail)
 
     def _check(self):
         if self.fail_with:
@@ -35,7 +44,8 @@ class FakeStore:
 
     @staticmethod
     def _public(u):
-        return {"id": u["id"], "email": u["email"], "status": u.get("status", "approved"), "is_admin": bool(u.get("is_admin", False))}
+        return {"id": u["id"], "email": u["email"], "status": u.get("status", "approved"), "is_admin": bool(u.get("is_admin", False)),
+                "tier": u.get("tier", FULL_TIER), "created_at": u.get("created_at"), "deleted_at": u.get("deleted_at")}
 
     def create(self, email, password_hash, status="pending", is_admin=False):
         self._check()
@@ -43,7 +53,8 @@ class FakeStore:
             raise auth.AuthError("An account with that email already exists. Try signing in instead.", 409)
         user_id, self.next_id = self.next_id, self.next_id + 1
         self.users[user_id] = {"id": user_id, "email": email, "password_hash": password_hash, "status": status, "is_admin": is_admin,
-                               "created_at": 1_700_000_000 + user_id, "last_login_at": None, "reviewed_at": None}
+                               "tier": tiers.account_tier(),      # what the real table's column default gives a new sign-up
+                               "created_at": 1_700_000_000 + user_id, "last_login_at": None, "reviewed_at": None, "deleted_at": None}
         return user_id
 
     def find_by_email(self, email):
@@ -59,8 +70,8 @@ class FakeStore:
 
     def list_users(self):
         self._check()
-        return [{**self._public(u), "created_at": u.get("created_at"), "last_login_at": u.get("last_login_at"), "reviewed_at": u.get("reviewed_at")}
-                for u in sorted(self.users.values(), key=lambda u: -u["id"])]
+        return [{**self._public(u), "created_at": u.get("created_at"), "last_login_at": u.get("last_login_at"), "reviewed_at": u.get("reviewed_at"),
+                 "deleted_at": u.get("deleted_at")} for u in sorted(self.users.values(), key=lambda u: -u["id"])]
 
     def set_status(self, user_id, status, reviewed_by):
         self._check()
@@ -72,17 +83,54 @@ class FakeStore:
         self._check()
         self.users[user_id]["last_login_at"] = 1_800_000_000
 
+    def mark_deleted(self, user_id, when):
+        self._check()
+        u = self.users.get(user_id)
+        if not u or u["status"] != "approved":
+            return False
+        u["status"], u["deleted_at"] = "deleted", when
+        return True
+
+    def restore(self, user_id):
+        self._check()
+        u = self.users.get(user_id)
+        if not u or u["status"] != "deleted":
+            return False
+        u["status"], u["deleted_at"] = "approved", None
+        return True
+
+    def other_admins(self, user_id):
+        self._check()
+        return sum(1 for u in self.users.values() if u["is_admin"] and u["status"] == "approved" and u["id"] != user_id)
+
+    def purge_if_expired(self, user_id, cutoff):
+        self._check()
+        u = self.users.get(user_id)
+        if not u or u["status"] != "deleted" or u.get("deleted_at") is None or u["deleted_at"] > cutoff:
+            return False
+        del self.users[user_id]
+        self.purged.append(user_id)
+        return True
+
+    def purge_expired(self, cutoff):
+        self._check()
+        return [user_id for user_id in list(self.users) if self.purge_if_expired(user_id, cutoff)]
+
+    def add_event(self, kind, user_id, actor_id, detail, now):
+        self._check()
+        self.events.append((kind, user_id, actor_id, detail))
+
 
 auth.store = FakeStore()
 
 
-def add_user(email, status="approved", is_admin=False, user_id=None):
+def add_user(email, status="approved", is_admin=False, user_id=None, tier=FULL_TIER):
     """Put an account straight into the fake store (no password needed) and return its id."""
     store = auth.store
     uid = user_id or store.next_id
     store.next_id = max(store.next_id, uid + 1)
-    store.users[uid] = {"id": uid, "email": email, "password_hash": "", "status": status, "is_admin": is_admin,
-                        "created_at": 1_700_000_000 + uid, "last_login_at": None, "reviewed_at": None}
+    store.users[uid] = {"id": uid, "email": email, "password_hash": "", "status": status, "is_admin": is_admin, "tier": tier,
+                        "created_at": 1_700_000_000 + uid, "last_login_at": None, "reviewed_at": None, "deleted_at": None}
     auth.access_cache.invalidate(uid)
     return uid
 
@@ -95,7 +143,7 @@ class AccountsTestCase:
         auth.store = FakeStore()
         auth.access_cache.clear()
         api.ALLOW_SIGNUP, api.SIGNUP_CODE, api.REQUIRE_APPROVAL = True, "", True
-        for limiter in (api._login_by_client, api._login_by_email, api._signups):
+        for limiter in (api._login_by_client, api._login_by_email, api._signups, api._public_hits):
             limiter.reset()
         api._agent_hits.clear()
         # personal data endpoints answer with empty data, so a test can see whether a request got through
@@ -106,19 +154,20 @@ class AccountsTestCase:
     def tearDown(self):
         auth.store, api.ALLOW_SIGNUP, api.SIGNUP_CODE, api.REQUIRE_APPROVAL = self._saved
         auth.access_cache.clear()
-        for limiter in (api._login_by_client, api._login_by_email, api._signups):
+        for limiter in (api._login_by_client, api._login_by_email, api._signups, api._public_hits):
             limiter.reset()
         api._agent_hits.clear()
 
 
-def signed_in_client(user_id=1, is_admin=False, create=True, **kwargs):
+def signed_in_client(user_id=1, is_admin=False, create=True, tier=FULL_TIER, **kwargs):
     """A test client carrying a valid session cookie for `user_id`, who is made an approved account if it isn't one yet
-    (pass create=False for a cookie whose account does not exist). Also makes sure no test can reach the real database
+    (pass create=False for a cookie whose account does not exist; `tier` picks its plan, by default one with everything).
+    Also makes sure no test can reach the real database
     through the accounts layer."""
     if not isinstance(auth.store, FakeStore):
         auth.store = FakeStore()
     if create and user_id not in auth.store.users:
-        add_user(f"user{user_id}@example.com", "approved", is_admin, user_id)
+        add_user(f"user{user_id}@example.com", "approved", is_admin, user_id, tier)
     auth.access_cache.clear()
     client = TestClient(api.app, **kwargs)
     client.cookies.set(api.SESSION_COOKIE, auth.make_token(user_id))

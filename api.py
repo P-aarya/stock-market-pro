@@ -1,14 +1,14 @@
 # ============================================================
 # STOCK MARKET PRO - api.py (Final Clean Version)
 # ============================================================
-from fastapi import Depends, FastAPI, Body, HTTPException, Request
+from fastapi import Depends, FastAPI, Body, HTTPException, Request, Response
 from starlette.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 import mysql.connector
 import yfinance as yf
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 import hashlib
 import hmac
@@ -29,6 +29,7 @@ import auth
 import auth_pages
 import mailer
 import support
+import tiers
 
 app = FastAPI(title="Aymetrix API")
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000").split(",") if o.strip()]
@@ -41,10 +42,22 @@ app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_methods=["*
 #   ALLOW_SIGNUP=false  closes registration (accounts can still be made with manage_users.py)
 #   SIGNUP_CODE=...     keeps registration open only for people who know the code
 #   APP_SECRET=...      the key sessions are signed with (otherwise a random one is kept in .app_secret)
+#   UPGRADE_CONTACT_EMAIL=...  the address the profile page's "Request this plan" buttons write to (optional; no online payment yet)
 ALLOW_SIGNUP = os.getenv("ALLOW_SIGNUP", "true").strip().lower() not in ("false", "0", "no")
 REQUIRE_APPROVAL = os.getenv("REQUIRE_APPROVAL", "true").strip().lower() not in ("false", "0", "no")
 SIGNUP_CODE = os.getenv("SIGNUP_CODE", "")
+
+
+def _plain_email(value: str) -> str:
+    """`value` if it is a plain email address, else "" (so nothing can be smuggled into a mailto link)."""
+    import re
+    return value if re.fullmatch(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}", value) else ""
+
+
+# Where the profile page sends someone who asks for a higher plan (there is no online payment yet). Optional.
+UPGRADE_CONTACT = _plain_email(os.getenv("UPGRADE_CONTACT_EMAIL", "").strip())
 SESSION_COOKIE = "smp_session"
+PREVIEW_COOKIE = "smp_preview"                  # an administrator's "view the app as this plan" choice (auth.make_preview_token)
 _login_by_client = auth.RateLimiter(5, 300)     # wrong passwords per client in 5 minutes ...
 _login_by_email = auth.RateLimiter(10, 900)     # ... and per account in 15 minutes
 _signups = auth.RateLimiter(5, 3600)            # sign-up attempts per client in an hour
@@ -66,8 +79,16 @@ _APP_ASSETS = {
     "/favicon.png": ("favicon.png", "image/png"),
     "/favicon.ico": ("favicon.png", "image/png"),
     "/logo.svg": ("logo.svg", "image/svg+xml"),
+    # The pictures behind the sign-in and sign-up pages (drawn artwork, nothing private), fetched before anyone is signed in
+    "/bg-login.svg": ("bg-login.svg", "image/svg+xml"),
+    "/bg-register.svg": ("bg-register.svg", "image/svg+xml"),
+    "/bg-settings.svg": ("bg-settings.svg", "image/svg+xml"),             # the picture behind the Settings page (artwork, nothing private)
 }
-_OPEN_PATHS = {"/login", "/register", "/logout", "/forgot-password", "/reset-password", "/confirm-email", "/health", "/api/auth/status", "/favicon.ico"} | set(_APP_ASSETS)
+_OPEN_PATHS = {"/login", "/register", "/restore", "/logout", "/forgot-password", "/reset-password", "/confirm-email", "/health", "/api/auth/status", "/favicon.ico"} | set(_APP_ASSETS)
+# The Free tier is a visitor with no account (tiers.py). They may load "/", which shows them only the public page (the price
+# list and a read-only portfolio page), and that list's own feed. Everything else still needs a sign-in.
+_ANONYMOUS_PATHS = {"/", "/api/public/stocks"}
+_public_hits = auth.RateLimiter(120, 60)            # price-list requests per visitor per minute
 
 
 _SETUP_HINT = "The accounts tables need a database update. Run: python manage_users.py migrate"
@@ -88,15 +109,37 @@ async def _approved_user(request: Request):
     return user if _usable(token, user) else None
 
 
+def _preview_level(request: Request, user):
+    """The plan an administrator has chosen to look at the app as, or None. Only an administrator can have one, and only for a plan
+    that exists; the cookie is signed for that one account and lapses on its own (auth.make_preview_token)."""
+    if not user or not user["is_admin"]:
+        return None
+    level = auth.read_preview_token(request.cookies.get(PREVIEW_COOKIE, ""), user["id"])
+    return level if level in tiers.TIERS else None
+
+
 def _unavailable(request: Request, status: int, message: str):
     if request.url.path.startswith(("/api/", "/agent/")):
         return JSONResponse({"status": "error", "message": message}, status_code=status)
     return HTMLResponse(auth_pages.notice_page("Temporarily unavailable", message), status_code=status)
 
 
+def _plan_denied(request: Request, feature: str, plan: dict):
+    """The answer to a signed-in person asking for something their plan doesn't include."""
+    info = tiers.upgrade_info(feature)
+    if feature == tiers.UNCLASSIFIED:
+        log.warning("%s %s has no tier rule (tiers.py); refusing it for non-administrators", request.method, request.url.path)
+    message = f"{info['label']} isn't included in the {plan['name']} plan. " + (
+        f"It comes with the {info['required_name']} plan." if info["required_name"] else "Higher plans will include it.")
+    if request.url.path.startswith(("/api/", "/agent/")):
+        return JSONResponse({"status": "error", "code": "upgrade_required", "message": message, **info}, status_code=403)
+    return HTMLResponse(auth_pages.notice_page("Not in your plan", message, "/", "Back to the dashboard"), status_code=403)
+
+
 @app.middleware("http")
 async def require_login(request: Request, call_next):
-    request.state.user_id, request.state.is_admin = None, False
+    request.state.user_id, request.state.is_admin, request.state.preview = None, False, None
+    request.state.tier, request.state.features = tiers.visitor_plan().level, tiers.visitor_features()
     if request.method == "OPTIONS" or request.url.path in _OPEN_PATHS:
         return await call_next(request)
     try:
@@ -107,7 +150,16 @@ async def require_login(request: Request, call_next):
         log.exception("Could not check access")
         return _unavailable(request, 503, "We couldn't check your access just now. Please try again in a moment.")
     if user:
-        request.state.user_id, request.state.is_admin = user["id"], bool(user["is_admin"])
+        is_admin = bool(user["is_admin"])
+        preview = _preview_level(request, user)              # an administrator looking at the app as some plan sees it: that plan's rules apply to them
+        plan = tiers.resolve(user.get("tier") if preview is None else preview)
+        request.state.user_id, request.state.is_admin, request.state.tier, request.state.preview = user["id"], is_admin, plan.level, preview
+        request.state.features = tiers.ADMIN_FEATURES if is_admin and preview is None else tiers.features_for(plan.level)
+        needed = tiers.feature_for(request.method, request.url.path)
+        if (not is_admin or preview is not None) and needed != tiers.NO_FEATURE and needed not in request.state.features:
+            return _plan_denied(request, needed, tiers.describe(plan.level))
+        return await call_next(request)
+    if request.url.path in _ANONYMOUS_PATHS:
         return await call_next(request)
     if request.url.path.startswith(("/api/", "/agent/")):
         return JSONResponse({"status": "error", "message": "Please sign in."}, status_code=401)
@@ -150,7 +202,9 @@ def _set_session_cookie(request: Request, response, user_id: int):
 
 
 def _start_session(request: Request, user_id: int) -> RedirectResponse:
-    return _set_session_cookie(request, RedirectResponse("/", status_code=303), user_id)
+    response = _set_session_cookie(request, RedirectResponse("/", status_code=303), user_id)
+    response.delete_cookie(PREVIEW_COOKIE)                    # a new sign-in starts as yourself, not as a plan left over from before
+    return response
 
 
 async def _read_form(request: Request) -> dict:
@@ -169,7 +223,7 @@ def login_page(request: Request):
                 return RedirectResponse("/", status_code=303)
         except Exception:
             return RedirectResponse("/", status_code=303)      # the database hiccuped: don't sign anyone out for that
-    response = HTMLResponse(auth_pages.login_page(signup_open=ALLOW_SIGNUP))
+    response = HTMLResponse(auth_pages.login_page(signup_open=ALLOW_SIGNUP, notice=request.query_params.get("notice", "")))
     if cookie:
         response.delete_cookie(SESSION_COOKIE)                # expired, forged, blocked, or for an account that no longer exists
     return response
@@ -191,12 +245,39 @@ async def login(request: Request):
         _login_by_email.clear(email)
         if user["status"] == "pending":
             return HTMLResponse(auth_pages.pending_page(user["email"]), status_code=403)
+        if user["status"] == "deleted":                       # the owner deleted it less than 30 days ago: offer to bring it back
+            deleted_at = user["deleted_at"]
+            page = auth_pages.restore_page(user["email"], auth.make_restore_token(user["id"]), _fmt_date(deleted_at),
+                                           _fmt_date(deleted_at + auth.grace_seconds()), auth.days_left(deleted_at))
+            return HTMLResponse(page, headers={"Cache-Control": "no-store"})
         if user["status"] != "approved":
             return HTMLResponse(auth_pages.blocked_page(), status_code=403)
         return _start_session(request, user["id"])
     _login_by_client.record(client)
     _login_by_email.record(email)
     return HTMLResponse(auth_pages.login_page("That email or password isn't right.", email, ALLOW_SIGNUP), status_code=401)
+
+
+def _fmt_date(seconds) -> str:
+    """'Dec 10, 2026' (UTC)."""
+    d = datetime.fromtimestamp(seconds, timezone.utc)
+    return f"{d:%b} {d.day}, {d.year}"
+
+
+@app.post("/restore")
+async def restore(request: Request):
+    """The "Restore my account" button. It carries a token that only a correct password for that deleted account can produce."""
+    form = await _read_form(request)
+    user_id = auth.read_restore_token(form.get("token", ""))
+    if user_id is None:
+        return HTMLResponse(auth_pages.login_page("That restore link has expired. Please sign in again.", "", ALLOW_SIGNUP), status_code=400)
+    try:
+        user = await run_in_threadpool(auth.restore_account, user_id)
+    except auth.AuthError as e:
+        return HTMLResponse(auth_pages.login_page(e.message, "", ALLOW_SIGNUP), status_code=e.status)
+    except auth.AccountsNotSetUp:
+        return HTMLResponse(auth_pages.notice_page("Accounts aren't set up yet", "The site owner needs to run: python manage_users.py migrate"), status_code=503)
+    return _start_session(request, user["id"])
 
 
 @app.get("/register", response_class=HTMLResponse)
@@ -240,6 +321,7 @@ async def register(request: Request):
 def logout():
     response = RedirectResponse("/login", status_code=303)
     response.delete_cookie(SESSION_COOKIE)
+    response.delete_cookie(PREVIEW_COOKIE)
     return response
 
 
@@ -338,17 +420,78 @@ def auth_status(request: Request):
     token = request.cookies.get(SESSION_COOKIE, "")
     user_id = auth.read_token(token)
     if user_id is None:
-        return {"enabled": True, "signed_in": False, "user": None, "admin": False}
+        return {"enabled": True, "signed_in": False, "user": None, "admin": False, "plan": tiers.describe_visitor()}
     try:
         user = auth.access_for(user_id)
     except Exception:
         return {"enabled": True, "signed_in": True, "user": None, "admin": False}   # a database hiccup shouldn't sign anyone out
     if not _usable(token, user):
-        return {"enabled": True, "signed_in": False, "user": None, "admin": False}
-    return {"enabled": True, "signed_in": True, "user": {"id": user["id"], "email": user["email"]}, "admin": bool(user["is_admin"])}
+        return {"enabled": True, "signed_in": False, "user": None, "admin": False, "plan": tiers.describe_visitor()}
+    admin = bool(user["is_admin"])
+    preview = _preview_level(request, user)
+    plan = tiers.describe(user.get("tier") if preview is None else preview)
+    status = {"enabled": True, "signed_in": True, "user": {"id": user["id"], "email": user["email"]}, "admin": admin, "plan": plan,
+              "features": sorted(tiers.ADMIN_FEATURES if admin and preview is None else tiers.features_for(plan["level"]))}
+    if preview is not None:
+        status["preview"] = plan                                   # an administrator looking at the app as this plan sees it
+    return status
+
+
+@app.get("/api/profile")
+def get_profile(request: Request, response: Response, user_id: int = Depends(current_user_id)):
+    """The signed-in person's own profile: who they are, when they joined, their plan and what it includes, and every plan with
+    its perks for the comparison. Nothing about anyone else, and never the password hash."""
+    response.headers["Cache-Control"] = "private, no-store"
+    try:
+        user = auth.get_user(user_id)                       # the account as it is now, not the remembered copy
+    except Exception:
+        log.exception("Could not load the profile")
+        return agent_error(503, "We couldn't load your profile just now. Please try again in a moment.")
+    if not user:
+        return agent_error(401, "Please sign in.")
+    preview = getattr(request.state, "preview", None)
+    admin = bool(request.state.is_admin) and preview is None      # an administrator previewing a plan gets that plan's page, not the administrator's
+    plan = {"level": None, "name": "Administrator", "price": None} if admin else tiers.describe(user.get("tier") if preview is None else preview)
+    features = tiers.ADMIN_FEATURES if admin else tiers.features_for(plan["level"])
+    return {"status": "success", "email": user["email"], "full_name": user.get("full_name") or None, "joined_at": user.get("created_at"), "admin": admin, "plan": plan,
+            "included": tiers.feature_list(features), "plans": tiers.catalog(), "upgrade_contact": UPGRADE_CONTACT or None,
+            "grace_days": auth.DELETION_GRACE_DAYS, "preview": plan if preview is not None else None}
 
 
 # ── Serve dashboard.html directly from port 8000 ──
+def _plan_label(request: Request) -> str:
+    """The plan's name ('Basic') for an account on that plan, 'Administrator' for an administrator (or the plan they are previewing)."""
+    if getattr(request.state, "is_admin", False) and getattr(request.state, "preview", None) is None:
+        return "Administrator"
+    return tiers.describe(getattr(request.state, "tier", None))["name"]
+
+
+def _locked_features(request: Request) -> dict:
+    """What the page says on a padlock: for each feature this person's plan lacks, its name and the plan that includes it."""
+    have = getattr(request.state, "features", frozenset())
+    out = {}
+    for feature in tiers.FEATURES:
+        if feature not in have:
+            info = tiers.upgrade_info(feature)
+            out[feature] = {"label": info["label"], "plan": info["required_name"]}
+    return out
+
+
+def _public_response():
+    """What someone who isn't signed in sees at "/": the public price list and read-only portfolio page (public.html)."""
+    path = os.path.join(_BASE_DIR, "public.html")
+    if not os.path.exists(path):
+        return RedirectResponse("/login", status_code=302)
+    with open(path, encoding="utf-8") as f:
+        page = f.read()
+    plan = tiers.first_paid_plan()                           # the plan the page invites people to move up to (an account itself is free)
+    perks = [tiers.FEATURES[f].lower() for f in plan.adds]
+    perk_text = ", ".join(perks[:-1]) + " and " + perks[-1] if len(perks) > 1 else perks[0]
+    page = (page.replace("<!--PLAN_NAME-->", _escape_html(plan.name)).replace("<!--PLAN_PRICE-->", f"{plan.price:.2f}")
+                .replace("<!--PLAN_PERKS-->", _escape_html(perk_text)))
+    return HTMLResponse(page, headers={"Cache-Control": "private, no-cache"})
+
+
 def _dashboard_response(request: Request):
     path = os.path.join(_BASE_DIR, "dashboard.html")
     if not os.path.exists(path):
@@ -356,6 +499,7 @@ def _dashboard_response(request: Request):
     with open(path, encoding="utf-8") as f:
         page = f.read()
     user_id = getattr(request.state, "user_id", None)
+    preview = getattr(request.state, "preview", None)
     meta = ""
     if user_id is not None:
         try:
@@ -365,13 +509,23 @@ def _dashboard_response(request: Request):
         meta = (f'<meta name="smp-user-id" content="{int(user_id)}">'
                 f'<meta name="smp-user-email" content="{_escape_html((user or {}).get("email", ""), quote=True)}">'
                 f'<meta name="smp-user-name" content="{_escape_html((user or {}).get("full_name") or "", quote=True)}">'
-                f'<meta name="smp-user-admin" content="{1 if getattr(request.state, "is_admin", False) else 0}">')
+                # while previewing a plan the page is the plan's own, so it shows no Admin link either (the preview bar has the way back)
+                f'<meta name="smp-user-admin" content="{1 if getattr(request.state, "is_admin", False) and preview is None else 0}">'
+                f'<meta name="smp-plan" content="{_escape_html(_plan_label(request), quote=True)}">'
+                f'<meta name="smp-features" content="{",".join(sorted(getattr(request.state, "features", ())))}">'
+                f'<meta name="smp-locks" content="{_escape_html(json.dumps(_locked_features(request)), quote=True)}">')
+        if preview is not None and getattr(request.state, "is_admin", False):
+            meta += (f'<meta name="smp-preview" content="{_escape_html(tiers.describe(preview)["name"], quote=True)}">'
+                     f'<meta name="smp-preview-level" content="{int(preview)}">'
+                     f'<meta name="smp-plans" content="{_escape_html(json.dumps([tiers.describe(n) for n in sorted(tiers.TIERS)]), quote=True)}">')
     # The page is different for every person, so it must never be stored by a browser cache or a shared proxy.
     return HTMLResponse(page.replace("<!--SMP_USER-->", meta, 1), headers={"Cache-Control": "private, no-store"})
 
 
 @app.get("/")
 def serve_root(request: Request):
+    if getattr(request.state, "user_id", None) is None:
+        return _public_response()
     return _dashboard_response(request)
 
 
@@ -390,6 +544,56 @@ def _app_asset_route(filename: str, media_type: str):
 
 for _route, (_file, _type) in _APP_ASSETS.items():
     app.add_api_route(_route, _app_asset_route(_file, _type), methods=["GET"], include_in_schema=False)
+
+@app.get("/api/public/stocks")
+def public_stocks(request: Request, response: Response):
+    """The Free tier's price list for visitors without an account: ticker, name, sector, price and today's change for
+    every stock, and nothing more. Answered from the same in-memory list as the search box, so a crowd of visitors never
+    reaches the database; each visitor is limited to a modest number of requests a minute."""
+    client = _client_id(request)
+    if _public_hits.blocked(client):
+        return JSONResponse({"status": "error", "message": "Too many requests. Please wait a minute and try again."},
+                            status_code=429, headers={"Retry-After": "60"})
+    _public_hits.record(client)
+    rows = _stock_directory()
+    response.headers["Cache-Control"] = "public, max-age=30"
+    return {"fields": ["ticker", "company_name", "sector", "current_price", "price_change_pct"],
+            "stocks": [tiers.public_stock_row(r) for r in rows], "updated": _directory_cache["at"] or None}
+
+
+# ── removing deleted accounts for good ──
+# An account its owner deleted is locked at once and kept for auth.DELETION_GRACE_DAYS days (so signing in can restore it). Past
+# that it can't be restored whether or not it has been cleaned up yet; this sweep does the cleaning: when the server starts and
+# every few hours after. Signing in or signing up with the address also removes it, and so does `manage_users.py purge-deleted`.
+ACCOUNT_CLEANUP = os.getenv("ACCOUNT_CLEANUP", "true").strip().lower() not in ("false", "0", "no")
+ACCOUNT_CLEANUP_EVERY = 6 * 3600
+
+
+def run_account_cleanup() -> int:
+    """One sweep. Returns how many accounts were removed; never raises."""
+    try:
+        removed = auth.purge_expired()
+        if removed:
+            log.info("Permanently removed %d deleted account(s) past their %d days", removed, auth.DELETION_GRACE_DAYS)
+        return removed
+    except auth.AccountsNotSetUp:
+        log.warning("Account clean-up skipped: the accounts tables need a database update (python manage_users.py migrate)")
+    except Exception:
+        log.exception("Account clean-up failed")
+    return 0
+
+
+def _account_cleanup_loop():
+    while True:
+        run_account_cleanup()
+        time.sleep(ACCOUNT_CLEANUP_EVERY)
+
+
+@app.on_event("startup")
+def start_account_cleanup():
+    if ACCOUNT_CLEANUP:
+        threading.Thread(target=_account_cleanup_loop, name="account-cleanup", daemon=True).start()
+
 
 @app.get("/health")
 def health():
@@ -516,6 +720,11 @@ _directory_lock = __import__("threading").Lock()
 def _plain_name(text):
     """'McDonald's Corp.' -> 'mcdonaldscorp' (lower case, letters and digits only)."""
     return __import__("re").sub(r"[^a-z0-9]", "", (text or "").lower())
+
+
+def _plan_features(request) -> frozenset:
+    """The features of the plan behind this request. Missing (a call outside a request) counts as nothing: fail closed."""
+    return getattr(getattr(request, "state", None), "features", frozenset())
 
 
 def _stock_directory():
@@ -2388,6 +2597,44 @@ def admin_page(request: Request):
         return HTMLResponse(f.read(), headers={"Cache-Control": "private, no-store"})
 
 
+# ── Deleting your own account ──
+
+class DeleteAccountBody(BaseModel):
+    password: str = Field(min_length=1, max_length=256)
+
+
+def require_fetch_header(request: Request):
+    """Deleting an account must come from the app's own script, which sends this header; another site can't add it without the
+    browser asking this server's permission first. (The password is needed as well.)"""
+    if request.headers.get("x-requested-with") != "fetch":
+        raise HTTPException(status_code=403, detail="This action must be made from the app itself.")
+
+
+@app.post("/api/profile/delete")
+def delete_profile(request: Request, body: DeleteAccountBody, user_id: int = Depends(current_user_id), _fetch: None = Depends(require_fetch_header)):
+    """Delete the signed-in person's own account, after they confirm with their password. The account is locked at once and kept
+    for 30 days, during which signing in offers to restore it; after that it is removed for good (see auth.py)."""
+    client, who = _client_id(request), f"uid:{user_id}"
+    if _login_by_client.blocked(client) or _login_by_email.blocked(who):             # guessing the password here is as bad as at sign-in
+        return agent_error(429, "Too many wrong passwords. Please wait a few minutes and try again.")
+    try:
+        result = auth.delete_own_account(user_id, body.password)
+    except auth.WrongPassword as e:
+        _login_by_client.record(client); _login_by_email.record(who)
+        return agent_error(e.status, e.message)
+    except auth.AuthError as e:
+        return agent_error(e.status, e.message)
+    except auth.AccountsNotSetUp:
+        return agent_error(503, "The accounts tables need a database update. Ask the site owner to run: python manage_users.py migrate")
+    except Exception:
+        log.exception("Deleting an account failed")
+        return agent_error(500, "Something went wrong, and your account was not deleted. Please try again.")
+    _login_by_client.clear(client); _login_by_email.clear(who)
+    response = JSONResponse({"status": "success", **result, "grace_days": auth.DELETION_GRACE_DAYS})
+    response.delete_cookie(SESSION_COOKIE)                                           # signed out on this device straight away
+    return response
+
+
 class StatusBody(BaseModel):
     status: Literal["approved", "blocked"]
 
@@ -2395,7 +2642,8 @@ class StatusBody(BaseModel):
 @app.get("/api/admin/users")
 def admin_list_users(admin_id: int = Depends(require_admin)):
     try:
-        return {"status": "success", "you": admin_id, **auth.list_users()}
+        return {"status": "success", "you": admin_id, "grace_days": auth.DELETION_GRACE_DAYS, **auth.list_users(),
+                "plans": {str(n): {"name": t.name, "price": t.price} for n, t in tiers.TIERS.items() if n >= tiers.account_tier()}}
     except Exception:
         log.exception("Listing users failed")
         return agent_error(500, "Something went wrong loading the accounts.")
@@ -2426,6 +2674,44 @@ def admin_set_status(user_id: int, body: StatusBody, admin_id: int = Depends(req
     except Exception:
         log.exception("Changing an account's status failed")
         return agent_error(500, "Something went wrong saving that change.")
+
+
+# ── Administrators: view the app as a plan ──
+# So that an administrator can check what each plan sees without a separate account for each plan or running set-plan every time.
+# The choice is a signed cookie for that administrator only (auth.make_preview_token): it changes nobody's account and nothing in
+# the database, and while it is set the middleware applies that plan's rules to the administrator's own requests. Admin pages and
+# /api/admin/* stay open (they aren't part of any plan), so the way back always works.
+
+class PreviewBody(BaseModel):
+    plan: Optional[int] = None          # a plan level, or null to go back to being an administrator
+
+
+def _preview_catalog() -> list:
+    """Every plan an administrator may look at the app as, with what it includes (the labels from the plan table)."""
+    return [{**tiers.describe(n), "included": tiers.feature_list(tiers.features_for(n))} for n in sorted(tiers.TIERS)]
+
+
+@app.get("/api/admin/preview")
+def admin_get_preview(request: Request, response: Response, admin_id: int = Depends(require_admin)):
+    """The plans an administrator can look at the app as, and the one they are looking at now (null when none)."""
+    response.headers["Cache-Control"] = "private, no-store"
+    preview = getattr(request.state, "preview", None)
+    return {"status": "success", "plans": _preview_catalog(), "current": tiers.describe(preview) if preview is not None else None}
+
+
+@app.post("/api/admin/preview")
+def admin_set_preview(request: Request, body: PreviewBody, admin_id: int = Depends(require_admin_action)):
+    """Start looking at the app as plan `plan`, or stop (plan null). Takes effect on this administrator's very next request."""
+    if body.plan is None:
+        response = JSONResponse({"status": "success", "current": None})
+        response.delete_cookie(PREVIEW_COOKIE)
+        return response
+    if body.plan not in tiers.TIERS:
+        return agent_error(400, "That isn't one of the plans.")
+    response = JSONResponse({"status": "success", "current": tiers.describe(body.plan)})
+    # no max-age: the browser forgets it when it closes, and the signed expiry stops it lasting longer than a working day
+    response.set_cookie(PREVIEW_COOKIE, auth.make_preview_token(admin_id, body.plan), httponly=True, samesite="lax", secure=_is_https(request))
+    return response
 
 
 def require_fetch(request: Request, user_id: int = Depends(current_user_id)) -> int:
@@ -3028,13 +3314,19 @@ def _parse_compare_tickers(tickers: str):
 
 
 @app.get("/api/compare/prices")
-def compare_prices(tickers: str = Query(..., min_length=1, max_length=120)):
-    """One-year closing prices rebased to 100, so the stocks' relative performance can be charted."""
+def compare_prices(tickers: str = Query(..., min_length=1, max_length=120), start: Optional[Date] = Query(None), end: Optional[Date] = Query(None),
+                   period: Optional[str] = Query(None, pattern="^max$")):
+    """Closing prices rebased to 100 over a chosen period, so the stocks' relative performance can be charted. The period is
+    `start` and `end` (both), `period=max` (everything there is), or, when none is given, the last year."""
     valid, error = _parse_compare_tickers(tickers)
     if error:
         return error
+    if period and (start or end):
+        return agent_error(400, "Choose either a period or start and end dates, not both.")
     try:
-        return {"status": "success", **peers.rebased_prices(valid)}
+        return {"status": "success", **peers.rebased_prices(valid, start, end, to_max=bool(period))}
+    except stock_period.PeriodError as e:
+        return agent_error(e.status, e.message)
     except Exception:
         log.exception("Price comparison failed")
         return agent_error(500, "Something went wrong loading prices.")
@@ -3078,6 +3370,10 @@ def recommend_payload(body: RecommendRequest) -> dict:
 
 @app.post("/agent/recommend")
 def agent_recommend(request: Request, body: RecommendRequest):
+    # A single question is the AI stock finder. Carrying on a conversation (earlier messages, or a reply to one) is Bounty, the
+    # AI interaction feature, which has its own route (/agent/recommend/stream); this is its fallback, so it needs that plan too.
+    if (body.chat_history or body.reply_to.strip()) and "ai_interaction" not in _plan_features(request):
+        return _plan_denied(request, "ai_interaction", tiers.describe(getattr(request.state, "tier", None)))
     limited = check_rate_limit(request)
     if limited:
         return limited
