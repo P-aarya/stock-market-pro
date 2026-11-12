@@ -117,6 +117,9 @@ class Registration(AccountsTestCase, unittest.TestCase):
         data = {"email": "new@example.com", "password": GOOD, "confirm": GOOD, **fields}
         return c.post("/register", data=data)
 
+    def test_the_sign_up_page_says_new_accounts_start_free(self):
+        self.assertIn("New accounts start on the free plan, which opens the Home tab.", self.client().get("/register").text)
+
     def test_the_form_is_served(self):
         r = self.client().get("/register")
         self.assertEqual(r.status_code, 200)

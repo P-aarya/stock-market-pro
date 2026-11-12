@@ -109,10 +109,10 @@ td.more,th.more{width:1%;padding-left:6px;padding-right:10px;text-align:center}
 
   <div id="view-prices">
   <h1>Live stock prices</h1>
-  <p class="lead">Every stock we track, with today's price and change. You're viewing the free plan.</p>
+  <p class="lead">Every stock we track, with today's price and change.</p>
 
   <section class="plan" aria-label="Plans">
-    <p><b><!--PLAN_NAME--> plan, $<!--PLAN_PRICE--> a month.</b> Create an account to manage your own portfolio and open the full market dashboard: charts, company details, news and calendars.</p>
+    <p><b>Create a free account.</b> It opens the Home tab. The <!--PLAN_NAME--> plan, $<!--PLAN_PRICE--> a month, adds <!--PLAN_PERKS-->.</p>
     <a class="btn primary" href="/register">Create an account</a>
   </section>
 
@@ -145,14 +145,14 @@ td.more,th.more{width:1%;padding-left:6px;padding-right:10px;text-align:center}
   <p class="foot">Prices are refreshed regularly and may be delayed. For information only. Not investment advice. Data from Yahoo Finance.</p>
   </div>
 
-  <!-- The Free plan includes portfolio visibility: the page is there to look at, but holdings can only be added and changed
+  <!-- Portfolio visibility comes with every plan: the page is there to look at, but holdings can only be added and changed
        with an account on a plan that has portfolio management. Nothing here asks the server for anything. -->
   <div id="view-portfolio" hidden>
     <h1>Portfolio</h1>
-    <p class="lead">This is where your holdings, their value and your gains and losses appear. You're viewing the free plan, so the page is read-only.</p>
+    <p class="lead">This is where your holdings, their value and your gains and losses appear. You haven't signed in, so the page is read-only.</p>
 
     <section class="plan" aria-label="Plans">
-      <p><b><!--PLAN_NAME--> plan, $<!--PLAN_PRICE--> a month.</b> Create an account to add your holdings and transactions and track how they perform.</p>
+      <p><b>Create a free account</b> to see your own portfolio. Adding holdings and transactions comes with the <!--PLAN_NAME--> plan, $<!--PLAN_PRICE--> a month.</p>
       <a class="btn primary" href="/register">Create an account</a>
     </section>
 
@@ -167,7 +167,7 @@ td.more,th.more{width:1%;padding-left:6px;padding-right:10px;text-align:center}
       <div class="scroll">
         <table>
           <thead><tr><th scope="col">Ticker</th><th scope="col" class="r">Shares</th><th scope="col" class="r">Avg cost</th><th scope="col" class="r">Price</th><th scope="col" class="r">Value</th><th scope="col" class="r">P&amp;L</th></tr></thead>
-          <tbody><tr><td colspan="6" class="state">No holdings to show. Holdings can be added with an account on the <!--PLAN_NAME--> plan or higher.</td></tr></tbody>
+          <tbody><tr><td colspan="6" class="state">No holdings to show. Sign in to see yours; holdings can be added on the <!--PLAN_NAME--> plan or higher.</td></tr></tbody>
         </table>
       </div>
       <div class="moreRow"><a class="btn" href="/login">Sign in</a> <a class="btn primary" href="/register">Create an account</a></div>

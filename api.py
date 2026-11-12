@@ -57,6 +57,7 @@ def _plain_email(value: str) -> str:
 # Where the profile page sends someone who asks for a higher plan (there is no online payment yet). Optional.
 UPGRADE_CONTACT = _plain_email(os.getenv("UPGRADE_CONTACT_EMAIL", "").strip())
 SESSION_COOKIE = "smp_session"
+PREVIEW_COOKIE = "smp_preview"                  # an administrator's "view the app as this plan" choice (auth.make_preview_token)
 _login_by_client = auth.RateLimiter(5, 300)     # wrong passwords per client in 5 minutes ...
 _login_by_email = auth.RateLimiter(10, 900)     # ... and per account in 15 minutes
 _signups = auth.RateLimiter(5, 3600)            # sign-up attempts per client in an hour
@@ -81,6 +82,7 @@ _APP_ASSETS = {
     # The pictures behind the sign-in and sign-up pages (drawn artwork, nothing private), fetched before anyone is signed in
     "/bg-login.svg": ("bg-login.svg", "image/svg+xml"),
     "/bg-register.svg": ("bg-register.svg", "image/svg+xml"),
+    "/bg-settings.svg": ("bg-settings.svg", "image/svg+xml"),             # the picture behind the Settings page (artwork, nothing private)
 }
 _OPEN_PATHS = {"/login", "/register", "/restore", "/logout", "/forgot-password", "/reset-password", "/confirm-email", "/health", "/api/auth/status", "/favicon.ico"} | set(_APP_ASSETS)
 # The Free tier is a visitor with no account (tiers.py). They may load "/", which shows them only the public page (the price
@@ -107,6 +109,15 @@ async def _approved_user(request: Request):
     return user if _usable(token, user) else None
 
 
+def _preview_level(request: Request, user):
+    """The plan an administrator has chosen to look at the app as, or None. Only an administrator can have one, and only for a plan
+    that exists; the cookie is signed for that one account and lapses on its own (auth.make_preview_token)."""
+    if not user or not user["is_admin"]:
+        return None
+    level = auth.read_preview_token(request.cookies.get(PREVIEW_COOKIE, ""), user["id"])
+    return level if level in tiers.TIERS else None
+
+
 def _unavailable(request: Request, status: int, message: str):
     if request.url.path.startswith(("/api/", "/agent/")):
         return JSONResponse({"status": "error", "message": message}, status_code=status)
@@ -127,7 +138,7 @@ def _plan_denied(request: Request, feature: str, plan: dict):
 
 @app.middleware("http")
 async def require_login(request: Request, call_next):
-    request.state.user_id, request.state.is_admin = None, False
+    request.state.user_id, request.state.is_admin, request.state.preview = None, False, None
     request.state.tier, request.state.features = tiers.visitor_plan().level, tiers.visitor_features()
     if request.method == "OPTIONS" or request.url.path in _OPEN_PATHS:
         return await call_next(request)
@@ -140,11 +151,12 @@ async def require_login(request: Request, call_next):
         return _unavailable(request, 503, "We couldn't check your access just now. Please try again in a moment.")
     if user:
         is_admin = bool(user["is_admin"])
-        plan = tiers.resolve(user.get("tier"))
-        request.state.user_id, request.state.is_admin, request.state.tier = user["id"], is_admin, plan.level
-        request.state.features = tiers.ADMIN_FEATURES if is_admin else tiers.features_for(plan.level)
+        preview = _preview_level(request, user)              # an administrator looking at the app as some plan sees it: that plan's rules apply to them
+        plan = tiers.resolve(user.get("tier") if preview is None else preview)
+        request.state.user_id, request.state.is_admin, request.state.tier, request.state.preview = user["id"], is_admin, plan.level, preview
+        request.state.features = tiers.ADMIN_FEATURES if is_admin and preview is None else tiers.features_for(plan.level)
         needed = tiers.feature_for(request.method, request.url.path)
-        if not is_admin and needed != tiers.NO_FEATURE and needed not in request.state.features:
+        if (not is_admin or preview is not None) and needed != tiers.NO_FEATURE and needed not in request.state.features:
             return _plan_denied(request, needed, tiers.describe(plan.level))
         return await call_next(request)
     if request.url.path in _ANONYMOUS_PATHS:
@@ -190,7 +202,9 @@ def _set_session_cookie(request: Request, response, user_id: int):
 
 
 def _start_session(request: Request, user_id: int) -> RedirectResponse:
-    return _set_session_cookie(request, RedirectResponse("/", status_code=303), user_id)
+    response = _set_session_cookie(request, RedirectResponse("/", status_code=303), user_id)
+    response.delete_cookie(PREVIEW_COOKIE)                    # a new sign-in starts as yourself, not as a plan left over from before
+    return response
 
 
 async def _read_form(request: Request) -> dict:
@@ -307,6 +321,7 @@ async def register(request: Request):
 def logout():
     response = RedirectResponse("/login", status_code=303)
     response.delete_cookie(SESSION_COOKIE)
+    response.delete_cookie(PREVIEW_COOKIE)
     return response
 
 
@@ -413,9 +428,13 @@ def auth_status(request: Request):
     if not _usable(token, user):
         return {"enabled": True, "signed_in": False, "user": None, "admin": False, "plan": tiers.describe_visitor()}
     admin = bool(user["is_admin"])
-    plan = tiers.describe(user.get("tier"))
-    return {"enabled": True, "signed_in": True, "user": {"id": user["id"], "email": user["email"]}, "admin": admin, "plan": plan,
-            "features": sorted(tiers.ADMIN_FEATURES if admin else tiers.features_for(plan["level"]))}
+    preview = _preview_level(request, user)
+    plan = tiers.describe(user.get("tier") if preview is None else preview)
+    status = {"enabled": True, "signed_in": True, "user": {"id": user["id"], "email": user["email"]}, "admin": admin, "plan": plan,
+              "features": sorted(tiers.ADMIN_FEATURES if admin and preview is None else tiers.features_for(plan["level"]))}
+    if preview is not None:
+        status["preview"] = plan                                   # an administrator looking at the app as this plan sees it
+    return status
 
 
 @app.get("/api/profile")
@@ -430,18 +449,19 @@ def get_profile(request: Request, response: Response, user_id: int = Depends(cur
         return agent_error(503, "We couldn't load your profile just now. Please try again in a moment.")
     if not user:
         return agent_error(401, "Please sign in.")
-    admin = bool(request.state.is_admin)
-    plan = {"level": None, "name": "Administrator", "price": None} if admin else tiers.describe(user.get("tier"))
+    preview = getattr(request.state, "preview", None)
+    admin = bool(request.state.is_admin) and preview is None      # an administrator previewing a plan gets that plan's page, not the administrator's
+    plan = {"level": None, "name": "Administrator", "price": None} if admin else tiers.describe(user.get("tier") if preview is None else preview)
     features = tiers.ADMIN_FEATURES if admin else tiers.features_for(plan["level"])
     return {"status": "success", "email": user["email"], "full_name": user.get("full_name") or None, "joined_at": user.get("created_at"), "admin": admin, "plan": plan,
             "included": tiers.feature_list(features), "plans": tiers.catalog(), "upgrade_contact": UPGRADE_CONTACT or None,
-            "grace_days": auth.DELETION_GRACE_DAYS}
+            "grace_days": auth.DELETION_GRACE_DAYS, "preview": plan if preview is not None else None}
 
 
 # ── Serve dashboard.html directly from port 8000 ──
 def _plan_label(request: Request) -> str:
-    """'Basic' for an account on that plan, 'Administrator' for an administrator."""
-    if getattr(request.state, "is_admin", False):
+    """The plan's name ('Basic') for an account on that plan, 'Administrator' for an administrator (or the plan they are previewing)."""
+    if getattr(request.state, "is_admin", False) and getattr(request.state, "preview", None) is None:
         return "Administrator"
     return tiers.describe(getattr(request.state, "tier", None))["name"]
 
@@ -458,14 +478,17 @@ def _locked_features(request: Request) -> dict:
 
 
 def _public_response():
-    """What a visitor without an account sees at "/": the Free tier's price list (public.html)."""
+    """What someone who isn't signed in sees at "/": the public price list and read-only portfolio page (public.html)."""
     path = os.path.join(_BASE_DIR, "public.html")
     if not os.path.exists(path):
         return RedirectResponse("/login", status_code=302)
     with open(path, encoding="utf-8") as f:
         page = f.read()
-    plan = tiers.TIERS[tiers.account_tier()]                 # the plan the page invites people to join
-    page = page.replace("<!--PLAN_NAME-->", _escape_html(plan.name)).replace("<!--PLAN_PRICE-->", f"{plan.price:.2f}")
+    plan = tiers.first_paid_plan()                           # the plan the page invites people to move up to (an account itself is free)
+    perks = [tiers.FEATURES[f].lower() for f in plan.adds]
+    perk_text = ", ".join(perks[:-1]) + " and " + perks[-1] if len(perks) > 1 else perks[0]
+    page = (page.replace("<!--PLAN_NAME-->", _escape_html(plan.name)).replace("<!--PLAN_PRICE-->", f"{plan.price:.2f}")
+                .replace("<!--PLAN_PERKS-->", _escape_html(perk_text)))
     return HTMLResponse(page, headers={"Cache-Control": "private, no-cache"})
 
 
@@ -476,6 +499,7 @@ def _dashboard_response(request: Request):
     with open(path, encoding="utf-8") as f:
         page = f.read()
     user_id = getattr(request.state, "user_id", None)
+    preview = getattr(request.state, "preview", None)
     meta = ""
     if user_id is not None:
         try:
@@ -485,10 +509,15 @@ def _dashboard_response(request: Request):
         meta = (f'<meta name="smp-user-id" content="{int(user_id)}">'
                 f'<meta name="smp-user-email" content="{_escape_html((user or {}).get("email", ""), quote=True)}">'
                 f'<meta name="smp-user-name" content="{_escape_html((user or {}).get("full_name") or "", quote=True)}">'
-                f'<meta name="smp-user-admin" content="{1 if getattr(request.state, "is_admin", False) else 0}">'
+                # while previewing a plan the page is the plan's own, so it shows no Admin link either (the preview bar has the way back)
+                f'<meta name="smp-user-admin" content="{1 if getattr(request.state, "is_admin", False) and preview is None else 0}">'
                 f'<meta name="smp-plan" content="{_escape_html(_plan_label(request), quote=True)}">'
                 f'<meta name="smp-features" content="{",".join(sorted(getattr(request.state, "features", ())))}">'
                 f'<meta name="smp-locks" content="{_escape_html(json.dumps(_locked_features(request)), quote=True)}">')
+        if preview is not None and getattr(request.state, "is_admin", False):
+            meta += (f'<meta name="smp-preview" content="{_escape_html(tiers.describe(preview)["name"], quote=True)}">'
+                     f'<meta name="smp-preview-level" content="{int(preview)}">'
+                     f'<meta name="smp-plans" content="{_escape_html(json.dumps([tiers.describe(n) for n in sorted(tiers.TIERS)]), quote=True)}">')
     # The page is different for every person, so it must never be stored by a browser cache or a shared proxy.
     return HTMLResponse(page.replace("<!--SMP_USER-->", meta, 1), headers={"Cache-Control": "private, no-store"})
 
@@ -2645,6 +2674,44 @@ def admin_set_status(user_id: int, body: StatusBody, admin_id: int = Depends(req
     except Exception:
         log.exception("Changing an account's status failed")
         return agent_error(500, "Something went wrong saving that change.")
+
+
+# ── Administrators: view the app as a plan ──
+# So that an administrator can check what each plan sees without a separate account for each plan or running set-plan every time.
+# The choice is a signed cookie for that administrator only (auth.make_preview_token): it changes nobody's account and nothing in
+# the database, and while it is set the middleware applies that plan's rules to the administrator's own requests. Admin pages and
+# /api/admin/* stay open (they aren't part of any plan), so the way back always works.
+
+class PreviewBody(BaseModel):
+    plan: Optional[int] = None          # a plan level, or null to go back to being an administrator
+
+
+def _preview_catalog() -> list:
+    """Every plan an administrator may look at the app as, with what it includes (the labels from the plan table)."""
+    return [{**tiers.describe(n), "included": tiers.feature_list(tiers.features_for(n))} for n in sorted(tiers.TIERS)]
+
+
+@app.get("/api/admin/preview")
+def admin_get_preview(request: Request, response: Response, admin_id: int = Depends(require_admin)):
+    """The plans an administrator can look at the app as, and the one they are looking at now (null when none)."""
+    response.headers["Cache-Control"] = "private, no-store"
+    preview = getattr(request.state, "preview", None)
+    return {"status": "success", "plans": _preview_catalog(), "current": tiers.describe(preview) if preview is not None else None}
+
+
+@app.post("/api/admin/preview")
+def admin_set_preview(request: Request, body: PreviewBody, admin_id: int = Depends(require_admin_action)):
+    """Start looking at the app as plan `plan`, or stop (plan null). Takes effect on this administrator's very next request."""
+    if body.plan is None:
+        response = JSONResponse({"status": "success", "current": None})
+        response.delete_cookie(PREVIEW_COOKIE)
+        return response
+    if body.plan not in tiers.TIERS:
+        return agent_error(400, "That isn't one of the plans.")
+    response = JSONResponse({"status": "success", "current": tiers.describe(body.plan)})
+    # no max-age: the browser forgets it when it closes, and the signed expiry stops it lasting longer than a working day
+    response.set_cookie(PREVIEW_COOKIE, auth.make_preview_token(admin_id, body.plan), httponly=True, samesite="lax", secure=_is_https(request))
+    return response
 
 
 def require_fetch(request: Request, user_id: int = Depends(current_user_id)) -> int:

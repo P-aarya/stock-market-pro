@@ -105,7 +105,7 @@ def register_page(error: str = "", email: str = "", needs_code: bool = False, cl
 <p class="alt"><a href="/login">Back to sign in</a></p>""", backdrop="register")
     code = ('<label for="code">Invite code</label><input id="code" type="text" name="code" autocomplete="off" autocapitalize="none" spellcheck="false" required>'
             if needs_code else "")
-    return _page("Create account", f"""<h1>Create your account</h1><p class="sub">Your portfolio, transactions and watchlist stay private to you.</p>
+    return _page("Create account", f"""<h1>Create your account</h1><p class="sub">Your portfolio, transactions and watchlist stay private to you. New accounts start on the free plan, which opens the Home tab.</p>
 {_error(error)}
 <form method="post" action="/register">
 <label for="email">Email</label>

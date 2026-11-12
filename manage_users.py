@@ -9,7 +9,7 @@ Account administration. Run it from the project folder with the virtual environm
     python manage_users.py block EMAIL              stop an account signing in
     python manage_users.py claim-legacy EMAIL       give the portfolio, transactions and price alerts saved before accounts existed to EMAIL
     python manage_users.py set-password EMAIL       set someone's password (people can also use "Forgot password?" on the sign-in page)
-    python manage_users.py set-plan EMAIL PLAN      move an account to a plan: 2 or Basic, 3 or "AI Stock Finder", 4, 5 or Deluxe, 6 or Premier
+    python manage_users.py set-plan EMAIL PLAN      move an account to a plan: 1 or Free, 2 or Basic, 3 or "AI Stock Finder", 4, 5 or Deluxe, 6 or Premier
     python manage_users.py purge-deleted            permanently remove accounts that people deleted more than 30 days ago (the app also does this by itself)
     python manage_users.py list-users [--pending]
     python manage_users.py delete-user EMAIL --yes  delete an account together with its holdings, transactions, price alerts and watchlist
@@ -27,7 +27,7 @@ import support
 import tiers
 from account_data import OPTIONAL_PERSONAL_TABLES, PERSONAL_TABLES, _has_table, delete_account, owned_tables, purge_expired  # noqa: F401  (they live in account_data.py; the app shares them)
 
-DEFAULT_TIER = tiers.account_tier()      # the plan every account is on until it is moved
+DEFAULT_TIER = tiers.account_tier()      # the plan every new account starts on (Free)
 
 USERS_DDL = f"""CREATE TABLE IF NOT EXISTS users (
   id INT NOT NULL AUTO_INCREMENT,

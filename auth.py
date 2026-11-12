@@ -189,6 +189,32 @@ def read_restore_token(token, at=None):
         return None
 
 
+PREVIEW_HOURS = 8       # an administrator's "view as this plan" setting lapses on its own after this long
+
+
+def make_preview_token(user_id: int, level: int, now=None) -> str:
+    """An administrator's choice to see the app as `level` sees it. Signed like a session but under its own version tag, so it can
+    never be used as a session cookie (or the reverse), and made for one account so that another can't borrow it."""
+    expires = int((time.time() if now is None else now) + PREVIEW_HOURS * 3600)
+    payload = f"p1.{int(user_id)}.{int(level)}.{expires}"
+    return f"{payload}.{_sign(payload)}"
+
+
+def read_preview_token(token, user_id, now=None):
+    """The plan level a valid, unexpired preview cookie made for `user_id` asks for, or None. Whether that person is still an
+    administrator is for the caller to check."""
+    try:
+        version, owner, level, expires, signature = str(token).split(".")
+        payload = f"{version}.{owner}.{level}.{expires}"
+        if version != "p1" or not hmac.compare_digest(signature, _sign(payload)):
+            return None
+        if int(owner) != int(user_id) or int(expires) <= (time.time() if now is None else now):
+            return None
+        return int(level)
+    except (ValueError, TypeError, AttributeError):
+        return None
+
+
 def make_token(user_id: int, now=None) -> str:
     expires = int((time.time() if now is None else now) + SESSION_DAYS * 86400)
     payload = f"v1.{int(user_id)}.{expires}"
@@ -273,11 +299,11 @@ class RateLimiter:
 USERS_EXTRA_COLUMNS = (
     ("full_name", "VARCHAR(80) NULL DEFAULT NULL"),
     ("sessions_after", "INT NULL DEFAULT NULL"),
-    ("tier", f"TINYINT NOT NULL DEFAULT {tiers.account_tier()}"),     # the subscription plan (tiers.py); existing accounts start on the lowest account plan
+    ("tier", f"TINYINT NOT NULL DEFAULT {tiers.EXISTING_ACCOUNTS_TIER}"),     # the subscription plan (tiers.py); accounts that already exist stay on Basic (new sign-ups are given Free explicitly)
     ("deleted_at", "TIMESTAMP NULL DEFAULT NULL"),                     # when the person deleted their own account (removed for good after DELETION_GRACE_DAYS)
 )
 USERS_COLUMN_NOTES = {            # what the migration says about a column it adds
-    "tier": f"existing accounts start on the {tiers.TIERS[tiers.account_tier()].name} plan",
+    "tier": f"existing accounts stay on the {tiers.TIERS[tiers.EXISTING_ACCOUNTS_TIER].name} plan; new sign-ups start on {tiers.TIERS[tiers.account_tier()].name}",
     "deleted_at": "people can now delete and restore their own account",
 }
 PROFILE_EXTRA_COLUMNS = (
@@ -417,12 +443,13 @@ class MySQLStore:
 
     def create(self, email, password_hash, status="pending", is_admin=False):
         import mysql.connector
+        self._extras()                                   # the plan column has to exist before a new account can be given one
 
         def work(conn):
             cur = conn.cursor()
             try:
-                cur.execute("INSERT INTO users (email, password_hash, status, is_admin) VALUES (%s, %s, %s, %s)",
-                            (email, password_hash, status, 1 if is_admin else 0))
+                cur.execute("INSERT INTO users (email, password_hash, status, is_admin, tier) VALUES (%s, %s, %s, %s, %s)",
+                            (email, password_hash, status, 1 if is_admin else 0, tiers.account_tier()))     # everyone starts on the lowest plan
                 conn.commit()
                 return cur.lastrowid
             except mysql.connector.IntegrityError as e:

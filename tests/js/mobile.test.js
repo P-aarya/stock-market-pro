@@ -43,9 +43,9 @@ const tablet = mediaBlock('max-width:960px'), phone = mediaBlock('max-width:700p
     assert(/<meta name="apple-mobile-web-app-capable" content="yes"/.test(html));
   });
 
-  await t('all nine tabs have an icon and a label, so the bottom bar can stack them', () => {
+  await t('all eight tabs have an icon and a label, so the bottom bar can stack them', () => {
     const tabs = [...html.matchAll(/<button class="ntab[^"]*"[^>]*>(.*?)<\/button>/g)].map(m => m[1]);
-    assert.strictEqual(tabs.length, 9);       // Home, Market, IPOs, Watchlist, Commodities, Learn, Portfolio, Transactions and Profile
+    assert.strictEqual(tabs.length, 8);       // Home, Market, IPOs, Watchlist, Commodities, Learn, Portfolio and Transactions (Profile is in the account menu)
     for (const inner of tabs) assert(/<span class="ico">.+<\/span><span class="lbl"/.test(inner), inner);
   });
 

@@ -110,7 +110,8 @@ PUT /api/account/notifications
 PUT /api/account/profile
 PUT /api/admin/learn/{item_id}
 """.split("\n")       # her second round: Settings, Help Desk, forgot password, Admin Center, Learn, insider filings, recently viewed
-ONLY_TIERS = ["GET /api/public/stocks", "GET /api/profile", "POST /api/profile/delete", "POST /restore"]   # the Free tier's price list, the signed-in profile page and deleting / restoring an account
+ONLY_TIERS = ["GET /api/public/stocks", "GET /api/profile", "POST /api/profile/delete", "POST /restore",
+              "GET /api/admin/preview", "POST /api/admin/preview"]   # the Free tier's price list, the signed-in profile page, deleting / restoring an account, and an administrator viewing the app as a plan
 SHARED_ROUTES = 51      # routes both of you had (market data, stocks, news, login ...), plus one Aarya added after the merge
 
 

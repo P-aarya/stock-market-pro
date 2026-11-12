@@ -106,7 +106,7 @@ function plan({ features, locks = {}, name = 'Basic', tagged = [], hidden = [] }
     }
   });
 
-  await t('the page asks only for what the plan includes when it starts: the IPO list and the top-5 predictions are the only optional loads', () => {
+  await t('the page asks only for what the plan includes when it starts: the currency card, the IPO list and the top-5 predictions are the optional loads', () => {
     const src = between('async function init(){', 'initStockSuggest();');
     const run = (allowed) => {
       const calls = [], stub = n => () => { calls.push(n); return Promise.resolve(); };
@@ -115,17 +115,23 @@ function plan({ features, locks = {}, name = 'Basic', tagged = [], hidden = [] }
       vm.createContext(ctx); vm.runInContext(src.replace(/\/\/.*$/gm, ''), ctx);
       return ctx.init().then(() => calls.sort());
     };
-    return Promise.all([run(new Set(['initial_screen', 'portfolio_mgt'])), run(new Set(['initial_screen', 'stock_prediction'])), run(new Set(['initial_screen', 'pre_ipo'])), run(new Set(FEATURES))]).then(([basic, predicting, ipos, all]) => {
-      assert.deepStrictEqual(basic, ['ecoInitMonth', 'loadCurrencies', 'loadEarnings', 'loadGL', 'loadIndices', 'loadMarketNews', 'loadSectors', 'loadSentiment', 'loadStocks', 'loadSummary']);
+    return Promise.all([run(new Set(['initial_screen', 'portfolio_view'])), run(new Set(['initial_screen', 'market'])), run(new Set(['initial_screen', 'market', 'stock_prediction'])),
+                        run(new Set(['initial_screen', 'market', 'pre_ipo'])), run(new Set(FEATURES))]).then(([free, basic, predicting, ipos, all]) => {
+      assert.deepStrictEqual(free, ['ecoInitMonth', 'loadEarnings', 'loadGL', 'loadIndices', 'loadMarketNews', 'loadSectors', 'loadSentiment', 'loadStocks', 'loadSummary'],
+        'a Free account loads everything the Home tab is drawn from, but not the Market tab\'s own currency card');
+      assert.deepStrictEqual(basic, [...free, 'loadCurrencies'].sort());
       assert.deepStrictEqual(predicting, [...basic, 'loadTop5'].sort()); assert.deepStrictEqual(ipos, [...basic, 'loadIPOs'].sort());
       assert.strictEqual(all.length, 12);
     });
   });
 
-  await t('alerts and notifications run on every plan (they are part of the initial screen), and Bounty will not open without AI interaction', () => {
+  await t('alerts and notifications run on every plan, the Help Desk poll only where tickets can be raised, and Bounty will not open without AI interaction', () => {
     const timers = between('ntRenderBell();', '// ─── QUARTERLY RESULTS');
-    assert(!/can\(/.test(timers), 'the three timers are not tied to a plan');
-    for (const timer of ['checkAlertsForNotifications', 'ntPollFeed', 'ntEventReminders']) assert(timers.includes(timer), timer);
+    const guard = timers.indexOf("if(can('raise_ticket')){");
+    assert(guard > 0 && timers.lastIndexOf('ntPollSupport') > guard, 'the Help Desk poll sits inside the Basic check');
+    const others = timers.slice(0, guard);                                              // everything before it: not tied to any plan
+    assert(!/can\(/.test(others), 'the alert, news and reminder timers are not tied to a plan');
+    for (const timer of ['checkAlertsForNotifications', 'ntPollFeed', 'ntEventReminders']) assert(others.includes(timer), timer);
     const bounty = between('function toggleBounty(){', 'bountyOpen = !bountyOpen;');
     assert(/can\('ai_interaction'\)/.test(bounty) && /showUpgrade\('ai_interaction'\)/.test(bounty));
   });
@@ -156,24 +162,29 @@ function plan({ features, locks = {}, name = 'Basic', tagged = [], hidden = [] }
     assert.deepStrictEqual(await run(true), ['/api/market/commodities']);
   });
 
-  await t('every tag in the markup names a feature the server knows, so a typo cannot leave something open', () => {
-    assert.deepStrictEqual(FEATURES, ['initial_screen', 'portfolio_view', 'portfolio_mgt', 'stock_prediction', 'ai_stock_finder', 'ai_interaction', 'commodities', 'pre_ipo'], 'the eight rows of the plan table');
-    const used = [...html.matchAll(/data-feature(?:-hide)?="([^"]+)"/g)].map(m => m[1]);
-    assert(used.length >= 10, 'the page is tagged');
-    for (const f of used) assert(FEATURES.includes(f), `"${f}" is not a feature in tiers.py`);
-    for (const f of FEATURES.filter(f => f !== 'initial_screen')) assert(used.includes(f), `${f} is a plan feature the page never mentions`);
-    assert(!used.includes('initial_screen'), 'the initial screen is what every account has: nothing on it is padlocked');
+  await t('every tag in the markup names a feature the server knows, and every plan feature is used somewhere on the page', () => {
+    assert.deepStrictEqual(FEATURES, ['initial_screen', 'portfolio_view', 'market', 'portfolio_mgt', 'raise_ticket', 'stock_prediction', 'ai_stock_finder', 'peer_comparison',
+                                       'ai_interaction', 'learn', 'commodities', 'pre_ipo', 'insider_dealings', 'filings'], 'the rows of the plan table, in its order');
+    const tags = [...html.matchAll(/data-feature(?:-hide)?="([^"]+)"/g)].map(m => m[1]);
+    const checks = [...html.matchAll(/\bcan\('([a-z_]+)'\)/g)].map(m => m[1]);
+    assert(tags.length >= 14, 'the page is tagged');
+    for (const f of [...tags, ...checks]) assert(FEATURES.includes(f), `"${f}" is not a feature in tiers.py`);
+    for (const f of FEATURES.filter(f => f !== 'initial_screen')) assert(tags.includes(f) || checks.includes(f), `${f} is a plan feature the page never mentions`);
+    assert(!tags.includes('initial_screen'), 'the Home tab is what every account has: nothing on it is padlocked');
   });
 
-  await t('the right parts are tagged: the tabs, the AI and prediction boxes, the portfolio forms and the Bounty chat', () => {
+  await t('the right parts are tagged: the tabs, the stock-page tabs, the AI and prediction boxes, the portfolio forms and the Bounty chat', () => {
     const tagOf = re => { const m = html.match(re); assert(m, String(re)); return m[1]; };
     assert.strictEqual(tagOf(/data-feature="([a-z_]+)" onclick="showPage\('ipos',this\)"/), 'pre_ipo');
     assert.strictEqual(tagOf(/data-feature="([a-z_]+)" onclick="showPage\('commodities',this\)"/), 'commodities');
     assert.strictEqual(tagOf(/data-feature="([a-z_]+)" onclick="showPage\('portfolio',this\)"/), 'portfolio_view');
     assert.strictEqual(tagOf(/data-feature="([a-z_]+)" onclick="showPage\('transactions',this\)"/), 'portfolio_view');
-    for (const open of ['market', 'watchlist']) assert(!new RegExp(`class="ntab[^"]*"[^>]*data-feature[^>]*showPage\\('${open}'`).test(html), `${open} is the initial screen: open to every account`);
-    assert.strictEqual(tagOf(/class="fstab" data-feature="([a-z_]+)" onclick="showFST\('intelligence',this\)"/), 'stock_prediction');
-    for (const open of ['overview', 'charts', 'company', 'peers', 'financials', 'earnings', 'dividends', 'news'])
+    assert.strictEqual(tagOf(/data-feature="([a-z_]+)" onclick="showPage\('market',this\)"/), 'market');
+    assert.strictEqual(tagOf(/data-feature="([a-z_]+)" onclick="showPage\('learn',this\)"/), 'learn');
+    for (const open of ['home', 'watchlist']) assert(!new RegExp(`class="ntab[^"]*"[^>]*data-feature[^>]*showPage\\('${open}'`).test(html), `${open} is open to every account`);
+    const stockTabs = { intelligence: 'stock_prediction', peers: 'peer_comparison', insiders: 'insider_dealings', filings: 'filings' };
+    for (const [tab, feature] of Object.entries(stockTabs)) assert.strictEqual(tagOf(new RegExp(`class="fstab" data-feature="([a-z_]+)" onclick="showFST\\('${tab}',this\\)"`)), feature, tab);
+    for (const open of ['overview', 'charts', 'company', 'financials', 'earnings', 'dividends', 'news'])
       assert(!new RegExp(`class="fstab[^"]*"[^>]*data-feature[^>]*showFST\\('${open}'`).test(html), `${open} stays open to every account`);
     const cards = { 'ai-wrap': 'ai_stock_finder', 'top5-card': 'stock_prediction' };
     for (const [id, feature] of Object.entries(cards)) assert(new RegExp(`(class="${id}"|id="${id}")[^>]*data-feature="${feature}"|data-feature="${feature}"[^>]*(class="${id}"|id="${id}")`).test(html), id);

@@ -51,8 +51,22 @@ body{background:var(--bg0);color:var(--t1);font-family:var(--sans);min-height:10
 .nprof-name{font-size:14px;font-weight:800;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .nprof-email{font-size:12px;font-weight:600;color:var(--t3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px;}
 .nprof-hr{height:1px;background:var(--b1);margin:12px 0;}
-.nsignout{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--t2);text-decoration:none;padding:8px 6px;border-radius:7px;}
-.nsignout:hover{color:var(--t1);background:var(--bg3);}
+.nsignout,.nmenu-item{display:flex;align-items:center;gap:8px;width:100%;font-size:13px;font-weight:700;color:var(--t2);text-decoration:none;padding:8px 6px;border-radius:7px;}
+.nmenu-item{background:none;border:0;cursor:pointer;font-family:inherit;text-align:left;}
+.nsignout:hover,.nmenu-item:hover{color:var(--t1);background:var(--bg3);}
+.nmenu-item:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px;}
+.nprof-btn.on{border-color:var(--blue);background:rgba(79,142,247,0.14);}          /* the Profile page is open */
+/* An administrator looking at the app as a plan: a small bar that stays on screen, with the way to switch plan or stop */
+.pvbar{position:fixed;left:16px;bottom:16px;z-index:350;display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;max-width:calc(100vw - 32px);padding:8px 10px 8px 12px;background:var(--bg2);border:1px solid var(--cyan);border-radius:12px;box-shadow:0 6px 28px rgba(0,0,0,0.55);font-size:12px;color:var(--t2);}
+.pvbar b{color:var(--t1);}
+.pv-eye{display:inline-flex;color:var(--cyan);}
+.pvbar select{background:var(--bg3);color:var(--t1);border:1px solid var(--b2);border-radius:7px;padding:6px 8px;font-size:12px;font-weight:700;font-family:inherit;max-width:100%;}
+.pvbar select:focus-visible,.pvbar button:focus-visible,.pvbar a:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
+.pv-exit{background:var(--cyan);color:#041018;border:0;border-radius:7px;padding:7px 11px;font-size:12px;font-weight:800;font-family:inherit;cursor:pointer;}
+.pv-exit:hover{filter:brightness(1.1);}
+.pv-admin{color:var(--cyan);font-weight:800;text-decoration:none;white-space:nowrap;}
+.pv-admin:hover{text-decoration:underline;}
+.pv-msg{flex-basis:100%;color:#ff8080;font-weight:700;}.pv-msg:empty{display:none;}
 .nadmin{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:var(--cyan);text-decoration:none;white-space:nowrap;padding:5px 10px;border:1px solid rgba(0,212,255,0.3);border-radius:7px;}
 .nadmin:hover{background:rgba(0,212,255,0.1);}
 .nbadge{background:var(--yellow);color:#000;font-size:10px;font-weight:900;border-radius:9px;padding:1px 6px;min-width:18px;text-align:center;}
@@ -595,14 +609,13 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   </div>
   <div class="ntabs">
     <button class="ntab on" id="ntab-home" onclick="showPage('home',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg></span><span class="lbl">Home</span></button>
-    <button class="ntab" id="ntab-market" onclick="showPage('market',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></svg></span><span class="lbl">Market</span></button>
+    <button class="ntab" id="ntab-market" data-feature="market" onclick="showPage('market',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></svg></span><span class="lbl">Market</span></button>
     <button class="ntab" id="ntab-ipos" data-feature="pre_ipo" onclick="showPage('ipos',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span><span class="lbl">IPOs</span></button>
     <button class="ntab" id="ntab-watchlist" onclick="showPage('watchlist',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.1 8.3 22 9.3 17 14.1 18.2 21 12 17.8 5.8 21 7 14.1 2 9.3 8.9 8.3 12 2"/></svg></span><span class="lbl">Watchlist</span></button>
     <button class="ntab" id="ntab-commodities" data-feature="commodities" onclick="showPage('commodities',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg></span><span class="lbl" data-short="Commod.">Commodities</span></button>
-    <button class="ntab" id="ntab-learn" onclick="showPage('learn',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/></svg></span><span class="lbl">Learn</span></button>
+    <button class="ntab" id="ntab-learn" data-feature="learn" onclick="showPage('learn',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/></svg></span><span class="lbl">Learn</span></button>
     <button class="ntab" id="ntab-portfolio" data-feature="portfolio_view" onclick="showPage('portfolio',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg></span><span class="lbl">Portfolio</span></button>
     <button class="ntab" id="ntab-transactions" data-feature="portfolio_view" onclick="showPage('transactions',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span><span class="lbl" data-short="Trades">Transactions</span></button>
-    <button class="ntab" id="ntab-profile" onclick="showPage('profile',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg></span><span class="lbl">Profile</span></button>
   </div>
   <div class="nav-r">
     <button id="nt-bell" class="nt-bell" onclick="ntToggleBell(event)" title="Notifications"><svg class="lic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span id="nt-badge" class="nt-badge" style="display:none">0</span></button>
@@ -1343,13 +1356,13 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <button class="fstab on" onclick="showFST('overview',this)">Overview</button>
       <button class="fstab" onclick="showFST('charts',this)">Price Chart</button>
       <button class="fstab" onclick="showFST('company',this)">Company</button>
-      <button class="fstab" onclick="showFST('peers',this)">Peers</button>
+      <button class="fstab" data-feature="peer_comparison" onclick="showFST('peers',this)">Peers</button>
       <button class="fstab" onclick="showFST('financials',this)">Financials</button>
       <button class="fstab" data-feature="stock_prediction" onclick="showFST('intelligence',this)">Forecast</button>
       <button class="fstab" onclick="showFST('earnings',this)">Earnings</button>
       <button class="fstab" onclick="showFST('dividends',this)">Dividends</button>
-      <button class="fstab" onclick="showFST('insiders',this)">Insider Deals</button>
-      <button class="fstab" onclick="showFST('filings',this)">Filings</button>
+      <button class="fstab" data-feature="insider_dealings" onclick="showFST('insiders',this)">Insider Deals</button>
+      <button class="fstab" data-feature="filings" onclick="showFST('filings',this)">Filings</button>
       <button class="fstab" onclick="showFST('news',this)">News</button>
     </div>
 
@@ -1761,18 +1774,21 @@ function addAccountMenu(nav){
   gear.innerHTML='<svg class="lic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
   nav.appendChild(gear);
   const wrap=document.createElement('div');wrap.className='nprof';
-  const btn=document.createElement('button');btn.type='button';btn.className='nicon nprof-btn';btn.title='Account';btn.setAttribute('aria-label','Account');btn.setAttribute('aria-haspopup','true');btn.setAttribute('aria-expanded','false');
+  const btn=document.createElement('button');btn.type='button';btn.id='nprof-btn';btn.className='nicon nprof-btn';btn.title='Account';btn.setAttribute('aria-label','Account');btn.setAttribute('aria-haspopup','true');btn.setAttribute('aria-expanded','false');
   btn.innerHTML='<svg class="lic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
   const menu=document.createElement('div');menu.className='nprof-menu';menu.setAttribute('role','menu');
   const nm=document.createElement('div');nm.className='nprof-name';nm.textContent=ME.name||'Your account';
   const em=document.createElement('div');em.className='nprof-email';em.textContent=ME.email;em.title=ME.email;
   const hr=document.createElement('div');hr.className='nprof-hr';
+  const prof=document.createElement('button');prof.type='button';prof.className='nmenu-item';prof.id='nprof-profile';prof.setAttribute('role','menuitem');
+  prof.innerHTML='<svg class="lic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg><span>Profile and plan</span>';
   const out=document.createElement('a');out.href='/logout';out.className='nsignout';out.setAttribute('role','menuitem');
   out.innerHTML='<svg class="lic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Sign out</span>';
-  menu.appendChild(nm);menu.appendChild(em);menu.appendChild(hr);menu.appendChild(out);
+  menu.appendChild(nm);menu.appendChild(em);menu.appendChild(hr);menu.appendChild(prof);menu.appendChild(out);
   wrap.appendChild(btn);wrap.appendChild(menu);nav.appendChild(wrap);
   const setOpen=(open)=>{menu.classList.toggle('open',open);btn.setAttribute('aria-expanded',open?'true':'false');};
   btn.addEventListener('click',(e)=>{e.stopPropagation();setOpen(!menu.classList.contains('open'));});
+  prof.addEventListener('click',()=>{setOpen(false);openProfile();});
   document.addEventListener('click',(e)=>{if(!wrap.contains(e.target))setOpen(false);});
   document.addEventListener('keydown',(e)=>{if(e.key==='Escape')setOpen(false);});
   return {gear,btn,menu};
@@ -1782,6 +1798,47 @@ function addAccountMenu(nav){
   addAccountMenu(nav);})();
 // A session for an account that has since been removed still passes the cookie check: send that person to the login page
 (async()=>{try{const r=await fetch(API+'/api/auth/status');const d=await r.json();if(d&&d.signed_in===false)location.href='/login';}catch(e){}})();
+
+// ── Administrators: looking at the app as a plan ──
+// The server has already made the page that plan's own (its tabs, padlocks and refusals; no Admin link). This bar says so, and is the way to
+// switch to another plan or stop. It only exists when the server wrote a plan into the page, which it does for an administrator alone.
+const PREVIEW=(()=>{
+  const g=n=>document.querySelector('meta[name="'+n+'"]')?.content||'';
+  let plans=[];try{plans=JSON.parse(g('smp-plans')||'[]');}catch(e){}
+  return{name:g('smp-preview'),level:Number(g('smp-preview-level'))||null,plans:Array.isArray(plans)?plans:[]};
+})();
+/** Text made safe to put inside markup. (Its own copy: this block runs while the page loads, before the page's general escapeHtml exists.) */
+const pvEsc=x=>String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+/** Ask the server to show this administrator the app as plan `level` (null: as themselves), then reload: the page itself is different for each plan. */
+async function setPlanPreview(level){
+  const msg=document.getElementById('pv-msg'),sel=document.getElementById('pv-select');
+  if(msg)msg.textContent='';
+  try{
+    const r=await fetch(API+'/api/admin/preview',{method:'POST',headers:{'Content-Type':'application/json','X-Requested-With':'fetch'},body:JSON.stringify({plan:level})});
+    if(signedOut(r))return;
+    if(!r.ok)throw new Error(r.status);
+    location.reload();
+  }catch(e){
+    if(msg)msg.textContent='We couldn’t switch plans just now. Please try again.';
+    if(sel&&PREVIEW.level!=null)sel.value=String(PREVIEW.level);
+  }
+}
+function addPreviewBar(){
+  const bar=document.createElement('div');bar.className='pvbar';bar.id='pvbar';bar.setAttribute('role','region');bar.setAttribute('aria-label','Plan preview');
+  const opts=PREVIEW.plans.map(p=>'<option value="'+Number(p.level)+'"'+(p.level===PREVIEW.level?' selected':'')+'>'+pvEsc(p.name)+(p.price?' · $'+Number(p.price).toFixed(2):'')+'</option>').join('');
+  bar.innerHTML='<span class="pv-eye" aria-hidden="true"><svg class="lic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></span>'
+    +'<span class="pv-txt">Viewing as <b id="pv-name">'+pvEsc(PREVIEW.name)+'</b></span>'
+    +'<select id="pv-select" aria-label="Plan to view as">'+opts+'</select>'
+    +'<button type="button" class="pv-exit" id="pv-exit">Exit preview</button>'
+    +'<a class="pv-admin" id="pv-admin" href="/admin#plan">Admin Center</a>'
+    +'<div class="pv-msg" id="pv-msg" role="alert"></div>';
+  document.body.appendChild(bar);
+  const sel=document.getElementById('pv-select'),exit=document.getElementById('pv-exit');
+  if(sel)sel.addEventListener('change',()=>{const v=Number(sel.value);if(v&&v!==PREVIEW.level)setPlanPreview(v);});
+  if(exit)exit.addEventListener('click',()=>setPlanPreview(null));
+  return bar;
+}
+if(PREVIEW.name)addPreviewBar();
 
 // ── Profile page ──
 // Who the person is, when they joined, their plan and what it includes; the Upgrade button opens every plan with its perks.
@@ -1818,7 +1875,7 @@ function profileHtml(d,open){
   const top=d.plans.length&&d.plan.level!=null&&d.plan.level>=Math.max(...d.plans.map(p=>p.level));
   const canUpgrade=!d.admin&&!top;
   const label=open?'Hide plans':canUpgrade?'Upgrade plan':'View plans';
-  const planNote=d.admin?'Full access to everything':profilePrice(d.plan.price)+(d.plan.price?' per month':'');
+  const planNote=d.admin?'Full access to everything':d.plan.price?profilePrice(d.plan.price)+' per month':'No monthly charge';
   const contactNote=d.upgrade_contact
     ?`There is no online payment yet. An Upgrade button opens an email to ${escapeHtml(d.upgrade_contact)} asking for that plan.`
     :'There is no online payment yet. Plans are changed by an administrator: ask them to move your account to the plan you want.';
@@ -1904,11 +1961,12 @@ async function confirmDelete(){
   delBusy=false;go.textContent='Yes, delete my account';delSync();pw.focus();
 }
 
+/** The "Profile and plan" entry of the account menu: the page opens with no tab highlighted, because it isn't one of the app's tabs. */
+function openProfile(){showPage('profile');}
 /** The padlock message's "See plans": open the profile with the comparison showing. */
 function seePlans(){
   closeUpgrade();
-  const tab=document.getElementById('ntab-profile');if(!tab)return;
-  profilePlansOpen=true;profileScroll=true;showPage('profile',tab);
+  profilePlansOpen=true;profileScroll=true;openProfile();
 }
 
 function showPage(n,btn){
@@ -1917,7 +1975,8 @@ function showPage(n,btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('on'));
   document.getElementById('page-'+n).classList.add('on');
-  btn.classList.add('on');
+  if(btn&&btn.classList)btn.classList.add('on');                          // the pages without a tab (Profile) are opened from the account menu
+  const acct=document.getElementById('nprof-btn');if(acct&&acct.classList)acct.classList[n==='profile'?'add':'remove']('on');     // the account icon is lit while Profile is open
   if(typeof window!=='undefined'&&window.scrollTo)window.scrollTo(0,0);   // a new tab starts at the top, not where the last one was scrolled
   const gs=document.getElementById('gsearch');if(gs&&gs.style)gs.style.display=(n==='home'||n==='market'||n==='commodities')?'':'none';   // search only where it is useful
   pageChrome(n);
@@ -5431,7 +5490,7 @@ async function init(){
   if(can('pre_ipo'))loadIPOs();   // independent of the rest of the page
   ecoInitMonth();                  // the economic calendar starts on the current month
   if(can('stock_prediction'))loadTop5(); // the model's top 5 for the next 3 months
-  await Promise.all([loadSummary(),loadIndices(),loadSentiment(),loadSectors(),loadGL(),loadEarnings(),loadMarketNews(),loadStocks(),loadCurrencies()]);   // loadPredictions() fed the Market Intelligence grid, which the compact layout replaced
+  await Promise.all([loadSummary(),loadIndices(),loadSentiment(),loadSectors(),loadGL(),loadEarnings(),loadMarketNews(),loadStocks(),can('market')&&loadCurrencies()]);   // the currency card is the Market tab's own   // loadPredictions() fed the Market Intelligence grid, which the compact layout replaced
 }
 
 initStockSuggest();
@@ -5439,7 +5498,7 @@ loadStockDirectory().then(() => { if(typeof renderRecent === 'function') renderR
 setInterval(loadStockDirectory, 5 * 60 * 1000);
 init();
 checkConn();
-setInterval(()=>{loadSummary();loadIndices();loadSentiment();loadCurrencies();},30000);
+setInterval(()=>{loadSummary();loadIndices();loadSentiment();if(can('market'))loadCurrencies();},30000);
 setInterval(init,120000);
 </script>
 
@@ -6670,25 +6729,19 @@ button,select,.ntab,.fstab,.stab,.fbtn,.pgbtn{touch-action:manipulation;-webkit-
 .ntab .ico{display:none;}
 /* The top bar must never wrap. As the window narrows it drops the least useful items first: "Connected", then the
    clock, and the tabs tighten; below 960px the tabs move to the bottom bar. Settings and the profile menu always stay. */
-.ntab,.brand-title,.nsignout,.ntime,#nconn{white-space:nowrap;}
+.ntab,.brand-title,.nsignout,.nmenu-item,.ntime,#nconn{white-space:nowrap;}
 .brand,.nav-r{flex-shrink:0;}
 @media(max-width:1500px){.nav-r #nconn{display:none;}}
-/* Nine tabs (Profile is the ninth) need a little less room each than eight did, so the padding steps down earlier. */
-@media(max-width:1340px){.ntab{padding:7px 14px;}}
-@media(max-width:1540px) and (min-width:1341px){.nav.has-admin .ntab{padding:7px 18px;}}
 @media(max-width:1260px){.nav-r .ntime{display:none;}}
-@media(max-width:1160px){.nav{padding:0 16px;}.ntab{padding:7px 10px;}}
+@media(max-width:1160px){.nav{padding:0 16px;}.ntab{padding:7px 12px;}}
 @media(max-width:1060px){.nav-r .lpill{display:none;}.ntab{padding:7px 8px;}.nav{padding:0 12px;}.nav-r{gap:8px;}}
 /* An administrator's bar also holds the Admin link, so it sheds items sooner: the clock, then the word "Admin", then Live. */
 .na-icon{display:inline-flex;line-height:1;}
 @media(max-width:1450px){.nav.has-admin .ntime{display:none;}}
 @media(max-width:1300px){.nav.has-admin .na-text{display:none;}}
-@media(max-width:1200px){.nav.has-admin{padding:0 16px;}.nav.has-admin .ntab{padding:7px 10px;}}
+@media(max-width:1200px){.nav.has-admin{padding:0 16px;}.nav.has-admin .ntab{padding:7px 12px;}}
 @media(max-width:1120px){.nav.has-admin .lpill{display:none;}}
 @media(max-width:1060px){.nav.has-admin .ntab{padding:7px 8px;}.nav.has-admin{padding:0 12px;}}
-/* the last rungs before the tabs move to the bottom bar: nine tabs need to start tightening a little sooner */
-@media(max-width:1080px) and (min-width:961px){.ntab{padding:7px 8px;}}
-@media(max-width:1000px) and (min-width:961px){.nav.has-admin .ntab{padding:7px 6px;}}
 @media(max-width:960px){
   body{min-height:100dvh;}
   .nav{height:auto;min-height:calc(54px + env(safe-area-inset-top));padding:env(safe-area-inset-top) calc(14px + env(safe-area-inset-right)) 0 calc(14px + env(safe-area-inset-left));gap:8px;}
@@ -6698,7 +6751,9 @@ button,select,.ntab,.fstab,.stab,.fbtn,.pgbtn{touch-action:manipulation;-webkit-
   .brand-sub{font-size:9px;letter-spacing:1.5px;white-space:nowrap;}
   .nav-r{gap:8px;flex-shrink:0;}
   .nav-r #nconn{display:none;}
-  .nsignout{padding:11px 6px;}
+  .nsignout,.nmenu-item{padding:11px 6px;min-height:44px;}
+  .pvbar{left:calc(10px + env(safe-area-inset-left));right:calc(76px + env(safe-area-inset-right));bottom:calc(68px + env(safe-area-inset-bottom));max-width:none;}   /* above the tab bar, beside the Bounty button */
+  .pvbar select,.pv-exit{min-height:40px;}
   .nav-r .ntime{font-size:11px;}
   .lpill{padding:3px 9px;font-size:11px;}
   /* the tabs become a bottom bar, in easy reach of a thumb */
@@ -7309,9 +7364,11 @@ setInterval(checkAlertsForNotifications, 60 * 1000);    // price alerts: every m
 setTimeout(ntPollFeed, 6000);
 setInterval(ntPollFeed, 5 * 60 * 1000);                   // news + economic events: every 5 minutes
 setInterval(ntEventReminders, 60 * 1000);                 // 15-minute release reminders
-setTimeout(ntPollSupport, 3000);
-setInterval(() => { if(!document.hidden) ntPollSupport(); }, 20 * 1000);   // Help Desk replies: every 20 seconds ...
-document.addEventListener('visibilitychange', () => { if(!document.hidden) ntPollSupport(); });   // ... and as soon as you come back to the tab
+if(can('raise_ticket')){                                              // the Help Desk comes with Basic: other plans have no replies to wait for
+  setTimeout(ntPollSupport, 3000);
+  setInterval(() => { if(!document.hidden) ntPollSupport(); }, 20 * 1000);   // Help Desk replies: every 20 seconds ...
+  document.addEventListener('visibilitychange', () => { if(!document.hidden) ntPollSupport(); });   // ... and as soon as you come back to the tab
+}
 
 // ─── QUARTERLY RESULTS ─────────────────────────────────────
 async function loadQuarterly(){

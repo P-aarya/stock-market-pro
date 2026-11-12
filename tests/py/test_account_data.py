@@ -149,6 +149,12 @@ class TheStoresQueries(unittest.TestCase):
         conn = FakeConn(responder(rows=[{"id": 9}])); store = self.store(conn)
         self.assertEqual(store.purge_expired(CUTOFF), [9])
 
+    def test_a_new_account_is_created_on_the_free_plan(self):
+        conn = FakeConn(responder(update_rows=1)); store = self.store(conn)
+        store.create("new@example.com", "hash", "approved", False)
+        (sql, params), = conn.statements("INSERT INTO users")
+        self.assertIn("tier", sql); self.assertEqual(params, ("new@example.com", "hash", "approved", 0, 1))          # the last value is the plan: 1 = Free
+
     def test_a_fresh_database_gets_the_plan_and_deletion_columns_added_the_first_time_they_are_needed(self):
         def respond(sql, params):
             if "information_schema.columns" in sql:

@@ -11,14 +11,12 @@ import tiers
 
 REAL = {n: t for n, t in tiers.TIERS.items() if n != FULL_TIER}
 ORDER = list(tiers.FEATURES)                       # the order of the plan table
-FEATURES_OF = {
-    1: {"initial_screen", "portfolio_view"},
-    2: {"initial_screen", "portfolio_view", "portfolio_mgt"},
-    3: {"initial_screen", "portfolio_view", "portfolio_mgt", "stock_prediction", "ai_stock_finder"},
-    4: {"initial_screen", "portfolio_view", "portfolio_mgt", "stock_prediction", "ai_stock_finder", "ai_interaction"},
-    5: {"initial_screen", "portfolio_view", "portfolio_mgt", "stock_prediction", "ai_stock_finder", "ai_interaction", "commodities"},
-    6: set(tiers.FEATURES),
-}
+F1 = {"initial_screen", "portfolio_view"}
+F2 = F1 | {"market", "portfolio_mgt", "raise_ticket"}
+F3 = F2 | {"stock_prediction", "ai_stock_finder", "peer_comparison"}
+F4 = F3 | {"ai_interaction", "learn"}
+F5 = F4 | {"commodities"}
+FEATURES_OF = {1: F1, 2: F2, 3: F3, 4: F4, 5: F5, 6: set(tiers.FEATURES)}
 
 
 class Catalog(unittest.TestCase):
@@ -30,32 +28,33 @@ class Catalog(unittest.TestCase):
     def test_every_plan_is_listed_cheapest_first_with_its_name_and_price(self):
         self.assertEqual([(p["level"], p["name"], p["price"]) for p in self.plans],
                          [(1, "Free", 0.0), (2, "Basic", 9.99), (3, "AI Stock Finder", 19.99), (4, "AI Interaction", 29.99), (5, "Deluxe", 39.99), (6, "Premier", 49.99)])
-        self.assertEqual([p["account"] for p in self.plans], [False, True, True, True, True, True])
+        self.assertEqual([p["account"] for p in self.plans], [True] * 6)                        # every plan, Free included, can have an account
 
     def test_each_plan_says_which_plan_it_builds_on(self):
         self.assertEqual([p["includes"] for p in self.plans], [None, "Free", "Basic", "AI Stock Finder", "AI Interaction", "Deluxe"])
 
     def test_each_plan_lists_what_it_adds_and_the_total_matches_the_plan_table(self):
         adds = {p["level"]: [f["key"] for f in p["adds"]] for p in self.plans}
-        self.assertEqual(adds[1], ["initial_screen", "portfolio_view"])
-        self.assertEqual(adds[2], ["initial_screen", "portfolio_mgt"])          # an account widens the initial screen to the whole dashboard
-        self.assertEqual(adds[3], ["stock_prediction", "ai_stock_finder"]); self.assertEqual(adds[4], ["ai_interaction"])
-        self.assertEqual(adds[5], ["commodities"]); self.assertEqual(adds[6], ["pre_ipo"])
+        self.assertEqual(adds[1], ["initial_screen", "portfolio_view"])                         # Free: the Home tab (and a read-only portfolio)
+        self.assertEqual(adds[2], ["market", "portfolio_mgt", "raise_ticket"])
+        self.assertEqual(adds[3], ["stock_prediction", "ai_stock_finder", "peer_comparison"]); self.assertEqual(adds[4], ["ai_interaction", "learn"])
+        self.assertEqual(adds[5], ["commodities"]); self.assertEqual(adds[6], ["pre_ipo", "insider_dealings", "filings"])
         for level, features in FEATURES_OF.items():                             # what each plan can use in all
             self.assertEqual(set().union(*(set(adds[n]) for n in range(1, level + 1))), features, level)
 
-    def test_every_feature_has_a_label_and_a_description_and_free_has_its_own_wording(self):
+    def test_every_feature_has_a_label_and_a_description_in_plain_words(self):
         self.assertEqual(set(tiers.DESCRIPTIONS), set(tiers.FEATURES))
         for plan in self.plans:
             for f in plan["adds"]:
-                self.assertEqual(f["label"], tiers.FEATURES[f["key"]]); self.assertTrue(f["description"], f)
-        free = {f["key"]: f["description"] for f in self.plans[0]["adds"]}
-        basic = {f["key"]: f["description"] for f in self.plans[1]["adds"]}
-        self.assertIn("No account needed", free["initial_screen"]); self.assertIn("read-only", free["portfolio_view"])
-        self.assertIn("full dashboard", basic["initial_screen"]); self.assertNotEqual(free["initial_screen"], basic["initial_screen"])
+                self.assertEqual(f["label"], tiers.FEATURES[f["key"]]); self.assertTrue(len(f["description"]) > 20, f)
+        by_key = {f["key"]: f for plan in self.plans for f in plan["adds"]}
+        self.assertIn("portfolio snapshot", by_key["initial_screen"]["description"]); self.assertIn("stock table", by_key["market"]["description"])
+        self.assertIn("Help Desk", by_key["raise_ticket"]["description"]); self.assertIn("videos", by_key["learn"]["description"])
+        self.assertIn("competitors", by_key["peer_comparison"]["description"]); self.assertIn("IPOs", by_key["pre_ipo"]["description"])
+        self.assertIn("bought or sold", by_key["insider_dealings"]["description"]); self.assertIn("annual reports", by_key["filings"]["description"])
 
     def test_feature_list_follows_the_plan_table_order(self):
-        self.assertEqual([f["key"] for f in tiers.feature_list({"pre_ipo", "initial_screen", "commodities"})], ["initial_screen", "commodities", "pre_ipo"])
+        self.assertEqual([f["key"] for f in tiers.feature_list({"filings", "initial_screen", "commodities", "market"})], ["initial_screen", "market", "commodities", "filings"])
         self.assertEqual(tiers.feature_list(set()), [])
 
 
@@ -79,8 +78,6 @@ class ProfileEndpoint(AccountsTestCase, unittest.TestCase):
 
     def test_every_plan_sees_its_own_name_price_and_features(self):
         for level, features in FEATURES_OF.items():
-            if level == 1:
-                continue
             d = self.profile(10 + level, level)[1].json()
             self.assertEqual(d["plan"]["level"], level, level)
             self.assertEqual([f["key"] for f in d["included"]], [k for k in ORDER if k in features], level)

@@ -91,8 +91,8 @@ class Migrate(unittest.TestCase):
         conn = FakeConn(has_column(everything_else))
         done = mu.migrate(conn)
         alters = [sql for sql, _ in conn.statements("ALTER TABLE")]
-        self.assertEqual(alters, ["ALTER TABLE users ADD COLUMN tier TINYINT NOT NULL DEFAULT 2"])
-        self.assertTrue(any("users: added tier" in line and "existing accounts start on the Basic plan" in line for line in done), done)
+        self.assertEqual(alters, ["ALTER TABLE users ADD COLUMN tier TINYINT NOT NULL DEFAULT 2"])                  # accounts that exist now stay on Basic
+        self.assertTrue(any("users: added tier" in line and "existing accounts stay on the Basic plan" in line and "new sign-ups start on Free" in line for line in done), done)
         again = mu.migrate(FakeConn(has_column({**everything_else, ("users", "tier"): True})))
         self.assertIn("users: tier column already there", again)
 
@@ -104,8 +104,8 @@ class Migrate(unittest.TestCase):
         self.assertTrue(any("users: added deleted_at" in line and "delete and restore their own account" in line for line in done), done)
         self.assertIn("deleted_at TIMESTAMP NULL DEFAULT NULL", mu.USERS_DDL)                      # a brand-new table has it too
 
-    def test_a_brand_new_users_table_has_the_plan_column(self):
-        self.assertIn("tier TINYINT NOT NULL DEFAULT 2", mu.USERS_DDL)
+    def test_a_brand_new_users_table_has_the_plan_column_defaulting_to_free(self):
+        self.assertIn("tier TINYINT NOT NULL DEFAULT 1", mu.USERS_DDL)
 
     def test_it_only_ever_adds_never_removes_or_rewrites_data(self):
         conn = FakeConn(has_column({}))
@@ -248,17 +248,18 @@ class CommandLine(unittest.TestCase):
         self.assertIn("AI Stock Finder", out); self.assertIn("AI Interaction", out)
 
     def test_set_plan_moves_one_account_to_the_plan_named_or_numbered(self):
-        for typed, level, name in ((["3"], 3, "AI Stock Finder"), (["Deluxe"], 5, "Deluxe"), (["ai", "stock", "finder"], 3, "AI Stock Finder"), (["premier"], 6, "Premier")):
+        for typed, level, name in ((["3"], 3, "AI Stock Finder"), (["Deluxe"], 5, "Deluxe"), (["ai", "stock", "finder"], 3, "AI Stock Finder"), (["premier"], 6, "Premier"),
+                                   (["1"], 1, "Free"), (["free"], 1, "Free")):
             out, conn = self.run_cli("set-plan", "Me@Example.com", *typed)
             (sql, params), = conn.statements("UPDATE users SET tier")
             self.assertEqual(params, (level, 5), typed); self.assertIn(name, out); self.assertEqual(conn.commits, 1)
 
-    def test_set_plan_refuses_the_free_plan_and_anything_unknown_and_changes_nothing(self):
-        for typed in ("1", "free", "0", "7", "gold", "AI"):
+    def test_set_plan_refuses_anything_unknown_and_changes_nothing(self):
+        for typed in ("0", "7", "gold", "AI"):
             conn = FakeConn(lambda sql, p: [{"id": 5}] if "FROM users WHERE email" in sql else [])
             with mock.patch.object(mu, "_connect", return_value=conn), self.assertRaises(SystemExit) as cm:
                 mu.main(["set-plan", "me@example.com", typed])
-            self.assertIn("Choose one of", str(cm.exception), typed); self.assertIn("2 = Basic ($9.99)", str(cm.exception)); self.assertIn("6 = Premier ($49.99)", str(cm.exception))
+            self.assertIn("Choose one of", str(cm.exception), typed); self.assertIn("1 = Free ($0.00)", str(cm.exception)); self.assertIn("6 = Premier ($49.99)", str(cm.exception))
             self.assertEqual(conn.statements("UPDATE"), [], typed)
 
     def test_set_plan_for_an_unknown_account_changes_nothing(self):

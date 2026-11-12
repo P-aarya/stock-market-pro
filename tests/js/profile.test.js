@@ -58,6 +58,11 @@ function profile({ fetchImpl, signedOut = () => false } = {}) {
     assert(/<a class="prof-btn" id="prof-settings" href="\/settings"/.test(out) && out.includes('>Settings</a>'));
   });
 
+  await t('the Free plan says there is no monthly charge instead of repeating its own name', () => {
+    const out = profile().ctx.profileHtml(data({ plan: { level: 1, name: 'Free', price: 0 } }), false);
+    assert(out.includes('id="prof-plan">Free<') && out.includes('No monthly charge') && !/>Free<\/div><div class="prof-note">Free</.test(out));
+  });
+
   await t('what the plan includes is listed with each perk explained', () => {
     const out = profile().ctx.profileHtml(data(), false);
     const incl = out.slice(out.indexOf('prof-incl'), out.indexOf('id="prof-plans"'));
@@ -159,13 +164,77 @@ function profile({ fetchImpl, signedOut = () => false } = {}) {
     p.run('toggleProfilePlans()'); assert(/prof-plans"[^>]* hidden>/.test(p.body()) && p.body().includes('Upgrade plan'));
   });
 
-  await t('"See plans" on the padlock message closes it and opens the Profile tab with the plans showing', async () => {
-    const p = profile(); p.page.el('ntab-profile').id = 'ntab-profile';
+  await t('"See plans" on the padlock message closes it and opens the Profile page, with no tab involved, and the plans showing', async () => {
+    const p = profile();
     p.run('seePlans()');
-    assert.deepStrictEqual(p.calls, ['closeUpgrade', ['showPage', 'profile', 'ntab-profile']]);
+    assert.deepStrictEqual(p.calls, ['closeUpgrade', ['showPage', 'profile', undefined]]);
     assert.strictEqual(p.run('profilePlansOpen'), true);
     await p.ctx.loadProfile(); assert(!/prof-plans"[^>]* hidden>/.test(p.body()), 'and it is open when the data arrives');
-    const none = profile(); none.run('seePlans()'); assert.deepStrictEqual(none.calls, ['closeUpgrade'], 'no tab, no error');
+  });
+
+  await t('openProfile shows the Profile page without naming a tab to highlight', () => {
+    const p = profile(); p.run('openProfile()');
+    assert.deepStrictEqual(p.calls, [['showPage', 'profile', undefined]]);
+  });
+
+  /** A tiny fake page: just enough elements for the account menu and showPage. */
+  class El {
+    constructor(tag) { this.tag = tag; this.children = []; this.attrs = {}; this.listeners = {}; this.className = ''; this.textContent = ''; this.innerHTML = ''; this.classes = new Set();
+      this.classList = { toggle: (c, on) => { if (on === undefined ? !this.classes.has(c) : on) this.classes.add(c); else this.classes.delete(c); }, contains: c => this.classes.has(c), add: c => this.classes.add(c), remove: c => this.classes.delete(c) }; }
+    setAttribute(k, v) { this.attrs[k] = v; } appendChild(c) { this.children.push(c); return c; }
+    addEventListener(ev, fn) { (this.listeners[ev] = this.listeners[ev] || []).push(fn); } fire(ev, e = {}) { (this.listeners[ev] || []).forEach(fn => fn({ stopPropagation() {}, target: this, ...e })); }
+    contains(t) { return t === this || this.children.some(c => c.contains(t)); }
+  }
+  function accountMenu({ name = '' } = {}) {
+    const docListeners = {}, calls = [];
+    const document = { createElement: tag => new El(tag), addEventListener: (ev, fn) => { (docListeners[ev] = docListeners[ev] || []).push(fn); } };
+    const ctx = { document, ME: { name, email: 'abheek@example.com' }, openProfile: () => calls.push('openProfile') };
+    vm.createContext(ctx); vm.runInContext(between('function addAccountMenu(nav){', "(()=>{const nav=document.querySelector('.nav-r')"), ctx);
+    const nav = new El('nav'), parts = ctx.addAccountMenu(nav);
+    return { nav, parts, calls, docListeners, press: (ev, e) => (docListeners[ev] || []).forEach(fn => fn(e)) };
+  }
+
+  await t('the account menu lists the name, the email, then Profile and plan, then Sign out', () => {
+    const { parts } = accountMenu({ name: 'Abheek Das' });
+    assert.deepStrictEqual(parts.menu.children.map(c => c.className), ['nprof-name', 'nprof-email', 'nprof-hr', 'nmenu-item', 'nsignout']);
+    assert.strictEqual(parts.btn.id, 'nprof-btn', 'the account icon can be found, so it can be lit while Profile is open');
+    const [name, email, , prof, out] = parts.menu.children;
+    assert.strictEqual(name.textContent, 'Abheek Das'); assert.strictEqual(email.textContent, 'abheek@example.com');
+    assert.deepStrictEqual([prof.tag, prof.type, prof.id, prof.attrs.role], ['button', 'button', 'nprof-profile', 'menuitem']);
+    assert(prof.innerHTML.includes('<span>Profile and plan</span>'));
+    assert.deepStrictEqual([out.tag, out.href, out.attrs.role], ['a', '/logout', 'menuitem']);
+    assert.strictEqual(accountMenu().parts.menu.children[0].textContent, 'Your account', 'with no name the menu says Your account');
+  });
+
+  await t('choosing Profile and plan closes the menu and opens the page', () => {
+    const { parts, calls } = accountMenu();
+    parts.btn.fire('click'); assert(parts.menu.classList.contains('open')); assert.strictEqual(parts.btn.attrs['aria-expanded'], 'true');
+    parts.menu.children[3].fire('click');
+    assert(!parts.menu.classList.contains('open')); assert.strictEqual(parts.btn.attrs['aria-expanded'], 'false');
+    assert.deepStrictEqual(calls, ['openProfile']);
+  });
+
+  await t('the menu still closes on Escape and on a click elsewhere, and opens only from its button', () => {
+    const a = accountMenu(); a.parts.btn.fire('click'); a.press('keydown', { key: 'Enter' }); assert(a.parts.menu.classList.contains('open'));
+    a.press('keydown', { key: 'Escape' }); assert(!a.parts.menu.classList.contains('open'));
+    a.parts.btn.fire('click'); a.press('click', { target: new El('div') }); assert(!a.parts.menu.classList.contains('open'), 'a click outside closes it');
+    a.parts.btn.fire('click'); a.press('click', { target: a.parts.menu }); assert(a.parts.menu.classList.contains('open'), 'a click inside does not');
+    assert(a.calls.length === 0, 'none of that opened the page');
+  });
+
+  await t('while the Profile page is open no tab is highlighted and the account icon is; any other page clears it', () => {
+    const tabs = ['home', 'market'].map(n => Object.assign(new El('button'), { id: 'ntab-' + n })); tabs[0].classes.add('on');
+    const pages = Object.fromEntries(['home', 'market', 'profile'].map(n => [n, Object.assign(new El('div'), { id: 'page-' + n })])); pages.home.classes.add('on');
+    const acct = new El('button');
+    const ctx = { can: () => true, showUpgrade() {}, pageChrome() {}, loadProfile: () => ctx.loaded.push('profile'), loadHome() {}, loaded: [], window: { scrollTo() {} },
+      document: { querySelectorAll: sel => (sel === '.ntab' ? tabs : sel === '.page' ? Object.values(pages) : []),
+        getElementById: id => (id.startsWith('page-') ? pages[id.slice(5)] : id === 'nprof-btn' ? acct : null) }, mktSuggest: null };
+    vm.createContext(ctx); vm.runInContext(between('function showPage(n,btn){', 'function showSub'), ctx);
+    ctx.showPage('profile');
+    assert(pages.profile.classes.has('on') && !pages.home.classes.has('on')); assert(tabs.every(t => !t.classes.has('on')), 'no tab is lit'); assert(acct.classes.has('on'));
+    assert.deepStrictEqual(ctx.loaded, ['profile']);
+    ctx.showPage('market', tabs[1]);
+    assert(tabs[1].classes.has('on') && !acct.classes.has('on') && pages.market.classes.has('on') && !pages.profile.classes.has('on'));
   });
 
   await t('the profile has a Delete account section that says how long they can change their mind, using the server\'s number of days', () => {
@@ -287,9 +356,11 @@ function profile({ fetchImpl, signedOut = () => false } = {}) {
     assert(/\.del-input\{[^}]*font-size:16px/.test(html), '16px so a phone does not zoom in');
   });
 
-  await t('the page, the tab and the message are wired up: tab, page, loader and See plans button exist, and showPage loads the profile', () => {
-    assert(/<button class="ntab" id="ntab-profile" onclick="showPage\('profile',this\)">[\s\S]*?<span class="lbl">Profile<\/span><\/button>/.test(html));
-    assert(!/id="ntab-profile"[^>]*data-feature/.test(html), 'every account has a profile: the tab is never padlocked');
+  await t('the page, the menu entry and the message are wired up: page and loader exist, Profile is not a tab, and showPage loads it', () => {
+    const tabs = between('<div class="ntabs">', '<div class="nav-r">');
+    assert(!/profile/i.test(tabs), 'Profile is not one of the tabs');
+    assert.strictEqual((tabs.match(/<button class="ntab/g) || []).length, 8, 'the eight tabs of the app');
+    assert(!/showPage\('profile',this\)/.test(html), 'nothing opens the Profile page as if it were a tab');
     assert(html.includes('<div class="page" id="page-profile">') && html.includes('<div id="prof-body">'));
     assert(/if\(n==='profile'\)loadProfile\(\);/.test(between('function showPage(n,btn){', 'function showSub')));
     assert(/<button type="button" class="btn btnp" id="up-plans" onclick="seePlans\(\)">See plans<\/button>\s*<button type="button" class="btn btns" id="up-ok" onclick="closeUpgrade\(\)">Got it<\/button>/.test(html));
