@@ -1,0 +1,166 @@
+# Render Blueprint: creates everything the dashboard needs, in one region (Virginia, US East).
+# In Render: New → Blueprint → choose this GitHub repo. Render then creates:
+#   aymetrix-db           MySQL database (private service + 10 GB disk; only our services can reach it)
+#   aymetrix              the website (api.py)
+#   aymetrix-prices       live prices every 60 seconds (scheduler.py), runs non-stop
+#   aymetrix-earnings     earnings dates, every Saturday 06:00 UTC
+#   aymetrix-fundamentals company numbers, every Saturday 07:00 UTC
+#   aymetrix-predictions  3-month predictions, every Saturday 09:00 UTC
+# Secrets (marked sync: false) are typed into Render when the Blueprint is created; they are never stored here.
+# Every service gets the database settings from the database service itself, so no password is written in this file.
+
+services:
+  # ── The database ──
+  - type: pserv
+    name: aymetrix-db
+    runtime: docker
+    dockerfilePath: ./render/mysql/Dockerfile
+    dockerContext: ./render/mysql
+    region: virginia
+    autoDeploy: false            # never restart the database just because new code was pushed
+    numInstances: 1
+    disk:
+      name: mysql-data
+      mountPath: /var/lib/mysql
+      sizeGB: 10
+    envVars:
+      - key: MYSQL_DATABASE
+        value: aymetrix
+      - key: MYSQL_USER
+        value: aymetrix
+      - key: MYSQL_PASSWORD
+        generateValue: true
+      - key: MYSQL_ROOT_PASSWORD
+        generateValue: true
+
+  # ── The website ──
+  - type: web
+    name: aymetrix
+    runtime: python
+    region: virginia
+    branch: master
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: DB_HOST
+        fromService: { type: pserv, name: aymetrix-db, property: host }
+      - key: DB_PORT
+        value: "3306"
+      - key: DB_NAME
+        fromService: { type: pserv, name: aymetrix-db, envVarKey: MYSQL_DATABASE }
+      - key: DB_USER
+        fromService: { type: pserv, name: aymetrix-db, envVarKey: MYSQL_USER }
+      - key: DB_PASSWORD
+        fromService: { type: pserv, name: aymetrix-db, envVarKey: MYSQL_PASSWORD }
+      - key: DB_SSL
+        value: "true"
+      - key: APP_SECRET          # signs sign-in sessions; made once by Render and kept
+        generateValue: true
+      - key: GROQ_API_KEY
+        sync: false
+      - key: MAIL_WEBHOOK_URL
+        sync: false
+      - key: MAIL_WEBHOOK_SECRET
+        sync: false
+      - key: SUPPORT_EMAIL
+        sync: false
+
+  # ── Live prices, every 60 seconds, non-stop ──
+  - type: worker
+    name: aymetrix-prices
+    runtime: python
+    region: virginia
+    branch: master
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -u scheduler.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: DB_HOST
+        fromService: { type: pserv, name: aymetrix-db, property: host }
+      - key: DB_PORT
+        value: "3306"
+      - key: DB_NAME
+        fromService: { type: pserv, name: aymetrix-db, envVarKey: MYSQL_DATABASE }
+      - key: DB_USER
+        fromService: { type: pserv, name: aymetrix-db, envVarKey: MYSQL_USER }
+      - key: DB_PASSWORD
+        fromService: { type: pserv, name: aymetrix-db, envVarKey: MYSQL_PASSWORD }
+      - key: DB_SSL
+        value: "true"
+
+  # ── Weekly jobs (times are UTC, the same as UK time in winter). Each runs, finishes and stops. ──
+  - type: cron
+    name: aymetrix-earnings
+    runtime: python
+    region: virginia
+    branch: master
+    schedule: "0 6 * * 6"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -u fetch_earnings.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: DB_HOST
+        fromService: { type: pserv, name: aymetrix-db, property: host }
+      - key: DB_PORT
+        value: "3306"
+      - key: DB_NAME
+        fromService: { type: pserv, name: aymetrix-db, envVarKey: MYSQL_DATABASE }
+      - key: DB_USER
+        fromService: { type: pserv, name: aymetrix-db, envVarKey: MYSQL_USER }
+      - key: DB_PASSWORD
+        fromService: { type: pserv, name: aymetrix-db, envVarKey: MYSQL_PASSWORD }
+      - key: DB_SSL
+        value: "true"
+
+  - type: cron
+    name: aymetrix-fundamentals
+    runtime: python
+    region: virginia
+    branch: master
+    schedule: "0 7 * * 6"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -u fetch_fundamentals.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: DB_HOST
+        fromService: { type: pserv, name: aymetrix-db, property: host }
+      - key: DB_PORT
+        value: "3306"
+      - key: DB_NAME
+        fromService: { type: pserv, name: aymetrix-db, envVarKey: MYSQL_DATABASE }
+      - key: DB_USER
+        fromService: { type: pserv, name: aymetrix-db, envVarKey: MYSQL_USER }
+      - key: DB_PASSWORD
+        fromService: { type: pserv, name: aymetrix-db, envVarKey: MYSQL_PASSWORD }
+      - key: DB_SSL
+        value: "true"
+
+  - type: cron
+    name: aymetrix-predictions
+    runtime: python
+    region: virginia
+    branch: master
+    schedule: "0 9 * * 6"
+    plan: 1c-2g                  # the forecasting models need more memory than the smallest size (billed per minute)
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -u predict_aarya.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: DB_HOST
+        fromService: { type: pserv, name: aymetrix-db, property: host }
+      - key: DB_PORT
+        value: "3306"
+      - key: DB_NAME
+        fromService: { type: pserv, name: aymetrix-db, envVarKey: MYSQL_DATABASE }
+      - key: DB_USER
+        fromService: { type: pserv, name: aymetrix-db, envVarKey: MYSQL_USER }
+      - key: DB_PASSWORD
+        fromService: { type: pserv, name: aymetrix-db, envVarKey: MYSQL_PASSWORD }
+      - key: DB_SSL
+        value: "true"

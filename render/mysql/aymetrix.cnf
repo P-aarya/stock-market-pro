@@ -1,0 +1,12 @@
+[mysqld]
+# The data goes in a folder on the disk (not the disk's top level), so a fresh disk always starts clean.
+datadir = /var/lib/mysql/data
+# Sized for the smallest Render instance (512 MB): the performance statistics tables are switched off and the
+# memory cache is kept modest. Raise innodb_buffer_pool_size if the service is moved to a bigger instance.
+performance_schema = OFF
+innodb_buffer_pool_size = 192M
+max_connections = 150
+skip-name-resolve
+character-set-server = utf8mb4
+collation-server = utf8mb4_0900_ai_ci
+default-time-zone = '+00:00'
