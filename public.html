@@ -16,6 +16,8 @@
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
   padding:0 0 env(safe-area-inset-bottom)}
+/* the picture behind the page: a fixed layer, so it stays put while the prices scroll over it */
+body::before{content:"";position:fixed;inset:0;z-index:-1;background:var(--bg) url(/bg-public.svg) center/cover no-repeat}
 a{color:var(--cyan);text-decoration:none}
 .bar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:14px;padding:12px max(16px,env(safe-area-inset-right)) 12px max(16px,env(safe-area-inset-left));
   background:rgba(8,8,14,.94);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
@@ -31,7 +33,7 @@ main{max-width:1040px;margin:0 auto;padding:22px max(16px,env(safe-area-inset-ri
 h1{margin:0 0 4px;font-size:24px;letter-spacing:-.4px}
 .lead{margin:0 0 16px;color:var(--muted);font-size:14px}
 .plan{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:0 0 18px;padding:14px 16px;border:1px solid var(--line2);
-  border-radius:12px;background:linear-gradient(180deg,#10101e,#0c0c16)}
+  border-radius:12px;background:linear-gradient(180deg,rgba(16,16,30,.92),rgba(12,12,22,.92));-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 .plan p{margin:0;color:var(--text2);font-size:14px;flex:1 1 320px}.plan p b{color:var(--text)}
 .plan .btn{flex:none}
 .tools{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
@@ -41,7 +43,8 @@ input{flex:1 1 220px;min-width:0}
 input:focus,select:focus,button:focus-visible,a:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
 select{flex:0 1 220px;min-width:0}
 .meta{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:0 0 8px;color:var(--muted);font-size:12px}
-.wrap{border:1px solid var(--line);border-radius:12px;background:var(--bg2);overflow:hidden}
+/* the price table is long, so it is nearly opaque with no blur behind it (a blur over hundreds of rows makes scrolling heavy on a phone) */
+.wrap{border:1px solid var(--line);border-radius:12px;background:rgba(12,12,22,.95);overflow:hidden}
 .scroll{overflow-x:auto}
 table{width:100%;border-collapse:collapse;min-width:420px}
 th,td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
@@ -74,8 +77,10 @@ td.more,th.more{width:1%;padding-left:6px;padding-right:10px;text-align:center}
 .tabs button:hover{color:var(--text)}
 .tabs button[aria-current=page]{color:var(--text);border-bottom-color:var(--blue)}
 .tabs button:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+/* text that sits straight on the picture (not inside a panel) gets a thin dark halo, so a chart line passing behind it never swallows a letter */
+h1,.lead,.meta,.foot,.tabs button{text-shadow:0 0 2px var(--bg),0 0 7px var(--bg)}
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:0 0 16px}
-.stat{padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:var(--bg2)}
+.stat{padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:rgba(12,12,22,.92);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 .stat small{display:block;color:var(--muted);font-size:11px;letter-spacing:1px;text-transform:uppercase;font-weight:700}
 .stat b{display:block;margin-top:4px;font:700 20px var(--mono);color:var(--muted)}
 #view-portfolio th{padding:11px 14px}

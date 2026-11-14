@@ -83,6 +83,7 @@ _APP_ASSETS = {
     "/bg-login.svg": ("bg-login.svg", "image/svg+xml"),
     "/bg-register.svg": ("bg-register.svg", "image/svg+xml"),
     "/bg-settings.svg": ("bg-settings.svg", "image/svg+xml"),             # the picture behind the Settings page (artwork, nothing private)
+    "/bg-public.svg": ("bg-public.svg", "image/svg+xml"),                 # the picture behind the public price list, which loads before anyone signs in
 }
 _OPEN_PATHS = {"/login", "/register", "/restore", "/logout", "/forgot-password", "/reset-password", "/confirm-email", "/health", "/api/auth/status", "/favicon.ico"} | set(_APP_ASSETS)
 # The Free tier is a visitor with no account (tiers.py). They may load "/", which shows them only the public page (the price
