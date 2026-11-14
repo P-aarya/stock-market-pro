@@ -3,9 +3,9 @@
 #   aymetrix-db           MySQL database (private service + 10 GB disk; only our services can reach it)
 #   aymetrix              the website (api.py)
 #   aymetrix-prices       live prices every 60 seconds (scheduler.py), runs non-stop
-#   aymetrix-earnings     earnings dates, every Saturday 06:00 UTC
-#   aymetrix-fundamentals company numbers, every Saturday 07:00 UTC
-#   aymetrix-predictions  3-month predictions, every Saturday 09:00 UTC
+#   aymetrix-earnings     earnings dates, every Monday 05:00 UTC
+#   aymetrix-fundamentals company numbers, every Monday 06:00 UTC
+#   aymetrix-predictions  3-month predictions, every Monday 08:00 UTC (after the other two)
 # Secrets (marked sync: false) are typed into Render when the Blueprint is created; they are never stored here.
 # The code needs Python 3.12 or newer (it uses newer f-string syntax), so PYTHON_VERSION is set to 3.13.
 # Every service gets the database settings from the database service itself, so no password is written in this file.
@@ -92,13 +92,14 @@ services:
       - key: DB_SSL
         value: "true"
 
-  # ── Weekly jobs (times are UTC, the same as UK time in winter). Each runs, finishes and stops. ──
+  # ── Weekly jobs, early Monday so the data is fresh for the week and done before the US market opens (14:30 UK).
+#    Times are UTC: the same as UK time in winter, one hour earlier than UK time in summer. Each runs, finishes and stops. ──
   - type: cron
     name: aymetrix-earnings
     runtime: python
     region: virginia
     branch: master
-    schedule: "0 6 * * 6"
+    schedule: "0 5 * * 1"
     buildCommand: pip install -r requirements.txt
     startCommand: python -u fetch_earnings.py
     envVars:
@@ -122,7 +123,7 @@ services:
     runtime: python
     region: virginia
     branch: master
-    schedule: "0 7 * * 6"
+    schedule: "0 6 * * 1"
     buildCommand: pip install -r requirements.txt
     startCommand: python -u fetch_fundamentals.py
     envVars:
@@ -146,7 +147,7 @@ services:
     runtime: python
     region: virginia
     branch: master
-    schedule: "0 9 * * 6"
+    schedule: "0 8 * * 1"
     plan: 1c-2g                  # the forecasting models need more memory than the smallest size (billed per minute)
     buildCommand: pip install -r requirements.txt
     startCommand: python -u predict_aarya.py
