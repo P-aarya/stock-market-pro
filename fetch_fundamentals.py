@@ -2,6 +2,14 @@
 # fetch_fundamentals.py - extra company numbers used by the AI Stock Finder,
 # Bounty, the screener and the Peers comparison.
 #
+# Nov 2026 (Render): Yahoo refuses cloud servers that ask for each stock's
+#  details one by one. P/E, forward P/E, P/B, EPS, market cap, 52-week range,
+#  shares and the analyst rating now come from ONE batch request per 150
+#  stocks (yahoo_batch.py). The per-stock details (margins, growth, revenue,
+#  debt ...) are still tried, but the job stops asking for them if Yahoo
+#  keeps refusing; those keep their saved values. Stocks Yahoo no longer
+#  has are skipped.
+#
 # Oct 2026 fix (the AI Stock Finder / Bounty error
 # "Unknown column 'f.market_cap' in 'field list'"):
 #  - Adds any missing columns to stocks_fundamentals first
@@ -23,7 +31,8 @@ import time
 from datetime import datetime
 
 import yfinance as yf
-from fetch_stocks import get_connection, live_cursor, is_db_error, upsert, get_info
+from fetch_stocks import get_connection, live_cursor, is_db_error, upsert
+from yahoo_batch import fetch_quotes, DetailGate, analyst_score
 
 # every column the screener / AI / peers read from stocks_fundamentals
 COLUMNS = [
@@ -107,11 +116,23 @@ def quick_fill(conn):
         total, int(mc or 0), int(cat or 0)))
 
 
-def fetch_one(ticker, cursor, conn):
+QUOTE_TO_INFO = {      # batch answer name -> the .info name used below
+    "trailingPE": "trailingPE", "forwardPE": "forwardPE", "priceToBook": "priceToBook",
+    "epsTrailingTwelveMonths": "trailingEps", "marketCap": "marketCap",
+    "fiftyTwoWeekHigh": "fiftyTwoWeekHigh", "fiftyTwoWeekLow": "fiftyTwoWeekLow",
+    "sharesOutstanding": "sharesOutstanding",
+}
+
+
+def fetch_one(ticker, quote, gate, cursor, conn):
     if "=F" in ticker or ticker.startswith("^"):
         return True, "skipped (futures / index)"
     try:
-        info = get_info(yf.Ticker(ticker))
+        info = {QUOTE_TO_INFO[k]: v for k, v in quote.items() if k in QUOTE_TO_INFO and v is not None}
+        if analyst_score(quote) is not None:
+            info["recommendationMean"] = analyst_score(quote)
+        details = gate.info(yf.Ticker(ticker))          # {} if Yahoo refuses
+        info.update({k: v for k, v in details.items() if v is not None})
         if not info:
             return False, "Yahoo sent nothing - old data kept"
         mc = info.get("marketCap")
@@ -163,7 +184,7 @@ def pick_tickers(conn):
 
 def main():
     print("=" * 60)
-    print("  FUNDAMENTALS (database: Aiven / .env)")
+    print("  FUNDAMENTALS")
     print("=" * 60)
     conn, cursor = live_cursor(None)
     cursor.close()
@@ -177,15 +198,20 @@ def main():
         return
 
     tickers = pick_tickers(conn)
-    print("\n  Fetching from Yahoo for {} stocks...\n".format(len(tickers)))
+    print()
+    quotes = fetch_quotes(tickers)
+    gone = [t for t in tickers if t not in quotes]
+    tickers = [t for t in tickers if t in quotes]
+    gate = DetailGate()
+    print("\n  Saving {} stocks...\n".format(len(tickers)))
     success = failed = 0
     failed_list = []
     for i, ticker in enumerate(tickers, 1):
         conn, cursor = live_cursor(conn)
-        ok, note = fetch_one(ticker, cursor, conn)
+        ok, note = fetch_one(ticker, quotes[ticker], gate, cursor, conn)
         if not ok and is_db_error(note):
             conn, cursor = live_cursor(None)
-            ok, note = fetch_one(ticker, cursor, conn)
+            ok, note = fetch_one(ticker, quotes[ticker], gate, cursor, conn)
         try: cursor.close()
         except Exception: pass
         if ok:
@@ -195,17 +221,17 @@ def main():
             failed += 1
             failed_list.append(ticker)
             print("  FAIL [{}/{}] {} - {}".format(i, len(tickers), ticker, note))
-        if i % 50 == 0:
-            print("\n  Pausing 5s... {} done, {} failed\n".format(success, failed))
-            time.sleep(5)
-        else:
-            time.sleep(0.3)
 
     quick_fill(conn)   # sizes for anything Yahoo just filled in
     try: conn.close()
     except Exception: pass
     print("\n" + "=" * 60)
     print("  Done! {} updated, {} failed".format(success, failed))
+    print("  Extra details (margins, growth, revenue ...) from Yahoo for {} stocks{}".format(
+        gate.got, " - Yahoo refused the rest, saved values kept" if gate.closed else ""))
+    if gone:
+        print("  Not on Yahoo any more (skipped, old data kept): {}{}".format(
+            ", ".join(gone[:30]), " ... ({} in total)".format(len(gone)) if len(gone) > 30 else ""))
     if failed_list:
         print("  Failed: {}".format(", ".join(failed_list[:60])))
         print("  (Run  python fetch_fundamentals.py --missing  later to retry.)")

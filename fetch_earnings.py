@@ -2,6 +2,12 @@
 # fetch_earnings.py - Fetches proper earnings dates for all stocks
 # Run this separately - faster than full fetch_stocks.py
 #
+# Nov 2026 (Render): Yahoo refuses cloud servers that ask for each stock's
+#  details one by one ("Invalid Crumb"). Dates and EPS now come from ONE
+#  batch request per 150 stocks (yahoo_batch.py). The per-stock details
+#  (revenue, the earnings calendar) are still tried, but the job stops asking
+#  for them if Yahoo keeps refusing. Stocks Yahoo no longer has are skipped.
+#
 # Oct 2026 fix:
 #  - Connects to the SAME database as everything else (Aiven, from .env)
 #    instead of the old local MySQL (localhost).
@@ -21,7 +27,8 @@ from datetime import datetime, date
 
 import yfinance as yf
 from tickers import ALL_TICKERS
-from fetch_stocks import get_connection, live_cursor, is_db_error, upsert, get_info
+from fetch_stocks import get_connection, live_cursor, is_db_error, upsert
+from yahoo_batch import fetch_quotes, DetailGate
 
 
 def _to_date(v):
@@ -39,7 +46,7 @@ def _to_date(v):
         return None
 
 
-def next_earnings_date(stock, info):
+def next_earnings_date(stock, info, gate):
     """Earliest earnings date from today onwards; if none, the most recent one."""
     cands = []
     for k in ("earningsTimestampStart", "earningsTimestamp", "earningsCallTimestampStart", "earningsTimestampEnd"):
@@ -48,7 +55,7 @@ def next_earnings_date(stock, info):
             cands.append(d)
     today = date.today()
     cal = None
-    if not any(d >= today for d in cands):
+    if not any(d >= today for d in cands) and not gate.closed:
         try:
             cal = stock.calendar or {}
             ed = cal.get("Earnings Date") if isinstance(cal, dict) else None
@@ -64,15 +71,24 @@ def next_earnings_date(stock, info):
     return (max(cands) if cands else None), cal
 
 
-def fetch_earnings(ticker, cursor, conn):
+QUOTE_TO_INFO = {      # batch answer name -> the .info name used below
+    "earningsTimestamp": "earningsTimestamp", "earningsTimestampStart": "earningsTimestampStart",
+    "earningsTimestampEnd": "earningsTimestampEnd", "earningsCallTimestampStart": "earningsCallTimestampStart",
+    "epsForward": "forwardEps", "epsTrailingTwelveMonths": "trailingEps",
+}
+
+
+def fetch_earnings(ticker, quote, gate, cursor, conn):
     if "=F" in ticker:
         return True, "futures - no earnings"
     try:
         stock = yf.Ticker(ticker)
-        info = get_info(stock)
+        info = {QUOTE_TO_INFO[k]: v for k, v in quote.items() if k in QUOTE_TO_INFO and v is not None}
+        details = gate.info(stock)                      # {} if Yahoo refuses
+        info.update({k: v for k, v in details.items() if v is not None})
         now = datetime.now()
 
-        next_date, cal = next_earnings_date(stock, info)
+        next_date, cal = next_earnings_date(stock, info, gate)
 
         eps_est = info.get("forwardEps")
         eps_act = info.get("trailingEps")
@@ -125,20 +141,26 @@ def pick_tickers(conn):
 def main():
     conn, cursor = live_cursor(None)
     cursor.close()
-    tickers = pick_tickers(conn)
+    tickers = [t for t in pick_tickers(conn) if "=F" not in t]
 
     print("=" * 60)
-    print("  EARNINGS FETCH - {} stocks (database: Aiven / .env)".format(len(tickers)))
+    print("  EARNINGS FETCH - {} stocks".format(len(tickers)))
     print("=" * 60)
+
+    quotes = fetch_quotes(tickers)
+    gone = [t for t in tickers if t not in quotes]
+    tickers = [t for t in tickers if t in quotes]
+    gate = DetailGate()
+    print()
 
     success = failed = no_date = 0
     failed_list = []
     for i, ticker in enumerate(tickers, 1):
         conn, cursor = live_cursor(conn)
-        ok, note = fetch_earnings(ticker, cursor, conn)
+        ok, note = fetch_earnings(ticker, quotes[ticker], gate, cursor, conn)
         if not ok and is_db_error(note):
             conn, cursor = live_cursor(None)
-            ok, note = fetch_earnings(ticker, cursor, conn)
+            ok, note = fetch_earnings(ticker, quotes[ticker], gate, cursor, conn)
         try: cursor.close()
         except Exception: pass
 
@@ -152,10 +174,6 @@ def main():
             failed_list.append(ticker)
             print("  FAIL [{}/{}] {} - {}".format(i, len(tickers), ticker, note))
 
-        if i % 50 == 0:
-            print("\n  Pausing 5s... {} done, {} failed\n".format(success, failed))
-            time.sleep(5)
-
     cur = conn.cursor()
     cur.execute("SELECT COUNT(*) FROM stocks_earnings WHERE next_earnings_date >= CURDATE()")
     upcoming = cur.fetchone()[0]
@@ -165,6 +183,11 @@ def main():
 
     print("\n" + "=" * 60)
     print("  Done! {} updated ({} with no date from Yahoo), {} failed".format(success, no_date, failed))
+    print("  Extra details (revenue, calendar) from Yahoo for {} stocks{}".format(
+        gate.got, " - Yahoo refused the rest, saved values kept" if gate.closed else ""))
+    if gone:
+        print("  Not on Yahoo any more (skipped, old data kept): {}{}".format(
+            ", ".join(gone[:30]), " ... ({} in total)".format(len(gone)) if len(gone) > 30 else ""))
     if failed_list:
         print("  Failed: {}".format(", ".join(failed_list[:60])))
     print("  Stocks with an upcoming earnings date in the database: {}".format(upcoming))
