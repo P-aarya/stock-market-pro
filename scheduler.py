@@ -1,9 +1,18 @@
 # ============================================================
-# STOCK MARKET PRO — scheduler.py (v3, safe)
+# STOCK MARKET PRO — scheduler.py (v4, batched)
 # Refreshes live prices for all stocks every 60 seconds.
 # Reads ticker list from the DB itself (stocks_live table),
 # so it never depends on tickers.py structure.
 # Prints FULL error details for failures.
+#
+# v4 changes:
+#  - Asks Yahoo for 150 stocks in ONE request (about 20 requests a round
+#    instead of 3,000+), so Yahoo no longer blocks us for "too many requests".
+#    The same answer has market cap and the 52-week range, so the slow
+#    per-stock "details" call is gone.
+#  - If Yahoo still says "too many requests", the round stops and the
+#    updater waits 5 min (then 10, 20, 30) instead of hammering Yahoo.
+#  - Saves each batch of 150 in one go.
 #
 # v3 changes:
 #  - Never blanks market cap / 52-week high-low: if Yahoo sends nothing,
@@ -18,15 +27,20 @@
 import os
 from dotenv import load_dotenv
 load_dotenv()
-import yfinance as yf
+from yfinance.data import YfData
+from yfinance.exceptions import YFRateLimitError
 import mysql.connector
 import math
 import time
 import traceback
 from datetime import datetime
 
-INFO_REFRESH_SECONDS = 30 * 60      # market cap / 52-week range refresh
-_last_info = {}                     # ticker -> time of last .info call
+BATCH_SIZE = 150                    # stocks per request to Yahoo
+PAUSE_BETWEEN_BATCHES = 2           # seconds
+CYCLE_SECONDS = 60                  # a new round starts every 60 seconds
+BACKOFF_START = 5 * 60              # if Yahoo says "too many requests": wait 5 min,
+BACKOFF_MAX = 30 * 60               # then 10, 20, up to 30 min, until it answers again
+QUOTE_URL = "https://query1.finance.yahoo.com/v7/finance/quote?"
 
 def get_db():
     config = {
@@ -54,123 +68,141 @@ def _ok(x):
     except (TypeError, ValueError):
         return False
 
-def fetch_live(ticker):
-    """Fetch live price data using history() which is stable."""
-    t = yf.Ticker(ticker)
-    hist = t.history(period="5d")
+def _num(x, digits=4):
+    return round(float(x), digits) if _ok(x) else None
 
-    if hist is None or hist.empty:
-        raise ValueError("no price data returned")
-    hist = hist.dropna(subset=["Close"])
-    if hist.empty:
-        raise ValueError("no price data returned")
+def fetch_quotes(tickers):
+    """One request to Yahoo for many stocks. Returns {ticker: quote}. Raises YFRateLimitError if Yahoo refuses."""
+    data = YfData()          # yfinance's own connection: handles Yahoo's cookie and browser look-alike
+    res = data.get_raw_json(QUOTE_URL, params={"symbols": ",".join(tickers), "formatted": "false"})
+    out = {}
+    for q in (res.get("quoteResponse") or {}).get("result") or []:
+        sym = q.get("symbol")
+        if sym:
+            out[sym] = q
+    return out
 
-    latest = hist.iloc[-1]
-    prev = hist.iloc[-2] if len(hist) > 1 else hist.iloc[-1]
-
-    price = float(latest['Close'])
-    prev_close = float(prev['Close'])
-    open_price = float(latest['Open']) if _ok(latest['Open']) else None
-    day_high = float(latest['High']) if _ok(latest['High']) else None
-    day_low = float(latest['Low']) if _ok(latest['Low']) else None
-    volume = int(latest['Volume']) if _ok(latest['Volume']) else None
-
-    if not _ok(price) or not _ok(prev_close) or prev_close == 0:
-        raise ValueError("no valid price data")
-
+def quote_to_row(q):
+    """Yahoo's quote -> the values saved in stocks_live. None if there is no usable price."""
+    price = q.get("regularMarketPrice")
+    prev_close = q.get("regularMarketPreviousClose")
+    if not _ok(price) or not _ok(prev_close) or float(prev_close) == 0:
+        return None
+    price, prev_close = float(price), float(prev_close)
     change = price - prev_close
-    change_pct = (change / prev_close) * 100
-
-    # Market cap and 52 week range: only every 30 min per stock.
-    # None = "no new value" -> the saved value is kept.
-    market_cap = year_high = year_low = None
-    now = time.time()
-    if now - _last_info.get(ticker, 0) >= INFO_REFRESH_SECONDS:
-        try:
-            info = t.info or {}
-            market_cap = info.get("marketCap")
-            year_high = info.get("fiftyTwoWeekHigh")
-            year_low = info.get("fiftyTwoWeekLow")
-            if market_cap or year_high:
-                _last_info[ticker] = now
-        except Exception:
-            pass
-
+    volume = q.get("regularMarketVolume")
     return {
         "current_price":    round(price, 4),
         "price_change":     round(change, 4),
-        "price_change_pct": round(change_pct, 4),
-        "open_price":       round(open_price, 4) if open_price is not None else None,
-        "high":             round(day_high, 4) if day_high is not None else None,
-        "low":              round(day_low, 4) if day_low is not None else None,
+        "price_change_pct": round(change / prev_close * 100, 4),
+        "open_price":       _num(q.get("regularMarketOpen")),
+        "high":             _num(q.get("regularMarketDayHigh")),
+        "low":              _num(q.get("regularMarketDayLow")),
         "prev_close":       round(prev_close, 4),
-        "volume":           volume,
-        "market_cap":       float(market_cap) if _ok(market_cap) else None,
-        "week_52_high":     round(float(year_high), 4) if _ok(year_high) else None,
-        "week_52_low":      round(float(year_low), 4) if _ok(year_low) else None,
+        "volume":           int(volume) if _ok(volume) else None,
+        "market_cap":       float(q["marketCap"]) if _ok(q.get("marketCap")) else None,
+        "week_52_high":     _num(q.get("fiftyTwoWeekHigh")),
+        "week_52_low":      _num(q.get("fiftyTwoWeekLow")),
     }
 
-def save_live(conn, ticker, d):
+SAVE_SQL = """
+    UPDATE stocks_live SET
+        current_price=%s, price_change=%s, price_change_pct=%s,
+        open_price=COALESCE(%s, open_price), high=COALESCE(%s, high),
+        low=COALESCE(%s, low), prev_close=%s,
+        volume=COALESCE(%s, volume), market_cap=COALESCE(%s, market_cap),
+        week_52_high=COALESCE(%s, week_52_high), week_52_low=COALESCE(%s, week_52_low),
+        last_updated=%s
+    WHERE ticker=%s
+"""
+
+def save_rows(conn, rows):
+    """rows: list of (ticker, values). Saved together in one go."""
+    now = datetime.now()
+    params = [(d["current_price"], d["price_change"], d["price_change_pct"],
+               d["open_price"], d["high"], d["low"], d["prev_close"],
+               d["volume"], d["market_cap"], d["week_52_high"], d["week_52_low"],
+               now, t) for t, d in rows]
     cursor = conn.cursor()
-    cursor.execute("""
-        UPDATE stocks_live SET
-            current_price=%s, price_change=%s, price_change_pct=%s,
-            open_price=COALESCE(%s, open_price), high=COALESCE(%s, high),
-            low=COALESCE(%s, low), prev_close=%s,
-            volume=COALESCE(%s, volume), market_cap=COALESCE(%s, market_cap),
-            week_52_high=COALESCE(%s, week_52_high), week_52_low=COALESCE(%s, week_52_low),
-            last_updated=%s
-        WHERE ticker=%s
-    """, (d["current_price"], d["price_change"], d["price_change_pct"],
-          d["open_price"], d["high"], d["low"], d["prev_close"],
-          d["volume"], d["market_cap"],
-          d["week_52_high"], d["week_52_low"],
-          datetime.now(), ticker))
+    cursor.executemany(SAVE_SQL, params)
     conn.commit()
     cursor.close()
 
-def run_cycle(tickers, cycle_num):
-    saved, failed = 0, 0
-    error_samples = []
-    conn = get_db()
-    for i, ticker in enumerate(tickers, 1):
+def save_with_retry(conn, rows):
+    """Save; if the database connection dropped, reconnect once and save again. Returns the connection."""
+    try:
+        if conn is None or not conn.is_connected():
+            raise ConnectionError("dropped")
+        save_rows(conn, rows)
+        return conn
+    except Exception:
         try:
-            d = fetch_live(ticker)
-            try:
-                if conn is None or not conn.is_connected():
-                    raise ConnectionError("dropped")
-                save_live(conn, ticker, d)
-            except Exception:
-                # connection dropped (Aiven does this sometimes) -> reconnect and save again
-                try:
-                    if conn is not None:
-                        conn.close()
-                except Exception:
-                    pass
-                conn = get_db()
-                save_live(conn, ticker, d)
-            saved += 1
+            if conn is not None:
+                conn.close()
+        except Exception:
+            pass
+        conn = get_db()
+        save_rows(conn, rows)
+        return conn
+
+def run_cycle(tickers, cycle_num):
+    """One round over every stock, BATCH_SIZE at a time. Returns True if Yahoo rate-limited us."""
+    saved, no_data, failed = 0, [], 0
+    error_samples = []
+    rate_limited = False
+    conn = get_db()
+    batches = [tickers[i:i + BATCH_SIZE] for i in range(0, len(tickers), BATCH_SIZE)]
+    for b, batch in enumerate(batches, 1):
+        try:
+            quotes = fetch_quotes(batch)
+        except YFRateLimitError:
+            rate_limited = True
+            failed += sum(len(x) for x in batches[b - 1:])
+            error_samples.append("Yahoo: Too Many Requests (rate limited) - stopping this round")
+            break
         except Exception as e:
-            failed += 1
-            # Keep first 3 detailed errors so we can diagnose
+            failed += len(batch)
             if len(error_samples) < 3:
-                error_samples.append(f"{ticker}: {type(e).__name__}: {str(e)[:120]}")
-        if i % 50 == 0:
-            print(f"  ⏳ Progress: {i}/{len(tickers)} | ✅ {saved} saved | ❌ {failed} failed")
+                error_samples.append(f"batch {b} ({batch[0]}...): {type(e).__name__}: {str(e)[:120]}")
+            time.sleep(PAUSE_BETWEEN_BATCHES)
+            continue
+        rows = []
+        for t in batch:
+            row = quote_to_row(quotes[t]) if t in quotes else None
+            if row:
+                rows.append((t, row))
+            else:
+                no_data.append(t)
+        if rows:
+            try:
+                conn = save_with_retry(conn, rows)
+                saved += len(rows)
+            except Exception as e:
+                failed += len(rows)
+                if len(error_samples) < 3:
+                    error_samples.append(f"saving batch {b}: {type(e).__name__}: {str(e)[:120]}")
+        if b % 5 == 0:
+            print(f"  ⏳ Progress: {min(b * BATCH_SIZE, len(tickers))}/{len(tickers)} | ✅ {saved} saved")
+        if b < len(batches):
+            time.sleep(PAUSE_BETWEEN_BATCHES)
     try:
         conn.close()
     except Exception:
         pass
-    print(f"\n  Cycle {cycle_num} done: ✅ {saved} saved | ❌ {failed} failed | {datetime.now().strftime('%H:%M:%S')}")
+    print(f"\n  Cycle {cycle_num} done: ✅ {saved} saved | ⚪ {len(no_data)} no price from Yahoo | ❌ {failed} failed"
+          f" | {datetime.now().strftime('%H:%M:%S')}")
+    if no_data:
+        print(f"  No price for: {', '.join(no_data[:10])}{' ...' if len(no_data) > 10 else ''}")
     if error_samples:
         print("  First error details (for debugging):")
-        for s in error_samples:
+        for s in error_samples[:3]:
             print(f"    • {s}")
     print()
+    return rate_limited
 
 def main():
     print("="*60)
-    print("  STOCK MARKET PRO — Scheduler v3")
+    print("  STOCK MARKET PRO — Scheduler v4 (batched)")
     print(f"  Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("="*60)
 
@@ -185,7 +217,10 @@ def main():
         return
 
     cycle = 1
+    backoff = 0
     while True:
+        started = time.time()
+        rate_limited = False
         try:
             if cycle > 1:
                 try:
@@ -195,12 +230,18 @@ def main():
                     tickers = new_list
                 except Exception:
                     pass    # keep the old list if the DB hiccups
-            run_cycle(tickers, cycle)
+            rate_limited = run_cycle(tickers, cycle)
         except Exception:
             print("  ❌ Cycle crashed — full error:")
             traceback.print_exc()
         cycle += 1
-        time.sleep(60)
+        if rate_limited:
+            backoff = min(backoff * 2, BACKOFF_MAX) if backoff else BACKOFF_START
+            print(f"  ⏸  Yahoo asked us to slow down - waiting {backoff // 60} min before the next round\n", flush=True)
+            time.sleep(backoff)
+        else:
+            backoff = 0
+            time.sleep(max(5, CYCLE_SECONDS - (time.time() - started)))
 
 if __name__ == "__main__":
     main()
