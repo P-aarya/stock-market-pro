@@ -885,22 +885,42 @@ def get_historical(ticker: str):
 
 @app.get("/api/stocks/{ticker}/price-history")
 def get_price_history(ticker: str, period: str="5y"):
+    """Daily prices for the period. 1d and 5d are intraday instead: every 5 minutes (the last trading day, so it also
+    works at night and at weekends) and every 15 minutes (the last 5 trading days); their "date" has the time too
+    ("YYYY-MM-DD HH:MM", the exchange's local time)."""
     try:
-        hist = yf.Ticker(ticker.upper()).history(period=period)
-        if hist.empty: return []
+        t = yf.Ticker(ticker.upper())
+        intraday = period in ("1d", "5d")
+        if period == "1d":
+            hist = t.history(period="5d", interval="5m")
+        elif period == "5d":
+            hist = t.history(period="5d", interval="15m")
+        else:
+            hist = t.history(period=period)
+        if hist is None or hist.empty: return []
+        hist = hist.dropna(subset=["Close"])
+        if period == "1d" and not hist.empty:
+            last_day = hist.index[-1].date()
+            hist = hist[[ts.date() == last_day for ts in hist.index]]
         hist = hist.reset_index()
+        tcol = "Datetime" if "Datetime" in hist.columns else "Date"
         result = []
         for _, row in hist.iterrows():
+            close = float(row["Close"])
+            def px(col):
+                v = row[col]
+                return round(float(v), 2) if v == v else round(close, 2)     # v == v is False for NaN
+            vol = row["Volume"]
             result.append({
-                "date":   str(row["Date"])[:10],
-                "open":   round(float(row["Open"]),2),
-                "high":   round(float(row["High"]),2),
-                "low":    round(float(row["Low"]),2),
-                "close":  round(float(row["Close"]),2),
-                "volume": int(row["Volume"]),
+                "date":   str(row[tcol])[:16] if intraday else str(row[tcol])[:10],
+                "open":   px("Open"),
+                "high":   px("High"),
+                "low":    px("Low"),
+                "close":  round(close, 2),
+                "volume": int(vol) if vol == vol else 0,
             })
         return result
-    except: return []
+    except Exception: return []
 
 @app.get("/api/stocks/{ticker}/intraday")
 def get_intraday(ticker: str):
