@@ -28,6 +28,7 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 from yfinance.data import YfData
+from yahoo_batch import reset_yahoo_key
 from yfinance.exceptions import YFRateLimitError
 import mysql.connector
 import math
@@ -156,11 +157,13 @@ def run_cycle(tickers, cycle_num):
         try:
             quotes = fetch_quotes(batch)
         except YFRateLimitError:
+            reset_yahoo_key()
             rate_limited = True
             failed += sum(len(x) for x in batches[b - 1:])
             error_samples.append("Yahoo: Too Many Requests (rate limited) - stopping this round")
             break
         except Exception as e:
+            reset_yahoo_key()                           # e.g. "Invalid Crumb": get a fresh Yahoo key next time
             failed += len(batch)
             if len(error_samples) < 3:
                 error_samples.append(f"batch {b} ({batch[0]}...): {type(e).__name__}: {str(e)[:120]}")

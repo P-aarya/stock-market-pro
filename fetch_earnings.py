@@ -147,8 +147,9 @@ def main():
     print("  EARNINGS FETCH - {} stocks".format(len(tickers)))
     print("=" * 60)
 
-    quotes = fetch_quotes(tickers)
-    gone = [t for t in tickers if t not in quotes]
+    quotes, asked = fetch_quotes(tickers)
+    gone = [t for t in tickers if t in asked and t not in quotes]
+    refused = [t for t in tickers if t not in asked]
     tickers = [t for t in tickers if t in quotes]
     gate = DetailGate()
     print()
@@ -185,6 +186,8 @@ def main():
     print("  Done! {} updated ({} with no date from Yahoo), {} failed".format(success, no_date, failed))
     print("  Extra details (revenue, calendar) from Yahoo for {} stocks{}".format(
         gate.got, " - Yahoo refused the rest, saved values kept" if gate.closed else ""))
+    if refused:
+        print("  Yahoo refused {} stocks this run (old data kept) - run the job again later to update them.".format(len(refused)))
     if gone:
         print("  Not on Yahoo any more (skipped, old data kept): {}{}".format(
             ", ".join(gone[:30]), " ... ({} in total)".format(len(gone)) if len(gone) > 30 else ""))
