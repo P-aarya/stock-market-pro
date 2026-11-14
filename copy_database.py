@@ -140,9 +140,12 @@ def main(argv=None):
         c.execute("SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ")
         c.close()
     s = src.cursor()
-    s.execute("START TRANSACTION WITH CONSISTENT SNAPSHOT")   # every table is read as it was at one moment
     s.execute("SELECT @@GLOBAL.sql_mode")
     src_mode = s.fetchone()[0]
+    # Aiven runs in ANSI mode, where SHOW CREATE TABLE writes names in "double quotes". For this connection only
+    # (the old server's own setting is untouched), ask for MySQL's usual `backticks`, which any server accepts.
+    s.execute("SET SESSION sql_mode = ''")
+    s.execute("START TRANSACTION WITH CONSISTENT SNAPSHOT")   # every table is read as it was at one moment
     s.close()
     d = dst.cursor()
     d.execute("SELECT @@GLOBAL.sql_mode")

@@ -10,3 +10,5 @@ skip-name-resolve
 character-set-server = utf8mb4
 collation-server = utf8mb4_0900_ai_ci
 default-time-zone = '+00:00'
+# The same SQL mode as the old Aiven server, so every query behaves exactly as it did there
+sql_mode = ANSI,STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
