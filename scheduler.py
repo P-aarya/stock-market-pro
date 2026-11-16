@@ -10,8 +10,9 @@
 #    instead of 3,000+), so Yahoo no longer blocks us for "too many requests".
 #    The same answer has market cap and the 52-week range, so the slow
 #    per-stock "details" call is gone.
-#  - If Yahoo still says "too many requests", the round stops and the
-#    updater waits 5 min (then 10, 20, 30) instead of hammering Yahoo.
+#  - If Yahoo still says "too many requests" or refuses the request
+#    (401 "Invalid Crumb", 403), the round stops and the updater waits
+#    5 min (then 10, 20, 30) instead of hammering Yahoo.
 #  - Saves each batch of 150 in one go.
 #
 # v3 changes:
@@ -146,6 +147,15 @@ def save_with_retry(conn, rows):
         save_rows(conn, rows)
         return conn
 
+def yahoo_refused(e):
+    """True when the error means Yahoo is refusing us (not a one-off network hiccup)."""
+    status = getattr(getattr(e, "response", None), "status_code", None)
+    if status in (401, 403, 429):
+        return True
+    text = str(e)
+    return any(k in text for k in ("401", "403", "429", "Unauthorized", "Too Many Requests", "Invalid Crumb"))
+
+
 def run_cycle(tickers, cycle_num):
     """One round over every stock, BATCH_SIZE at a time. Returns True if Yahoo rate-limited us."""
     saved, no_data, failed = 0, [], 0
@@ -164,6 +174,13 @@ def run_cycle(tickers, cycle_num):
             break
         except Exception as e:
             reset_yahoo_key()                           # e.g. "Invalid Crumb": get a fresh Yahoo key next time
+            if yahoo_refused(e):
+                # Yahoo is refusing us (401 / 403 / 429). Asking again straight away only keeps the block going,
+                # so stop this round; main() then waits 5 minutes (then 10, 20, up to 30) before trying again.
+                rate_limited = True
+                failed += sum(len(x) for x in batches[b - 1:])
+                error_samples.append(f"Yahoo refused the request ({type(e).__name__}: {str(e)[:80].strip()}) - stopping this round")
+                break
             failed += len(batch)
             if len(error_samples) < 3:
                 error_samples.append(f"batch {b} ({batch[0]}...): {type(e).__name__}: {str(e)[:120]}")
