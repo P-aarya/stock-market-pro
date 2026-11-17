@@ -189,7 +189,7 @@ function plan({ features, locks = {}, name = 'Basic', tagged = [], hidden = [] }
     const cards = { 'ai-wrap': 'ai_stock_finder', 'top5-card': 'stock_prediction' };
     for (const [id, feature] of Object.entries(cards)) assert(new RegExp(`(class="${id}"|id="${id}")[^>]*data-feature="${feature}"|data-feature="${feature}"[^>]*(class="${id}"|id="${id}")`).test(html), id);
     assert(html.includes('<div class="ai-wrap" data-feature="ai_interaction" style="margin-bottom:16px;">\n    <div class="ai-header">\n      <div>\n        <div class="ai-title">AI Portfolio Review</div>'), 'the AI portfolio review is AI interaction');
-    for (const id of ['pf-form-card', 'tx-form-card']) assert(html.includes(`<div class="card" id="${id}" data-feature="portfolio_mgt">`), id);
+    for (const id of ['tx-form-card']) assert(html.includes(`<div class="card" id="${id}" data-feature="portfolio_mgt">`), id);
     for (const id of ['bounty-btn', 'bounty-win']) assert(new RegExp(`id="${id}"[^>]*data-feature-hide="ai_interaction"|data-feature-hide="ai_interaction"[^>]*id="${id}"`).test(html), id);
     // the Market page's other cards, the stock detail cards, the alert box and the bell are all initial screen
     for (const title of ['Market Sentiment', 'RSI Distribution', 'P/E Ratio vs Market Cap', '52-Week High/Low Proximity', 'Most Volatile Stocks', 'Top Dividend Yield Leaders', 'Volume Spikes', 'Technical Indicators', 'Fundamentals', 'Ownership & Short Interest', 'Dividend Info', 'Set Price Alert', 'RSI (14-day)', 'MACD'])

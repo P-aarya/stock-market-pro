@@ -77,6 +77,8 @@ GET /api/admin/tickets/{ticket_id}
 GET /api/admin/users/export
 GET /api/learn
 GET /api/portfolio/commodities
+GET /api/portfolio/history
+GET /api/watchlist/extras
 GET /api/stocks/quotes
 GET /api/stocks/{ticker}/buy-sell
 GET /api/stocks/{ticker}/filings

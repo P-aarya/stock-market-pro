@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 import mysql.connector
 import yfinance as yf
+import market_history
 import pandas as pd
 from datetime import datetime, timezone
 from typing import Optional
@@ -849,6 +850,55 @@ def stock_quotes(tickers: str = ""):
     return {"quotes": [{"ticker": t, "company_name": found[t].get("company_name"), "sector": found[t].get("sector"),
                         "current_price": found[t].get("current_price"), "price_change_pct": found[t].get("price_change_pct")}
                        for t in wanted if t in found]}
+
+
+_SIGNAL_WORDS = (("SELL", "SELL"), ("BUY", "BUY"))
+
+
+def simple_signal(raw):
+    """The model's signal as one word: BUY, SELL or HOLD ("Strong Buy" -> BUY, "Weak Sell" -> SELL, anything else HOLD)."""
+    text = str(raw or "").upper()
+    for word, label in _SIGNAL_WORDS:
+        if word in text:
+            return label
+    return "HOLD" if text else None
+
+
+@app.get("/api/watchlist/extras")
+def watchlist_extras(request: Request, tickers: str = ""):
+    """The Watchlist's extra columns, loaded after the table so it never waits for them: the price 3 months ago (from
+    Yahoo's price history), and, for plans that include stock prediction, the model's signal (BUY / SELL / HOLD) and its
+    chance that the price is higher in 3 months. ?tickers=AAPL,MSFT,... -> {"extras": {ticker: {...}}, "predictions": bool}"""
+    wanted = []
+    for t in str(tickers or "").split(","):
+        t = t.strip().upper()
+        if t and _QUOTE_TICKER.match(t) and t not in wanted:
+            wanted.append(t)
+    wanted = wanted[:MAX_QUOTES]
+    out = {t: {"price_3m_ago": None} for t in wanted}
+    if not wanted:
+        return {"extras": out, "predictions": False}
+    try:
+        hist = market_history.closes(wanted, "3mo")
+        for t in wanted:
+            if t in hist:
+                out[t]["price_3m_ago"] = round(hist[t]["closes"][0], 2)
+    except Exception:
+        log.exception("Watchlist 3-month prices failed")
+    allowed = "stock_prediction" in _plan_features(request)
+    if allowed:
+        try:
+            rows = query("SELECT ticker, buy_signal, prob_up_3m FROM stocks_predictions WHERE ticker IN ("
+                         + ", ".join(["%s"] * len(wanted)) + ")", wanted) or []
+            for r in rows:
+                t = str(r.get("ticker") or "").upper()
+                if t in out:
+                    p = r.get("prob_up_3m")
+                    out[t]["signal"] = simple_signal(r.get("buy_signal"))
+                    out[t]["chance_up"] = round(float(p)) if p is not None else None
+        except Exception:
+            log.exception("Watchlist predictions failed")
+    return {"extras": out, "predictions": allowed}
 
 
 @app.get("/api/stocks/search")
@@ -2528,6 +2578,27 @@ def get_portfolio(user_id: int = Depends(current_user_id)):
 @app.get("/api/portfolio/summary")
 def get_portfolio_summary(user_id: int = Depends(current_user_id)):
     return portfolio.summarize(portfolio.list_holdings(user_id))
+
+
+@app.get("/api/portfolio/history")
+def portfolio_history(tickers: str = "", user_id: int = Depends(current_user_id)):
+    """Up to 5 of your own holdings over the last 3 months, for the Portfolio chart: each with its daily closes and its
+    % change over the period. Tickers you don't hold are ignored."""
+    held = portfolio.held_tickers(user_id)
+    wanted = []
+    for t in str(tickers or "").split(","):
+        t = t.strip().upper()
+        if t in held and t not in wanted:
+            wanted.append(t)
+    wanted = wanted[:5]
+    data = market_history.closes([held[t] for t in wanted], "3mo") if wanted else {}
+    series = []
+    for t in wanted:
+        d = data.get(held[t])
+        if d and len(d["closes"]) >= 2:
+            series.append({"ticker": t, "dates": d["dates"], "closes": d["closes"],
+                           "change_pct": round((d["closes"][-1] / d["closes"][0] - 1) * 100, 2)})
+    return {"status": "success", "series": series, "missing": [t for t in wanted if t not in {x["ticker"] for x in series}]}
 
 
 @app.get("/api/portfolio/commodities")

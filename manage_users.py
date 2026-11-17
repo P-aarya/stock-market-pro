@@ -10,6 +10,7 @@ Account administration. Run it from the project folder with the virtual environm
     python manage_users.py claim-legacy EMAIL       give the portfolio, transactions and price alerts saved before accounts existed to EMAIL
     python manage_users.py set-password EMAIL       set someone's password (people can also use "Forgot password?" on the sign-in page)
     python manage_users.py set-plan EMAIL PLAN      move an account to a plan: 1 or Free, 2 or Basic, 3 or "AI Stock Finder", 4, 5 or Deluxe, 6 or Premier
+    python manage_users.py sync-portfolio [--check] one-off: every holding gets a transaction behind it, then holdings are rebuilt from transactions
     python manage_users.py purge-deleted            permanently remove accounts that people deleted more than 30 days ago (the app also does this by itself)
     python manage_users.py list-users [--pending]
     python manage_users.py delete-user EMAIL --yes  delete an account together with its holdings, transactions, price alerts and watchlist
@@ -196,6 +197,8 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("migrate")
     sub.add_parser("purge-deleted")
+    sy = sub.add_parser("sync-portfolio", help="one-off: give every holding a transaction behind it, then rebuild holdings from transactions")
+    sy.add_argument("--check", action="store_true", help="only show what would change")
     lu = sub.add_parser("list-users")
     lu.add_argument("--pending", action="store_true", help="only accounts waiting for approval")
     sp = sub.add_parser("set-plan")
@@ -218,6 +221,15 @@ def main(argv=None):
             print("\nNext: make yourself an administrator so you can approve new sign-ups:")
             print("      python manage_users.py make-admin YOU@EXAMPLE.COM")
             print("(No account yet? python manage_users.py create-user YOU@EXAMPLE.COM --admin, then claim-legacy.)")
+        elif args.cmd == "sync-portfolio":
+            import portfolio
+            lines = portfolio.reconcile(dry_run=args.check)
+            for line in lines:
+                print(("would change: " if args.check else "✓ ") + line)
+            if args.check:
+                print(f"\n{len(lines)} change(s) would be made. Nothing was changed (--check).")
+            else:
+                print(f"\n✓ Done: {len(lines)} change(s). Every holding now comes from transactions.")
         elif args.cmd == "create-user":
             email = auth.normalize_email(args.email)
             auth.check_email(email)

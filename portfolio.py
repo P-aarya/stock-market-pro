@@ -207,92 +207,33 @@ def merge_lots(lots, quantity, price):
 
 # ── add / edit / delete ───────────────────────────────────
 
+def held_tickers(user_id):
+    """{ticker: the symbol to ask Yahoo for} for everything this person holds (a commodity's futures symbol, e.g. GC=F)."""
+    out = {}
+    for r in _query("SELECT DISTINCT ticker FROM portfolio WHERE user_id = %s AND quantity > 0", (user_id,)):
+        t = r["ticker"]
+        c = commodity_groups.direct(t)
+        out[t] = c["symbol"] if c else t
+    return out
+
+
+HOLDINGS_COME_FROM_TRANSACTIONS = ("Your holdings are worked out from your transactions. To change one, add a BUY or SELL "
+                                   "(or edit or remove one) on the Transactions tab.")
+
+
 def add_holding(user_id, ticker, quantity, avg_buy_price, buy_date, notes=""):
-    ticker = (ticker or "").strip().upper()
-    if not TICKER_RE.match(ticker):
-        raise PortfolioError("That doesn't look like a ticker symbol.")
-    q, p, d, notes = _check_position(quantity, avg_buy_price, buy_date, notes)
-    commodity = commodity_groups.direct(ticker)
-
-    conn = get_db_connection()
-    try:
-        cur = conn.cursor(dictionary=True)
-        if commodity:                      # a commodity owned directly: no stock row, the catalogue names it
-            stock = {"company_name": commodity["name"], "sector": "Commodities"}
-        else:
-            cur.execute("SELECT company_name, sector FROM stocks_live WHERE ticker = %s AND current_price IS NOT NULL", (ticker,))
-            stock = cur.fetchone()
-        if not stock:
-            raise PortfolioError(f"{ticker} isn't a stock we track, so it can't be added.")
-        cur.execute("SELECT id, quantity, avg_buy_price, buy_date, notes FROM portfolio WHERE user_id = %s AND ticker = %s ORDER BY id", (user_id, ticker))
-        lots = [{k: _plain(v) for k, v in row.items()} for row in cur.fetchall()]
-
-        if lots:  # buying more of a stock you hold: one position at the weighted-average cost
-            total_q, avg = merge_lots(lots, q, p)
-            first = lots[0]
-            earliest = min([d] + [l["buy_date"] for l in lots if l["buy_date"]])
-            note = notes or first.get("notes") or ""
-            cur.execute("UPDATE portfolio SET quantity=%s, avg_buy_price=%s, buy_date=%s, notes=%s WHERE id=%s AND user_id=%s",
-                        (total_q, round(avg, 4), earliest, note, first["id"], user_id))
-            for extra in lots[1:]:
-                cur.execute("DELETE FROM portfolio WHERE id = %s AND user_id = %s", (extra["id"], user_id))
-            if commodity:
-                message = (f"Added {commodity_groups.amount(q, ticker)}. You now hold {total_q:g} "
-                           f"{commodity['unit'] if total_q == 1 else commodity['plural']} at ${avg:,.2f} per {commodity['unit']}.")
-            else:
-                message = f"Added {q:g} more {ticker}. Position is now {total_q:g} shares at ${avg:,.2f}."
-            holding_id = first["id"]
-        else:
-            cur.execute("""INSERT INTO portfolio (user_id, ticker, company_name, quantity, avg_buy_price, buy_date, sector, notes)
-                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
-                        (user_id, ticker, stock["company_name"] or ticker, q, p, d, stock["sector"] or "Unknown", notes))
-            holding_id = cur.lastrowid
-            message = f"Added {commodity_groups.amount(q, ticker)}." if commodity else f"Added {q:g} shares of {ticker}."
-        conn.commit()
-        return {"id": holding_id, "ticker": ticker, "message": message}
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    """Kept for older callers: adding a holding is recording a purchase, so it becomes a BUY transaction."""
+    return add_transaction(user_id, ticker, "BUY", quantity, avg_buy_price, buy_date, notes)
 
 
 def update_holding(user_id, holding_id, quantity, avg_buy_price, buy_date, notes=""):
-    q, p, d, notes = _check_position(quantity, avg_buy_price, buy_date, notes)
-    conn = get_db_connection()
-    try:
-        cur = conn.cursor()
-        cur.execute("SELECT ticker FROM portfolio WHERE id = %s AND user_id = %s", (holding_id, user_id))
-        row = cur.fetchone()
-        if not row:
-            raise PortfolioError("That holding no longer exists.", 404)
-        cur.execute("UPDATE portfolio SET quantity=%s, avg_buy_price=%s, buy_date=%s, notes=%s WHERE id=%s AND user_id=%s",
-                    (q, p, d, notes, holding_id, user_id))
-        conn.commit()
-        return {"id": holding_id, "ticker": row[0], "message": f"{_what(row[0])} updated."}
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    """Holdings are read-only: they follow the transactions."""
+    raise PortfolioError(HOLDINGS_COME_FROM_TRANSACTIONS, 409)
 
 
 def delete_holding(user_id, holding_id):
-    conn = get_db_connection()
-    try:
-        cur = conn.cursor()
-        cur.execute("SELECT ticker FROM portfolio WHERE id = %s AND user_id = %s", (holding_id, user_id))
-        row = cur.fetchone()
-        if not row:
-            raise PortfolioError("That holding no longer exists.", 404)
-        cur.execute("DELETE FROM portfolio WHERE id = %s AND user_id = %s", (holding_id, user_id))
-        conn.commit()
-        return {"id": holding_id, "ticker": row[0], "message": f"{_what(row[0])} removed."}
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+    """Holdings are read-only: they follow the transactions."""
+    raise PortfolioError(HOLDINGS_COME_FROM_TRANSACTIONS, 409)
 
 
 # ── AI review ─────────────────────────────────────────────
@@ -522,7 +463,7 @@ def realized_pnl(txs):
     A DIVIDEND counts its total_value (quantity x per-share amount).
     """
     pos, realized, unmatched, dividends = {}, {}, {}, 0.0
-    for t in sorted(txs, key=lambda t: (str(t["transaction_date"]), t.get("id") or 0)):
+    for t in sorted(txs, key=_tx_order):
         tk, typ = t["ticker"], t["transaction_type"]
         q, px = float(t["quantity"]), float(t["price"])
         qty0, cost0 = pos.get(tk, (0.0, 0.0))
@@ -569,42 +510,81 @@ def _check_tx(tx_type, quantity, price, tx_date, notes):
     return tx_type, q, px, d, notes
 
 
-def _net_shares(user_id, ticker, up_to, exclude_id=None):
-    """Shares of `ticker` the transaction history says you held on `up_to`."""
-    net = 0.0
-    for r in _query("SELECT id, transaction_type, quantity, transaction_date FROM transactions WHERE user_id = %s AND ticker = %s", (user_id, ticker)):
-        if r["id"] == exclude_id or r["transaction_date"] is None or str(r["transaction_date"]) > str(up_to):
-            continue
-        net += r["quantity"] if r["transaction_type"] == "BUY" else -r["quantity"] if r["transaction_type"] == "SELL" else 0
-    return net
+def _tx_order(t):
+    """Date order; on the same day a purchase comes before a sale."""
+    return (str(t["transaction_date"])[:10], 0 if t["transaction_type"] == "BUY" else 1, t.get("id") or 0)
 
 
-def _held_quantity(user_id, ticker):
-    rows = _query("SELECT quantity FROM portfolio WHERE user_id = %s AND ticker = %s", (user_id, ticker))
-    return sum(r["quantity"] for r in rows)
+def replay(txs):
+    """
+    The position that BUY and SELL transactions add up to, by the average-cost method (a sale doesn't change the average
+    cost of the shares that are left; selling everything starts afresh). DIVIDENDs don't change the position.
+    Returns quantity, avg_cost, since (the date the current position was opened) and short: the first sale larger than
+    what was held at the time ({date, held, sold}), or None.
+    """
+    qty = cost = 0.0
+    since, short = None, None
+    for t in sorted((t for t in txs if t["transaction_type"] in ("BUY", "SELL")), key=_tx_order):
+        q, px, day = float(t["quantity"]), float(t["price"]), str(t["transaction_date"])[:10]
+        if t["transaction_type"] == "BUY":
+            if qty <= 1e-9:
+                qty, cost, since = 0.0, 0.0, day
+            qty += q
+            cost += q * px
+        else:
+            if q > qty + 1e-9 and short is None:
+                short = {"date": day, "held": round(max(qty, 0.0), 6), "sold": q}
+            sold = min(q, qty)
+            if qty > 0:
+                cost -= sold * (cost / qty)
+            qty -= sold
+            if qty <= 1e-9:
+                qty, cost, since = 0.0, 0.0, None
+    return {"quantity": qty, "avg_cost": cost / qty if qty > 1e-9 else None, "since": since, "short": short}
 
 
-def _reduce_holding(user_id, ticker, quantity):
+def _ticker_txs(user_id, ticker):
+    return _query("SELECT id, transaction_type, quantity, price, transaction_date, notes FROM transactions "
+                  "WHERE user_id = %s AND ticker = %s", (user_id, ticker))
+
+
+def _short_message(ticker, short):
+    c = commodity_groups.direct(ticker)
+    unit = (c["unit"] if short["held"] == 1 else c["plural"]) if c else "shares"
+    return (f"That would mean selling {short['sold']:g} {unit} of {_what(ticker)} on {short['date']}, but your transactions "
+            f"show only {short['held']:g} {unit} held then.")
+
+
+def sync_holding(user_id, ticker):
+    """Make the holding for `ticker` match what this person's transactions add up to. Returns the position."""
+    pos = replay(_ticker_txs(user_id, ticker))
     conn = get_db_connection()
     try:
         cur = conn.cursor(dictionary=True)
-        cur.execute("SELECT id, quantity FROM portfolio WHERE user_id = %s AND ticker = %s ORDER BY id", (user_id, ticker))
+        cur.execute("SELECT id FROM portfolio WHERE user_id = %s AND ticker = %s ORDER BY id", (user_id, ticker))
         lots = cur.fetchall()
-        held = sum(float(l["quantity"]) for l in lots)
-        if not lots:
-            raise PortfolioError(f"You don't hold {_what(ticker)} in Holdings, so there is nothing to reduce. Untick \"Also update my holdings\".")
-        if quantity > held + 1e-9:
-            raise PortfolioError(f"Holdings only show {held:g} {'units' if commodity_groups.direct(ticker) else 'shares'} of {_what(ticker)}, so {quantity:g} can't be sold from them.")
-        remaining = held - quantity
-        keep, rest = lots[0], lots[1:]
-        for l in rest:
-            cur.execute("DELETE FROM portfolio WHERE id = %s AND user_id = %s", (l["id"], user_id))
-        if remaining <= 1e-9:
-            cur.execute("DELETE FROM portfolio WHERE id = %s AND user_id = %s", (keep["id"], user_id))
+        if pos["quantity"] <= 1e-9:
+            for l in lots:
+                cur.execute("DELETE FROM portfolio WHERE id = %s AND user_id = %s", (l["id"], user_id))
         else:
-            cur.execute("UPDATE portfolio SET quantity = %s WHERE id = %s AND user_id = %s", (remaining, keep["id"], user_id))
+            q, avg, since = round(pos["quantity"], 6), round(pos["avg_cost"], 4), pos["since"]
+            if lots:
+                cur.execute("UPDATE portfolio SET quantity=%s, avg_buy_price=%s, buy_date=%s WHERE id=%s AND user_id=%s",
+                            (q, avg, since, lots[0]["id"], user_id))
+                for extra in lots[1:]:
+                    cur.execute("DELETE FROM portfolio WHERE id = %s AND user_id = %s", (extra["id"], user_id))
+            else:
+                c = commodity_groups.direct(ticker)
+                if c:
+                    name, sector = c["name"], "Commodities"
+                else:
+                    cur.execute("SELECT company_name, sector FROM stocks_live WHERE ticker = %s", (ticker,))
+                    st = cur.fetchone() or {}
+                    name, sector = st.get("company_name") or ticker, st.get("sector") or "Unknown"
+                cur.execute("""INSERT INTO portfolio (user_id, ticker, company_name, quantity, avg_buy_price, buy_date, sector, notes)
+                               VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""", (user_id, ticker, name, q, avg, since, sector, ""))
         conn.commit()
-        return remaining
+        return pos
     except Exception:
         conn.rollback()
         raise
@@ -612,7 +592,19 @@ def _reduce_holding(user_id, ticker, quantity):
         conn.close()
 
 
-def add_transaction(user_id, ticker, tx_type, quantity, price, tx_date, notes="", apply_to_holdings=False):
+def _position_text(ticker, pos):
+    c = commodity_groups.direct(ticker)
+    if pos["quantity"] <= 1e-9:
+        return f"{_what(ticker)} is no longer in your portfolio."
+    if c:
+        unit = c["unit"] if pos["quantity"] == 1 else c["plural"]
+        return f"Your portfolio now holds {pos['quantity']:g} {unit} at ${pos['avg_cost']:,.2f} per {c['unit']}."
+    return f"Your portfolio now holds {pos['quantity']:g} {ticker} at ${pos['avg_cost']:,.2f} average."
+
+
+def add_transaction(user_id, ticker, tx_type, quantity, price, tx_date, notes="", apply_to_holdings=True):
+    """Record a BUY, SELL or DIVIDEND. A BUY or SELL always updates the portfolio (apply_to_holdings is ignored and
+    kept only so older callers still work)."""
     ticker = (ticker or "").strip().upper()
     if not TICKER_RE.match(ticker):
         raise PortfolioError("That doesn't look like a ticker symbol.")
@@ -626,14 +618,15 @@ def add_transaction(user_id, ticker, tx_type, quantity, price, tx_date, notes=""
         stock = _query("SELECT company_name FROM stocks_live WHERE ticker = %s AND current_price IS NOT NULL", (ticker,))
     if not stock:
         raise PortfolioError(f"{ticker} isn't a stock we track, so it can't be recorded.")
-    what = commodity["name"] if commodity else ticker
     if tx_type == "SELL":
-        allowed = max(_net_shares(user_id, ticker, d), _held_quantity(user_id, ticker))
-        if q > allowed + 1e-9:
+        short = replay(_ticker_txs(user_id, ticker) + [{"id": 10 ** 12, "transaction_type": "SELL", "quantity": q, "price": px,
+                                                         "transaction_date": d}])["short"]
+        if short:
             if commodity:
-                unit = commodity["unit"] if allowed == 1 else commodity["plural"]
-                raise PortfolioError(f"You can't sell {commodity_groups.amount(q, ticker)}: your records show only {allowed:g} {unit}.")
-            raise PortfolioError(f"You can't sell {q:g} {ticker}: your records show only {allowed:g} shares.")
+                unit = commodity["unit"] if short["held"] == 1 else commodity["plural"]
+                raise PortfolioError(f"You can't sell {commodity_groups.amount(q, ticker)}: on {short['date']} your transactions "
+                                     f"show only {short['held']:g} {unit}.")
+            raise PortfolioError(f"You can't sell {q:g} {ticker}: on {short['date']} your transactions show only {short['held']:g} shares.")
 
     conn = get_db_connection()
     try:
@@ -648,25 +641,36 @@ def add_transaction(user_id, ticker, tx_type, quantity, price, tx_date, notes=""
 
     message = (f"Recorded {tx_type} {commodity_groups.amount(q, ticker)} at ${px:,.2f} per {commodity['unit']}." if commodity
                else f"Recorded {tx_type} {q:g} {ticker} at ${px:,.2f}.")
-    if apply_to_holdings and tx_type != "DIVIDEND":
+    if tx_type != "DIVIDEND":
         try:
-            if tx_type == "BUY":
-                message += " " + add_holding(user_id, ticker, q, px, d, notes)["message"]
-            else:
-                left = _reduce_holding(user_id, ticker, q)
-                unit = commodity["plural"] if commodity else "shares"
-                message += f" Holdings now show {left:g} {unit}." if left > 0 else f" {what} is no longer in your holdings."
+            message += " " + _position_text(ticker, sync_holding(user_id, ticker))
         except Exception:
-            delete_transaction(user_id, tx_id)  # keep the two records consistent: undo the entry we just made
+            _remove_tx(user_id, tx_id)              # keep the two consistent: undo the entry we just made
             raise
     return {"id": tx_id, "ticker": ticker, "message": message}
+
+
+def _remove_tx(user_id, tx_id):
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM transactions WHERE id = %s AND user_id = %s", (tx_id, user_id))
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def update_transaction(user_id, tx_id, quantity, price, tx_date, notes=""):
     rows = _query("SELECT ticker, transaction_type FROM transactions WHERE id = %s AND user_id = %s", (tx_id, user_id))
     if not rows:
         raise PortfolioError("That transaction no longer exists.", 404)
-    _, q, px, d, notes = _check_tx(rows[0]["transaction_type"], quantity, price, tx_date, notes)
+    ticker, tx_type = rows[0]["ticker"], rows[0]["transaction_type"]
+    _, q, px, d, notes = _check_tx(tx_type, quantity, price, tx_date, notes)
+    if tx_type in ("BUY", "SELL"):
+        after = [dict(t, quantity=q, price=px, transaction_date=d) if t["id"] == tx_id else t for t in _ticker_txs(user_id, ticker)]
+        short = replay(after)["short"]
+        if short:
+            raise PortfolioError(_short_message(ticker, short) + " Change or remove that sale first.")
     conn = get_db_connection()
     try:
         cur = conn.cursor()
@@ -675,21 +679,72 @@ def update_transaction(user_id, tx_id, quantity, price, tx_date, notes=""):
         conn.commit()
     finally:
         conn.close()
-    return {"id": tx_id, "ticker": rows[0]["ticker"], "message": f"{_what(rows[0]['ticker'])} transaction updated. (Holdings are not changed by editing a past transaction.)"}
+    message = f"{_what(ticker)} transaction updated."
+    if tx_type in ("BUY", "SELL"):
+        message += " " + _position_text(ticker, sync_holding(user_id, ticker))
+    return {"id": tx_id, "ticker": ticker, "message": message}
 
 
 def delete_transaction(user_id, tx_id):
-    rows = _query("SELECT ticker FROM transactions WHERE id = %s AND user_id = %s", (tx_id, user_id))
+    rows = _query("SELECT ticker, transaction_type FROM transactions WHERE id = %s AND user_id = %s", (tx_id, user_id))
     if not rows:
         raise PortfolioError("That transaction no longer exists.", 404)
-    conn = get_db_connection()
-    try:
-        cur = conn.cursor()
-        cur.execute("DELETE FROM transactions WHERE id = %s AND user_id = %s", (tx_id, user_id))
-        conn.commit()
-    finally:
-        conn.close()
-    return {"id": tx_id, "ticker": rows[0]["ticker"], "message": f"{_what(rows[0]['ticker'])} transaction removed. (Holdings are not changed.)"}
+    ticker, tx_type = rows[0]["ticker"], rows[0]["transaction_type"]
+    if tx_type == "BUY":
+        short = replay([t for t in _ticker_txs(user_id, ticker) if t["id"] != tx_id])["short"]
+        if short:
+            raise PortfolioError(f"A later sale needs these shares: {_short_message(ticker, short)} Remove or change that sale first.")
+    _remove_tx(user_id, tx_id)
+    message = f"{_what(ticker)} transaction removed."
+    if tx_type in ("BUY", "SELL"):
+        message += " " + _position_text(ticker, sync_holding(user_id, ticker))
+    return {"id": tx_id, "ticker": ticker, "message": message}
+
+
+def reconcile(dry_run=False):
+    """
+    One-off, for the switch to "holdings come from transactions". For every account and holding:
+      * shares in Holdings that no transaction explains get a BUY transaction (dated the holding's buy date, priced so
+        the average cost stays the same), so the portfolio doesn't change;
+      * then the holding is rebuilt from the transactions.
+    A stock whose transactions add up to more than Holdings showed (purchases recorded without ticking "also update my
+    holdings") will show those shares from now on. Returns one line per change. dry_run=True changes nothing.
+    """
+    pairs = {(r["user_id"], r["ticker"]) for r in _query(
+        "SELECT DISTINCT user_id, ticker FROM portfolio WHERE user_id IS NOT NULL "
+        "UNION SELECT DISTINCT user_id, ticker FROM transactions WHERE user_id IS NOT NULL AND transaction_type IN ('BUY','SELL')")}
+    report = []
+    for user_id, ticker in sorted(pairs, key=lambda p: (p[0], p[1])):
+        lots = _query("SELECT quantity, avg_buy_price, buy_date FROM portfolio WHERE user_id = %s AND ticker = %s", (user_id, ticker))
+        held = sum(float(l["quantity"] or 0) for l in lots)
+        held_cost = sum(float(l["quantity"] or 0) * float(l["avg_buy_price"] or 0) for l in lots)
+        dates = [str(l["buy_date"])[:10] for l in lots if l.get("buy_date")]
+        pos = replay(_ticker_txs(user_id, ticker))
+        if held > pos["quantity"] + 1e-6:
+            missing = held - pos["quantity"]
+            price = (held_cost - pos["quantity"] * (pos["avg_cost"] or 0)) / missing
+            if not (price > 0 and math.isfinite(price)):
+                price = held_cost / held if held else 0
+            day = min(dates) if dates else date.today().isoformat()
+            report.append(f"user {user_id} {ticker}: added BUY {missing:g} at ${price:,.2f} on {day} (in Holdings, no transaction)")
+            if not dry_run and price > 0:
+                c = commodity_groups.direct(ticker)
+                name = c["name"] if c else ((_query("SELECT company_name FROM stocks_live WHERE ticker = %s", (ticker,)) or [{}])[0].get("company_name") or ticker)
+                conn = get_db_connection()
+                try:
+                    cur = conn.cursor()
+                    cur.execute("""INSERT INTO transactions (user_id, ticker, company_name, transaction_type, quantity, price, total_value, transaction_date, notes)
+                                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                                (user_id, ticker, name, "BUY", round(missing, 6), round(price, 4), round(missing * price, 2), day,
+                                 "Added from Portfolio"))
+                    conn.commit()
+                finally:
+                    conn.close()
+        elif pos["quantity"] > held + 1e-6:
+            report.append(f"user {user_id} {ticker}: Holdings showed {held:g}, transactions add up to {pos['quantity']:g} - now shows {pos['quantity']:g}")
+        if not dry_run:
+            sync_holding(user_id, ticker)
+    return report
 
 
 # ══════════════════════════════════════════════════════════
@@ -732,8 +787,8 @@ def performance(user_id):
     """
     How the portfolio compares with putting the same dollars into the S&P 500 on the same dates.
 
-    Method and limits: each holding is assumed to have been owned from its buy date at today's quantity (Holdings keeps
-    no sales history). The benchmark buys SPY with each holding's cost on that holding's buy date.
+    Method and limits: each holding is assumed to have been owned from the date its current position was opened, at
+    today's quantity (later buys and sales are not replayed day by day). The benchmark buys SPY with each holding's cost on that holding's buy date.
     """
     import numpy as np
     import pandas as pd
@@ -841,7 +896,7 @@ def performance(user_id):
             "difference_usd": round(v_now - b_now, 2),
         },
         "risk": risk,
-        "notes": ["Each holding is assumed to have been owned from its buy date at today's quantity (sales aren't tracked in Holdings).",
+        "notes": ["Each holding is assumed to have been owned at today's quantity from its first purchase date.",
                   "The S&P 500 line shows what the same dollars would be worth if put into SPY on the same dates."]
                  + (["Some buy dates are older than the five years of price history used, so those holdings start at the first available date."] if truncated else [])
                  + ([f"No price history for {', '.join(skipped)}, so they are left out of the chart."] if skipped else []),

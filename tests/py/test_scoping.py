@@ -51,39 +51,33 @@ class Holdings(unittest.TestCase):
         sql, params = conn.log[0]
         self.assertIn("WHERE p.user_id = %s", sql); self.assertEqual(params, (ME,))
 
-    def test_adding_a_new_stock_records_it_against_me(self):
-        _, conn = run(portfolio.add_holding, ME, "aapl", 5, 100.0, "2025-01-02")
+    def test_adding_a_holding_records_a_buy_against_me_and_rebuilds_my_holding(self):
+        # Holdings come from transactions: "add a holding" is a BUY, then MY holding is rebuilt from MY transactions.
+        bought = lambda sql, p: ([{"id": 1, "transaction_type": "BUY", "quantity": 5, "price": 100.0, "transaction_date": "2025-01-02", "notes": ""}]
+                                 if "FROM transactions" in sql else None)
+        _, conn = run(portfolio.add_holding, ME, "aapl", 5, 100.0, "2025-01-02", respond=bought)
         assert_scoped(self, conn)
-        insert = conn.statements("INSERT INTO portfolio")[0]
-        self.assertEqual(insert[1][0], ME)
-        lookup = conn.statements("FROM portfolio WHERE")[0]
-        self.assertEqual(lookup[1], (ME, "AAPL"))              # it only looks for MY lots of this stock
+        self.assertEqual(conn.statements("INSERT INTO transactions")[0][1][:2], (ME, "AAPL"))
+        self.assertEqual(conn.statements("INSERT INTO portfolio")[0][1][:2], (ME, "AAPL"))
+        self.assertTrue(all(p == (ME, "AAPL") for _, p in conn.statements("SELECT id FROM portfolio")))
 
-    def test_buying_more_merges_into_my_position_only(self):
-        lots = lambda sql, p: [{"id": 11, "quantity": 2, "avg_buy_price": 50, "buy_date": None, "notes": ""},
-                               {"id": 12, "quantity": 3, "avg_buy_price": 60, "buy_date": None, "notes": ""}] if "FROM portfolio" in sql else None
-        _, conn = run(portfolio.add_holding, ME, "AAPL", 5, 100.0, "2025-01-02", respond=lots)
+    def test_rebuilding_merges_my_lots_into_one_position(self):
+        rows = lambda sql, p: ([{"id": 1, "transaction_type": "BUY", "quantity": 2, "price": 50.0, "transaction_date": "2025-01-02", "notes": ""},
+                                {"id": 2, "transaction_type": "BUY", "quantity": 3, "price": 60.0, "transaction_date": "2025-02-02", "notes": ""}]
+                               if "FROM transactions" in sql else [{"id": 11}, {"id": 12}] if "SELECT id FROM portfolio" in sql else None)
+        pos, conn = run(portfolio.sync_holding, ME, "AAPL", respond=rows)
         assert_scoped(self, conn)
+        self.assertEqual(pos["quantity"], 5); self.assertAlmostEqual(pos["avg_cost"], 56.0)
         self.assertEqual(conn.statements("UPDATE portfolio")[0][1][-2:], (11, ME))
         self.assertEqual(conn.statements("DELETE FROM portfolio")[0][1], (12, ME))
-        self.assertEqual(conn.commits, 1)
 
-    def test_editing_and_deleting_my_holding(self):
-        found = lambda sql, p: [{"ticker": "AAPL"}] if sql.startswith("SELECT ticker FROM portfolio") else None
-        _, conn = run(portfolio.update_holding, ME, 9, 5, 100.0, "2025-01-02", respond=found)
-        assert_scoped(self, conn); self.assertEqual(conn.statements("UPDATE portfolio")[0][1][-2:], (9, ME))
-        _, conn = run(portfolio.delete_holding, ME, 9, respond=found)
-        assert_scoped(self, conn); self.assertEqual(conn.statements("DELETE FROM portfolio")[0][1], (9, ME))
-
-    def test_someone_elses_holding_id_looks_like_it_does_not_exist(self):
-        # The database filters by user_id, so another person's row is simply not returned: the code must answer 404 and change nothing.
+    def test_holdings_cannot_be_edited_or_deleted_directly(self):
         for call in (lambda: portfolio.update_holding(ME, 9, 5, 100.0, "2025-01-02"), lambda: portfolio.delete_holding(ME, 9)):
             conn = FakeConn(lambda sql, p: [])
             with mock.patch.object(portfolio, "get_db_connection", return_value=conn), self.assertRaises(portfolio.PortfolioError) as cm:
                 call()
-            self.assertEqual(cm.exception.status, 404)
-            self.assertEqual(conn.statements("UPDATE portfolio") + conn.statements("DELETE FROM portfolio"), [])
-            self.assertEqual(conn.rollbacks, 1)
+            self.assertEqual(cm.exception.status, 409)
+            self.assertEqual(conn.log, [])                          # nothing was read or changed
 
 
 class Transactions(unittest.TestCase):
@@ -97,20 +91,26 @@ class Transactions(unittest.TestCase):
         assert_scoped(self, conn); self.assertEqual(conn.statements("INSERT INTO transactions")[0][1][0], ME)
 
     def test_a_sale_is_checked_against_my_records_not_everyones(self):
-        mine = lambda sql, p: [{"id": 1, "transaction_type": "BUY", "quantity": 10, "transaction_date": "2024-01-01"}] if "FROM transactions" in sql else None
+        mine = lambda sql, p: [{"id": 1, "transaction_type": "BUY", "quantity": 10, "price": 90.0, "transaction_date": "2024-01-01", "notes": ""}] if "FROM transactions" in sql else None
         _, conn = run(portfolio.add_transaction, ME, "AAPL", "SELL", 4, 100.0, "2025-01-02", respond=mine)
         assert_scoped(self, conn)
         self.assertTrue(all(p[:2] == (ME, "AAPL") for _, p in conn.statements("FROM transactions WHERE")))
-        self.assertTrue(all(p == (ME, "AAPL") for _, p in conn.statements("SELECT quantity FROM portfolio")))
 
-    def test_updating_my_holdings_alongside_a_transaction(self):
-        sale = lambda sql, p: ([{"id": 1, "transaction_type": "BUY", "quantity": 10, "transaction_date": "2024-01-01"}] if "FROM transactions" in sql else
-                               [{"id": 5, "quantity": 10}] if "FROM portfolio" in sql else None)
-        _, conn = run(portfolio.add_transaction, ME, "AAPL", "SELL", 4, 100.0, "2025-01-02", apply_to_holdings=True, respond=sale)
+    def test_a_sale_always_updates_my_holding(self):
+        sale = lambda sql, p: ([{"id": 1, "transaction_type": "BUY", "quantity": 10, "price": 90.0, "transaction_date": "2024-01-01", "notes": ""},
+                                {"id": 2, "transaction_type": "SELL", "quantity": 4, "price": 100.0, "transaction_date": "2025-01-02", "notes": ""}]
+                               if "FROM transactions" in sql else [{"id": 5}] if "SELECT id FROM portfolio" in sql else None)
+        _, conn = run(portfolio.add_transaction, ME, "AAPL", "SELL", 4, 100.0, "2025-01-02", respond=sale)
         assert_scoped(self, conn)
-        self.assertEqual(conn.statements("UPDATE portfolio SET quantity")[0][1], (6.0, 5, ME))
-        _, conn = run(portfolio.add_transaction, ME, "AAPL", "BUY", 4, 100.0, "2025-01-02", apply_to_holdings=True)
-        assert_scoped(self, conn)
+        self.assertEqual(conn.statements("UPDATE portfolio SET quantity")[0][1][0], 6.0)
+        self.assertEqual(conn.statements("UPDATE portfolio SET quantity")[0][1][-2:], (5, ME))
+
+    def test_selling_more_than_my_transactions_show_is_refused(self):
+        mine = lambda sql, p: [{"id": 1, "transaction_type": "BUY", "quantity": 3, "price": 90.0, "transaction_date": "2024-01-01", "notes": ""}] if "FROM transactions" in sql else None
+        conn = FakeConn(lambda sql, p: stock_rows(sql, p) or mine(sql, p) or [])
+        with mock.patch.object(portfolio, "get_db_connection", return_value=conn), self.assertRaises(portfolio.PortfolioError):
+            portfolio.add_transaction(ME, "AAPL", "SELL", 4, 100.0, "2025-01-02")
+        self.assertEqual(conn.statements("INSERT INTO transactions"), [])
 
     def test_editing_and_deleting_my_transaction(self):
         found = lambda sql, p: [{"ticker": "AAPL", "transaction_type": "BUY"}] if sql.startswith("SELECT ticker") else None
@@ -156,7 +156,7 @@ class EveryStatementInTheModuleIsScoped(unittest.TestCase):
 
     def test_every_data_function_takes_the_user_first(self):
         for name in ("list_holdings", "add_holding", "update_holding", "delete_holding", "review", "list_transactions", "transaction_summary",
-                     "add_transaction", "update_transaction", "delete_transaction", "performance", "_net_shares", "_held_quantity", "_reduce_holding"):
+                     "add_transaction", "update_transaction", "delete_transaction", "performance", "sync_holding", "held_tickers", "_ticker_txs", "_remove_tx"):
             self.assertEqual(next(iter(inspect.signature(getattr(portfolio, name)).parameters)), "user_id", name)
         for name in ("get_watchlist", "save_watchlist"):
             self.assertEqual(next(iter(inspect.signature(getattr(watchlist, name)).parameters)), "user_id", name)
