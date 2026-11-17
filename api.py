@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 import mysql.connector
 import yfinance as yf
+import commodity_groups
 import market_history
 import pandas as pd
 from datetime import datetime, timezone
@@ -2596,8 +2597,11 @@ def portfolio_history(tickers: str = "", user_id: int = Depends(current_user_id)
     for t in wanted:
         d = data.get(held[t])
         if d and len(d["closes"]) >= 2:
-            series.append({"ticker": t, "dates": d["dates"], "closes": d["closes"],
-                           "change_pct": round((d["closes"][-1] / d["closes"][0] - 1) * 100, 2)})
+            c = commodity_groups.direct(t)
+            div = (c or {}).get("divisor") or 1                  # some commodities are quoted in cents: show dollars
+            closes = [round(v / div, 4) for v in d["closes"]]
+            series.append({"ticker": t, "dates": d["dates"], "closes": closes,
+                           "change_pct": round((closes[-1] / closes[0] - 1) * 100, 2)})
     return {"status": "success", "series": series, "missing": [t for t in wanted if t not in {x["ticker"] for x in series}]}
 
 

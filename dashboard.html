@@ -1082,8 +1082,14 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   </div>
 
   <div class="card" style="margin-bottom:16px" id="pf-trend-card">
-    <div class="chdr"><div class="ctitle">Last 3 months</div><span class="pft-sub">% change since 3 months ago · up to 5 stocks</span></div>
-    <div class="pft-pick" id="pf-trend-pick"></div>
+    <div class="chdr"><div class="ctitle">Last 3 months</div><span class="pft-sub">% change since 3 months ago · hover for the price · up to 5 stocks</span></div>
+    <div class="pft-bar">
+      <div class="pft-pick" id="pf-trend-pick"></div>
+      <div class="pft-add">
+        <input class="finp" id="pft-search" autocomplete="off" placeholder="Add a stock from your portfolio…" oninput="pftSuggest()" onfocus="pftSuggest()" onkeydown="pftKey(event)" onblur="setTimeout(pftHide,150)"/>
+        <div class="ssug" id="pft-sug" role="listbox"></div>
+      </div>
+    </div>
     <div id="pf-trend-msg"><div class="load"><div class="spin"></div>Loading prices...</div></div>
     <div style="height:260px;display:none" id="pf-trend-box"><canvas id="pft-c"></canvas></div>
   </div>
@@ -5027,17 +5033,55 @@ function pftChoices(){
   const seen=new Set();
   return (pfRows||[]).filter(x=>x.quantity>0&&!seen.has(x.ticker)&&seen.add(x.ticker)).sort((a,b)=>(b.current_value||0)-(a.current_value||0));
 }
-function pftColor(t){return PFT_COLORS[Math.max(0,pftPicked.indexOf(t))%PFT_COLORS.length];}
+const pftColors={};                                   // a stock keeps its colour while it stays on the chart
+function pftColor(t){
+  if(!pftColors[t]){const used=new Set(pftPicked.filter(x=>x!==t).map(x=>pftColors[x]));pftColors[t]=PFT_COLORS.find(c=>!used.has(c))||PFT_COLORS[0];}
+  return pftColors[t];
+}
+const X_ICON='<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>';
+let pftHit=0;
+/** The chosen stocks (at most 5), each with a × to take it off the chart; the search box adds others you hold. */
 function renderPftPick(){
   const el=document.getElementById('pf-trend-pick');if(!el)return;
-  el.innerHTML=pftChoices().map(x=>{
-    const on=pftPicked.includes(x.ticker),full=!on&&pftPicked.length>=PFT_MAX;
-    return `<button type="button" class="fbtn pft-b${on?' on':''}" data-t="${escapeHtml(x.ticker)}"${full?' disabled title="Up to 5 stocks at a time: remove one first"':''} onclick="togglePft(this.dataset.t)">${on?`<span class="pft-dot" style="background:${pftColor(x.ticker)}"></span>`:''}${escapeHtml(holdingName(x))}</button>`;
+  const byT=Object.fromEntries((pfRows||[]).map(x=>[x.ticker,x]));
+  el.innerHTML=pftPicked.map(t=>{
+    const name=byT[t]?holdingName(byT[t]):t;
+    return `<span class="pft-chip"><span class="pft-dot" style="background:${pftColor(t)}"></span>${escapeHtml(name)}<button type="button" class="pft-x" data-t="${escapeHtml(t)}" title="Remove ${escapeHtml(name)} from the chart" aria-label="Remove ${escapeHtml(name)} from the chart" onclick="togglePft(this.dataset.t)">${X_ICON}</button></span>`;
   }).join('');
+  const box=document.getElementById('pft-search');
+  if(box){
+    const full=pftPicked.length>=PFT_MAX,none=!pftChoices().some(x=>!pftPicked.includes(x.ticker));
+    box.disabled=full||none;
+    box.placeholder=full?'Remove one to add another (max 5)':none?'All your stocks are on the chart':'Add a stock from your portfolio…';
+    if(box.disabled){box.value='';pftHide();}
+  }
+}
+function pftMatches(){
+  const q=(document.getElementById('pft-search')?.value||'').trim().toLowerCase();
+  return pftChoices().filter(x=>!pftPicked.includes(x.ticker)&&(!q||x.ticker.toLowerCase().startsWith(q)||holdingName(x).toLowerCase().includes(q)||(x.company_name||'').toLowerCase().includes(q))).slice(0,8);
+}
+function pftSuggest(){
+  const box=document.getElementById('pft-sug');if(!box)return;
+  const list=pftMatches();pftHit=0;
+  if(!list.length){box.innerHTML=(document.getElementById('pft-search')?.value||'').trim()?'<div class="ssug-item" style="cursor:default;color:var(--t3)">Not in your portfolio</div>':'';box.classList.toggle('show',!!box.innerHTML);return;}
+  box.innerHTML=list.map((x,i)=>`<div class="ssug-item${i===0?' on':''}" role="option" data-t="${escapeHtml(x.ticker)}" onmousedown="event.preventDefault();pftAdd(this.dataset.t)"><span class="ssug-t">${escapeHtml(holdingName(x))}</span><span class="ssug-n">${escapeHtml(isCommodity(x)?'Commodity':(x.company_name||''))}</span></div>`).join('');
+  box.classList.add('show');
+}
+function pftHide(){document.getElementById('pft-sug')?.classList.remove('show');}
+function pftKey(e){
+  const items=[...document.querySelectorAll('#pft-sug .ssug-item[data-t]')];
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();if(!items.length)return;pftHit=(pftHit+(e.key==='ArrowDown'?1:-1)+items.length)%items.length;items.forEach((el,i)=>el.classList.toggle('on',i===pftHit));}
+  else if(e.key==='Enter'){e.preventDefault();if(items[pftHit])pftAdd(items[pftHit].dataset.t);}
+  else if(e.key==='Escape')pftHide();
+}
+function pftAdd(t){
+  const box=document.getElementById('pft-search');if(box)box.value='';
+  pftHide();
+  if(!pftPicked.includes(t)&&pftPicked.length<PFT_MAX){pftPicked.push(t);loadPortfolioTrend();}
 }
 function togglePft(t){
   const i=pftPicked.indexOf(t);
-  if(i>=0)pftPicked.splice(i,1);else if(pftPicked.length<PFT_MAX)pftPicked.push(t);else return;
+  if(i>=0){pftPicked.splice(i,1);delete pftColors[t];}else if(pftPicked.length<PFT_MAX)pftPicked.push(t);else return;
   loadPortfolioTrend();
 }
 async function loadPortfolioTrend(){
@@ -5061,6 +5105,7 @@ async function loadPortfolioTrend(){
     const at=new Map(x.dates.map((dt,i)=>[dt,x.closes[i]])),base=x.closes[0];
     const name=byT[x.ticker]?holdingName(byT[x.ticker]):x.ticker;
     return {label:`${name}  ${x.change_pct>=0?'+':''}${f2(x.change_pct)}%`,data:dates.map(dt=>at.has(dt)?+((at.get(dt)/base-1)*100).toFixed(2):null),
+      prices:dates.map(dt=>at.has(dt)?at.get(dt):null),name,
       borderColor:pftColor(x.ticker),backgroundColor:pftColor(x.ticker),borderWidth:2,pointRadius:0,pointHoverRadius:3,tension:0.15,spanGaps:true};
   });
   msg.style.display=(d.missing||[]).length?'block':'none';
@@ -5070,7 +5115,7 @@ async function loadPortfolioTrend(){
   if(ctx)charts['pft-c']=new Chart(ctx,{type:'line',data:{labels:dates.map(label),datasets},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
       plugins:{legend:{labels:{color:'#c0cce0',font:{size:11,weight:'700'},boxWidth:12,boxHeight:3}},
-        tooltip:{callbacks:{label:c=>c.raw==null?'':`${c.dataset.label.split('  ')[0]}: ${c.raw>=0?'+':''}${f2(c.raw)}%`}}},
+        tooltip:{callbacks:{label:c=>{const px=c.dataset.prices[c.dataIndex];return c.raw==null||px==null?'':`${c.dataset.name}: ${fp(px)} (${c.raw>=0?'+':''}${f2(c.raw,1)}%)`;}}}},
       scales:{x:{ticks:{color:'#58697a',maxTicksLimit:7,maxRotation:0},grid:{display:false}},
         y:{ticks:{color:'#58697a',callback:v=>(v>0?'+':'')+v+'%'},grid:{color:c=>c.tick&&c.tick.value===0?'rgba(192,204,224,0.35)':'rgba(28,28,48,0.5)'}}}}});
 }
@@ -6737,9 +6782,15 @@ body.pg-home #bounty-btn,body.pg-home #bounty-win{display:none!important;}   /* 
 .wl-lock{color:var(--t3);}
 .wl-wait{color:var(--t3);}
 .pft-sub{font-size:11px;font-weight:600;color:var(--t3);}
-.pft-pick{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
-.pft-b{display:inline-flex;align-items:center;gap:6px;}
-.pft-b:disabled{opacity:.4;cursor:not-allowed;}
+.pft-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:12px;}
+.pft-pick{display:flex;flex-wrap:wrap;gap:6px;}
+.pft-chip{display:inline-flex;align-items:center;gap:7px;background:var(--bg3);border:1px solid var(--b2);border-radius:999px;padding:4px 6px 4px 10px;font-size:12px;font-weight:700;color:var(--t1);}
+.pft-x{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border:0;border-radius:50%;background:transparent;color:var(--t3);cursor:pointer;padding:0;}
+.pft-x:hover{background:rgba(255,68,68,0.15);color:var(--red);}
+.pft-add{position:relative;flex:0 1 260px;min-width:200px;}
+.pft-add .finp{padding:7px 12px;font-size:12px;}
+.pft-add .finp:disabled{opacity:.55;cursor:not-allowed;}
+@media(max-width:600px){.pft-add{flex:1 1 100%;}.pft-x{width:26px;height:26px;}}
 .pft-dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
 .pf-from-tx{margin-top:16px;}
 .linkbtn{background:none;border:none;color:var(--cyan);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);padding:0;}
