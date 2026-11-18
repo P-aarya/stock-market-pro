@@ -1117,7 +1117,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <button class="fbtn" type="button" data-kind="commodity" onclick="setPfKind('commodity')">Commodities <span class="kn" id="pf-kn-commodity">0</span></button>
     </div>
     <div class="tw"><table>
-      <thead><tr><th>Ticker</th><th>Company</th><th>Type</th><th>Sector</th><th>Qty</th><th>Avg Buy</th><th>Current</th><th>Invested</th><th>Value</th><th>P&L $</th><th>P&L %</th><th>Day %</th><th>Analyst</th><th>Target</th></tr></thead>
+      <thead><tr><th>Ticker</th><th>Company</th><th>Type</th><th>Sector</th><th>Qty</th><th>Avg Buy</th><th>Current</th><th>Invested</th><th>Value</th><th>P&L $</th><th>P&L %</th><th>Day %</th><th>Analyst</th><th title="The prediction model's price for 3 months from now">3M Target</th></tr></thead>
       <tbody id="tb-pf"><tr><td colspan="14"><div class="load"><div class="spin"></div></div></td></tr></tbody>
     </table></div>
   </div>
@@ -1324,6 +1324,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     <div id="wl-empty" style="text-align:center;padding:40px;color:var(--t3);font-size:13px;display:none;">
       Your watchlist is empty. Search for a stock above and add it here.
     </div>
+    <div class="wl-sec" id="wl-sec" style="display:none"></div>
     <div class="tw"><table id="wl-table">
       <thead><tr><th>Stock</th><th>Price</th><th>Today</th><th title="The closing price about 3 months ago">3 months ago</th><th title="The prediction model's signal">Signal</th><th title="The model's chance that the price is higher in 3 months">Chance up</th><th></th></tr></thead>
       <tbody id="tb-wl"><tr><td colspan="7" style="text-align:center;color:var(--t3);padding:20px;">No stocks in watchlist yet</td></tr></tbody>
@@ -4907,8 +4908,15 @@ function renderHoldings(){
     <td class="num ${gc(x.pnl_pct)}">${x.pnl_pct!=null?(x.pnl_pct>=0?'+':'')+f2(x.pnl_pct)+'%':'--'}</td>
     <td class="num ${gc(x.day_change_pct)}">${x.day_change_pct!=null?(x.day_change_pct>=0?'+':'')+f2(x.day_change_pct)+'%':'--'}</td>
     <td>${mkRat(x.analyst_rating)}</td>
-    <td class="num">${x.target_price?fp(x.target_price):'--'}</td>
+    ${pfTargetCell(x)}
   </tr>`).join('');
+}
+/** The prediction model's 3-month target, with how far it is from today's price; a padlock on plans without prediction. */
+function pfTargetCell(x){
+  if(x.target_locked){const t=lockText('stock_prediction');return `<td class="wl-lock" title="${escapeHtml(t.where)}">${LOCK_ICON.replace('width="22" height="22"','width="13" height="13"')}</td>`;}
+  if(x.target_3m==null)return '<td class="num">--</td>';
+  const p=x.target_3m_pct;
+  return `<td class="num">${fp(x.target_3m)}${p!=null?`<span class="wl-sub ${p>=0?'g':'r'}">${p>=0?'+':''}${f2(p,1)}%</span>`:''}</td>`;
 }
 // Sector Breakdown card: by sector, or by type (Stocks, then each commodity: Gold, Oil...).
 function renderAllocList(){
@@ -6019,6 +6027,22 @@ async function fetchQuotes(tickers){
 // The Watchlist table appears at once from the stock list the dashboard already has, then the fresh prices
 // (one request for all of them) replace it. Every saved stock gets a row, so even one we have no data for can be removed.
 let wlSeq = 0;
+let wlSector = 'All';                          // the sector button that's on ('All' = every stock)
+function wlSectorOf(s){ return (s.sector || '').trim() || 'Other'; }
+/** One button per sector in the watchlist, with how many stocks it has; clicking one shows only those. */
+function renderWlSectors(rows){
+  const el = document.getElementById('wl-sec'); if(!el) return;
+  const counts = {};
+  rows.forEach(s => { const k = wlSectorOf(s); counts[k] = (counts[k] || 0) + 1; });
+  const names = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
+  if(wlSector !== 'All' && !counts[wlSector]) wlSector = 'All';          // its last stock was removed
+  el.style.display = names.length > 1 ? 'flex' : 'none';
+  if(names.length <= 1) { wlSector = 'All'; return; }
+  const btn = (k, n) => `<button type="button" class="fbtn${wlSector === k ? ' on' : ''}" data-k="${escapeHtml(k)}" onclick="setWlSector(this.dataset.k)">${escapeHtml(k)} <span class="wl-sec-n">${n}</span></button>`;
+  el.innerHTML = btn('All', rows.length) + names.map(k => btn(k, counts[k])).join('');
+}
+function setWlSector(k){ wlSector = k; renderWatchlistTable(wlKnown); }
+let wlKnown = {};
 let wlExtras = {}, wlPred = null;              // 3-months-ago price, signal and chance up, loaded after the table
 function wlLockCell(){
   const t = lockText('stock_prediction');
@@ -6026,17 +6050,20 @@ function wlLockCell(){
 }
 function renderWatchlistTable(known){
   const tbody = document.getElementById('tb-wl'); if(!tbody) return;
+  wlKnown = known;
   const rows = watchlist.map(t => ({ ticker: t, ...(known[t] || {}) }));
   const priced = rows.filter(s => s.price_change_pct != null);
   const gainers = priced.filter(s => s.price_change_pct > 0).length, losers = priced.filter(s => s.price_change_pct < 0).length;
-  const avg = priced.reduce((a, r) => a + Number(r.price_change_pct), 0) / (priced.length || 1);
+  const avg0 = priced.reduce((a, r) => a + Number(r.price_change_pct), 0) / (priced.length || 1), avg = Math.abs(avg0) < 0.005 ? 0 : avg0;   // no "-0.00%"
   document.getElementById('wl-gain').textContent = gainers;
   document.getElementById('wl-loss').textContent = losers;
   const avgEl = document.getElementById('wl-avg');
   if(avgEl){ avgEl.textContent = (avg >= 0 ? '+' : '') + avg.toFixed(2) + '%'; avgEl.className = 'sc-v ' + (avg >= 0 ? 'g' : 'r'); }
+  renderWlSectors(rows);
+  const shown = wlSector === 'All' ? rows : rows.filter(s => wlSectorOf(s) === wlSector);
   const locked = !can('stock_prediction') || wlPred === false;
   const sigCls = { BUY: 'g', SELL: 'r', HOLD: 'y' };
-  tbody.innerHTML = rows.map(s => {
+  tbody.innerHTML = shown.map(s => {
     const has = s.price_change_pct != null, chg = Number(s.price_change_pct) || 0, price = Number(s.current_price);
     const x = wlExtras[s.ticker] || {}, old = x.price_3m_ago;
     const since = old && isFinite(price) && s.current_price != null ? (price / old - 1) * 100 : null;
@@ -6781,6 +6808,8 @@ body.pg-home #bounty-btn,body.pg-home #bounty-win{display:none!important;}   /* 
 .wl-sig.g{color:var(--green);}.wl-sig.r{color:var(--red);}.wl-sig.y{color:var(--yellow);}
 .wl-lock{color:var(--t3);}
 .wl-wait{color:var(--t3);}
+.wl-sec{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;}
+.wl-sec-n{font-family:var(--mono);font-size:10px;font-weight:800;opacity:.7;margin-left:4px;}
 .pft-sub{font-size:11px;font-weight:600;color:var(--t3);}
 .pft-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:12px;}
 .pft-pick{display:flex;flex-wrap:wrap;gap:6px;}

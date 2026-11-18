@@ -137,10 +137,12 @@ def list_holdings(user_id):
                IF(l.last_updated >= DATE_SUB((SELECT MAX(last_updated) FROM stocks_live), INTERVAL 14 DAY), l.current_price, NULL) AS current_price,
                l.price_change_pct AS day_change_pct,
                COALESCE(l.sector, p.sector) AS sector,
-               a.analyst_rating, a.target_price, a.upside_pct
+               a.analyst_rating, a.target_price, a.upside_pct,
+               pr.target_3m
         FROM portfolio p
         LEFT JOIN stocks_live l ON p.ticker = l.ticker
         LEFT JOIN stocks_analyst a ON p.ticker = a.ticker
+        LEFT JOIN stocks_predictions pr ON p.ticker = pr.ticker
         WHERE p.user_id = %s
     """, (user_id,))
     rows = with_values(_price_commodities(rows))

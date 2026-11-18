@@ -83,6 +83,15 @@ class Endpoints(unittest.TestCase):
         basic = signed_in_client(6, tier=2).get("/api/watchlist/extras?tickers=AAPL").json()
         self.assertEqual(basic, {"extras": {"AAPL": {"price_3m_ago": 180.0}}, "predictions": False})
 
+    def test_holdings_show_the_3_month_target_only_on_plans_with_prediction(self):
+        rows = lambda: [{"ticker": "AAPL", "current_price": 200.0, "target_3m": 215.0, "asset_type": "stock"}]
+        mock.patch.object(api.portfolio, "list_holdings", side_effect=lambda uid: rows()).start()
+        full = signed_in_client(5).get("/api/portfolio").json()[0]
+        self.assertEqual((full["target_3m"], full["target_3m_pct"]), (215.0, 7.5))
+        basic = signed_in_client(6, tier=2).get("/api/portfolio").json()[0]
+        self.assertNotIn("target_3m", basic)
+        self.assertTrue(basic["target_locked"])
+
     def test_holdings_cannot_be_changed_directly(self):
         r = signed_in_client(5).put("/api/portfolio/3", json={"quantity": 1, "avg_buy_price": 1, "buy_date": "2025-01-02"})
         self.assertEqual(r.json()["status"], "error")

@@ -2572,8 +2572,20 @@ def holding_call(fn, user_id, *args):
 
 
 @app.get("/api/portfolio")
-def get_portfolio(user_id: int = Depends(current_user_id)):
-    return portfolio.list_holdings(user_id)
+def get_portfolio(request: Request, user_id: int = Depends(current_user_id)):
+    """Your holdings. Each has the prediction model's 3-month target (target_3m) and how far it is from today's price
+    (target_3m_pct), only for plans that include stock prediction; other plans get target_locked instead."""
+    rows = portfolio.list_holdings(user_id)
+    allowed = "stock_prediction" in _plan_features(request)
+    for r in rows:
+        t3 = r.pop("target_3m", None)
+        if not allowed:
+            r["target_locked"] = True
+            continue
+        px = r.get("current_price")
+        r["target_3m"] = round(float(t3), 2) if t3 is not None and not r.get("asset_type") == "commodity" else None
+        r["target_3m_pct"] = round((r["target_3m"] / float(px) - 1) * 100, 2) if r["target_3m"] and px else None
+    return rows
 
 
 @app.get("/api/portfolio/summary")
