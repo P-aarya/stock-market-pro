@@ -12,3 +12,7 @@ collation-server = utf8mb4_0900_ai_ci
 default-time-zone = '+00:00'
 # The same SQL mode as the old Aiven server, so every query behaves exactly as it did there
 sql_mode = ANSI,STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
+# No binary log (MySQL's history of every change, on by default and kept for 30 days). We have no replica that needs
+# it, and with the price updater saving ~2,200 rows every minute it filled the 10 GB disk within days - and a full
+# disk makes MySQL wait silently on every save. Backups are Render's daily disk snapshots.
+disable-log-bin
