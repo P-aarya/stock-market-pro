@@ -5,6 +5,12 @@
 # so it never depends on tickers.py structure.
 # Prints FULL error details for failures.
 #
+# v6 changes:
+#  - Safety timer: if no progress for 10 minutes (something hangs), it prints
+#    where it is stuck and exits, so Render restarts it at once instead of
+#    the site silently showing old prices.
+#  - The database connection gives up after 20 s instead of waiting forever.
+#
 # v5 changes:
 #  - Live prices come from Yahoo's "spark" route, which needs no sign-in key
 #    ("crumb"). Yahoo sometimes refuses that key to cloud servers for hours;
@@ -43,6 +49,9 @@ import mysql.connector
 import math
 import time
 import traceback
+import faulthandler
+import sys
+import threading
 from datetime import datetime
 
 BATCH_SIZE = 150                    # stocks per request to Yahoo
@@ -58,7 +67,8 @@ def get_db():
         "port": int(os.getenv("DB_PORT", 3306)),
         "user": os.getenv("DB_USER", "root"),
         "password": os.getenv("DB_PASSWORD") or os.getenv("DB_PASS") or "",
-        "database": os.getenv("DB_NAME", "stock_market_pro_db")
+        "database": os.getenv("DB_NAME", "stock_market_pro_db"),
+        "connection_timeout": 20,                    # never wait forever for the database to answer
     }
     if os.getenv("DB_SSL", "false").lower() == "true":
         config["ssl_disabled"] = False
@@ -274,6 +284,39 @@ def fetch_spark(symbols):
     return out
 
 
+# ---------- safety timer ----------
+# If the updater stops making progress (for example a request to Yahoo or the database that never answers), it would
+# otherwise sit silent forever while the site shows old prices. Every batch marks progress; a watchdog thread checks
+# once a minute and, after STALL_LIMIT without progress, prints where the program is stuck and exits, so Render
+# restarts it straight away (and marks the restart in Events).
+STALL_LIMIT = 10 * 60
+_last_beat = [time.time()]
+
+
+def beat():
+    _last_beat[0] = time.time()
+
+
+def rest(seconds):
+    """time.sleep that keeps marking progress, for the long waits after Yahoo refuses us."""
+    end = time.time() + seconds
+    while time.time() < end:
+        beat()
+        time.sleep(min(30, max(0.0, end - time.time())))
+    beat()
+
+
+def _watchdog():
+    while True:
+        time.sleep(60)
+        idle = time.time() - _last_beat[0]
+        if idle > STALL_LIMIT:
+            print(f"\n  ⛔ No progress for {idle / 60:.0f} minutes - the price updater is stuck. Where it is stuck:", flush=True)
+            faulthandler.dump_traceback(file=sys.stdout, all_threads=True)
+            print("  Exiting so Render restarts the price updater.\n", flush=True)
+            os._exit(1)
+
+
 def run_extras(tickers, conn):
     """Market cap and 52-week range through the batch quote, which needs Yahoo's sign-in key. Stops at the first refusal
     (and tries again in 30 minutes), so a refused key never turns into many requests. Returns (conn, saved)."""
@@ -292,6 +335,7 @@ def run_extras(tickers, conn):
         if rows:
             conn = save_with_retry(conn, rows)
             saved += len(rows)
+        beat()
         time.sleep(PAUSE_BETWEEN_BATCHES)
     return conn, saved
 
@@ -346,6 +390,7 @@ def run_cycle(tickers, cycle_num):
                     failed += len(rows)
                     if len(error_samples) < 3:
                         error_samples.append(f"saving: {type(e).__name__}: {str(e)[:120]}")
+        beat()
         if i < len(ask):
             time.sleep(SPARK_PAUSE)
     extras = 0
@@ -372,7 +417,7 @@ def run_cycle(tickers, cycle_num):
 
 def main():
     print("="*60)
-    print("  STOCK MARKET PRO — Scheduler v5 (spark route)")
+    print("  STOCK MARKET PRO — Scheduler v6 (spark route + safety timer)")
     print(f"  Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("="*60)
 
@@ -383,12 +428,15 @@ def main():
     except Exception as e:
         print("  ❌ CANNOT CONNECT TO MYSQL — scheduler cannot run.")
         print(f"  Error: {e}")
-        print("  Fix: start MySQL80 service (Windows key → services → MySQL80 → Start)")
-        return
+        print("  Check that the database service (aymetrix-db on Render) is running.")
+        sys.exit(1)                                      # a failed exit makes Render retry and show the failure
+
+    threading.Thread(target=_watchdog, name="watchdog", daemon=True).start()
 
     cycle = 1
     backoff = 0
     while True:
+        beat()
         started = time.time()
         rate_limited = False
         try:
@@ -408,10 +456,10 @@ def main():
         if rate_limited:
             backoff = min(backoff * 2, BACKOFF_MAX) if backoff else BACKOFF_START
             print(f"  ⏸  Yahoo asked us to slow down - waiting {backoff // 60} min before the next round\n", flush=True)
-            time.sleep(backoff)
+            rest(backoff)
         else:
             backoff = 0
-            time.sleep(max(5, CYCLE_SECONDS - (time.time() - started)))
+            rest(max(5, CYCLE_SECONDS - (time.time() - started)))
 
 if __name__ == "__main__":
     main()
