@@ -19,6 +19,10 @@ from datetime import datetime, timedelta
 import warnings
 import json
 import time
+import sys
+import threading
+import faulthandler
+import concurrent.futures as cf
 
 warnings.filterwarnings('ignore')
 
@@ -57,7 +61,8 @@ def get_db():
         "port": int(os.getenv("DB_PORT", 3306)),
         "user": os.getenv("DB_USER", "root"),
         "password": os.getenv("DB_PASSWORD") or os.getenv("DB_PASS", ""),
-        "database": os.getenv("DB_NAME", "stock_market_pro_db")
+        "database": os.getenv("DB_NAME", "stock_market_pro_db"),
+        "connection_timeout": 20,
     }
     if os.getenv("DB_SSL", "false").lower() == "true":
         config["ssl_disabled"] = False
@@ -486,7 +491,7 @@ def update_actuals():
 
 def process(ticker):
     try:
-        hist = yf.Ticker(ticker).history(period="5y")
+        hist = yf.Ticker(ticker).history(period="5y", timeout=30)
         if hist.empty or len(hist)<200:
             return False,"Insufficient history"
         cur_px=float(hist['Close'].iloc[-1])
@@ -517,46 +522,91 @@ def process(ticker):
     except Exception as e:
         return False,str(e)[:60]
 
+# ---------- limits, so a run can never hang for hours ----------
+PER_STOCK_LIMIT = 120          # seconds for one stock (download + models); slower ones are skipped
+STALL_LIMIT = 15 * 60          # no stock finished for this long -> print where it is stuck and stop
+RUN_LIMIT = 5 * 3600           # stop starting new stocks after 5 hours; what's done is already saved
+FRESH_DAYS = 4                 # only stocks whose live price was updated in the last 4 days (skips delisted ones)
+_last_beat = [time.time()]
+
+
+def _watchdog():
+    while True:
+        time.sleep(60)
+        idle = time.time() - _last_beat[0]
+        if idle > STALL_LIMIT:
+            print(f"\n  ⛔ No stock finished for {idle / 60:.0f} minutes - the run is stuck. Where it is stuck:", flush=True)
+            faulthandler.dump_traceback(file=sys.stdout, all_threads=True)
+            print("  Stopping. Every stock finished before this is already saved.\n", flush=True)
+            os._exit(1)
+
+
 def main():
     print("="*65)
     print("  STOCK MARKET PRO — Predictive Model (Updated)")
     print(f"  XGBoost: {'✅' if XGB_OK else '❌'}  Prophet: {'✅' if PROPHET_OK else '❌'}")
     print(f"  Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print("="*65)
+    print("="*65, flush=True)
+    threading.Thread(target=_watchdog, name="watchdog", daemon=True).start()
     setup_tables()
     # First update actuals from previous run
     update_actuals()
+    _last_beat[0] = time.time()
     if SENT_OK:
         try:
             ctx=se.market_context()
             print(f"  Market context: VIX {ctx.get('vix') or 0:.1f} | S&P 1m {ctx.get('spy_chg') or 0:+.1f}% | "
                   f"10y {ctx.get('tnx') or 0:.2f}% | oil 1m {ctx.get('oil_chg') or 0:+.1f}% | "
-                  f"world headlines {ctx.get('world_n',0)}")
+                  f"world headlines {ctx.get('world_n',0)}", flush=True)
         except Exception as e:
-            print(f"  Market context unavailable: {e}")
-    stocks=query("""SELECT ticker FROM stocks_live
+            print(f"  Market context unavailable: {e}", flush=True)
+    stocks=query(f"""SELECT ticker FROM stocks_live
         WHERE current_price IS NOT NULL AND current_price>0
         AND (sector!='Indices' OR sector IS NULL)
+        AND last_updated >= NOW() - INTERVAL {FRESH_DAYS} DAY
         ORDER BY market_cap DESC""")
-    print(f"\n  Stocks to predict: {len(stocks)}")
-    print(f"  Est. time: {len(stocks)*3//60}-{len(stocks)*5//60} mins\n")
-    ok=0; fail=0; fail_list=[]
+    print(f"\n  Stocks to predict: {len(stocks)} (with a live price in the last {FRESH_DAYS} days)")
+    print(f"  Est. time: {len(stocks)*3//60}-{len(stocks)*5//60} mins\n", flush=True)
+    ok=0; fail=0; fail_list=[]; slow=[]
+    t0=time.time()
+    pool=cf.ThreadPoolExecutor(max_workers=1)
     for i,s in enumerate(stocks,1):
+        if time.time()-t0 > RUN_LIMIT:
+            print(f"\n  ⏹  Time limit of {RUN_LIMIT//3600} hours reached at {i-1}/{len(stocks)} - stopping here; "
+                  f"the rest keep last week's predictions.", flush=True)
+            break
         t=s['ticker']
-        success,msg=process(t)
+        _last_beat[0] = time.time()
+        fut=pool.submit(process, t)
+        try:
+            success,msg=fut.result(timeout=PER_STOCK_LIMIT)
+        except cf.TimeoutError:
+            success,msg=False,f"took over {PER_STOCK_LIMIT}s - skipped"
+            slow.append(t)
+            pool.shutdown(wait=False, cancel_futures=True)       # leave the stuck one behind
+            pool=cf.ThreadPoolExecutor(max_workers=1)
+        except Exception as e:
+            success,msg=False,str(e)[:60]
+        _last_beat[0] = time.time()
         if success:
-            ok+=1; print(f"  ✅ [{i:3d}/{len(stocks)}] {t:<8} {msg}")
+            ok+=1; print(f"  ✅ [{i:3d}/{len(stocks)}] {t:<8} {msg}", flush=True)
         else:
             fail+=1; fail_list.append(t)
-            print(f"  ❌ [{i:3d}/{len(stocks)}] {t:<8} {msg}")
+            print(f"  ❌ [{i:3d}/{len(stocks)}] {t:<8} {msg}", flush=True)
         if i%50==0:
-            print(f"\n  ⏳ {i}/{len(stocks)} | ✅{ok} ❌{fail} | Pausing 5s...\n")
+            mins=(time.time()-t0)/60
+            left=mins/i*(len(stocks)-i)
+            print(f"\n  ⏳ {i}/{len(stocks)} | ✅{ok} ❌{fail} | {datetime.now().strftime('%H:%M')} | "
+                  f"{mins:.0f} min so far, about {left:.0f} min left | Pausing 5s...\n", flush=True)
             time.sleep(5)
+    pool.shutdown(wait=False, cancel_futures=True)
     print(f"\n{'='*65}")
-    print(f"  ✅ Predicted: {ok}  ❌ Failed: {fail}")
+    print(f"  ✅ Predicted: {ok}  ❌ Failed: {fail}  ({(time.time()-t0)/60:.0f} min)")
     if fail_list: print(f"  Failed: {', '.join(fail_list[:15])}")
+    if slow: print(f"  Skipped as too slow: {', '.join(slow[:15])}")
     print(f"  Finished: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print("="*65)
+    print("="*65, flush=True)
+    os._exit(0)                 # don't wait for a stuck download left behind
 
 if __name__=="__main__":
     main()
