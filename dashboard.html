@@ -5055,17 +5055,24 @@ async function saveMoney(){
   if(!(body.amount>0)){moneySay('Enter an amount more than $0.',false);return;}
   const btn=document.getElementById('money-save');btn.disabled=true;
   try{
-    const d=await api(moneyEditId?`/api/my-money/${moneyEditId}`:'/api/my-money',{method:moneyEditId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    if(!d||d.status!=='success'){moneySay((d&&d.message)||"Couldn't save. Please try again.",false);return;}
+    // api() only reads; saving needs fetch with the method and body (like the Transactions form)
+    const res=await fetch(API+(moneyEditId?`/api/my-money/${encodeURIComponent(moneyEditId)}`:'/api/my-money'),
+      {method:moneyEditId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    let d=null;try{d=await res.json();}catch(e){}
+    if(!res.ok||!d||d.status!=='success'){moneySay(apiMessage(d,res),false);return;}
     closeMoneyForm();moneySay(d.message,true);await loadMoney();
-  }finally{btn.disabled=false;}
+  }catch(e){moneySay("Couldn't reach the server. Please try again.",false);}
+  finally{btn.disabled=false;}
 }
 async function deleteMoney(id){
   const m=(moneyItems||[]).find(x=>x.id===id);if(!m)return;
   if(!confirm(`Remove ${m.name||m.kind_label} (${fb(m.amount)})?`))return;
-  const d=await api(`/api/my-money/${id}`,{method:'DELETE'});
-  if(!d||d.status!=='success'){moneySay((d&&d.message)||"Couldn't remove it. Please try again.",false);return;}
-  moneySay(d.message,true);await loadMoney();
+  try{
+    const res=await fetch(API+`/api/my-money/${encodeURIComponent(id)}`,{method:'DELETE'});
+    let d=null;try{d=await res.json();}catch(e){}
+    if(!res.ok||!d||d.status!=='success'){moneySay(apiMessage(d,res),false);return;}
+    moneySay(d.message,true);await loadMoney();
+  }catch(e){moneySay("Couldn't reach the server. Please try again.",false);}
 }
 function drawAllocDonut(id,emptyId,valueId,items){
   dc(id);
