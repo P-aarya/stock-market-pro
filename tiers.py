@@ -213,6 +213,7 @@ _RULES = [
     # everything else the dashboard shows is the Home tab and what you reach from it
     ("*",    r"/api/watchlist", _INITIAL),
     ("GET",  r"/api/watchlist/extras", _INITIAL),              # signal and chance-up only for plans with stock_prediction (api.py)
+    ("*",    r"/api/my-money(/[^/]+)?", "portfolio_view"),     # Where your money is (plan to be decided; for now with the Portfolio)
     ("GET",  r"/api/stocks(/(directory|search|batch))?", _INITIAL),                  # "/api/stocks" is the full list that Home's cards are drawn from
     ("GET",  rf"/api/stocks/{_P}", _INITIAL),
     ("GET",  rf"/api/stocks/{_P}/(price-history|intraday|price-range|period|period-spikes|price-spikes|news-sentiment|historical|quarterly|company|dividends|buy-sell)", _INITIAL),

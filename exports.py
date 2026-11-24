@@ -112,8 +112,11 @@ TX_COLUMNS = [("Date", 13, DATE), ("Type", 10, None), ("Ticker", 10, None), ("Na
 TX_TYPES = {"BUY": "Buy", "SELL": "Sell", "DIVIDEND": "Dividend"}
 
 
-def my_data_workbook(email, holdings, summary, transactions, tx_summary, now=None):
-    """Portfolio and Transactions sheets. `holdings` come from portfolio.list_holdings (with values),
+MONEY_COLUMNS = [("Kind", 20, None), ("Name", 30, None), ("Amount (US$)", 16, MONEY), ("Last updated", 13, DATE)]
+
+
+def my_data_workbook(email, holdings, summary, transactions, tx_summary, now=None, other_money=None):
+    """Portfolio, Transactions and (when given) Other money sheets. `holdings` come from portfolio.list_holdings (with values),
     `summary` from portfolio.summarize, `transactions` from portfolio.list_transactions,
     `tx_summary` from portfolio.transaction_summary."""
     now = now or dt.datetime.now()
@@ -178,6 +181,17 @@ def my_data_workbook(email, holdings, summary, transactions, tx_summary, now=Non
             if label.startswith("Realised"):
                 _colour(cell, value, bold=True)
             row += 1
+    if other_money is not None:
+        ws = wb.create_sheet("Other money")
+        row = _sheet_header(ws, "Aymetrix · Other money", f"{email} · savings, deposits, property and more that you added", MONEY_COLUMNS)
+        if not other_money:
+            ws.cell(row=row, column=1, value="Nothing added yet.").font = NOTE_FONT
+        for m in other_money:
+            row = _write_row(ws, row, MONEY_COLUMNS, [m.get("kind_label"), m.get("name") or "", m.get("amount"), _date(m.get("updated_at"))])
+        if other_money:
+            ws.cell(row=row + 1, column=2, value="Total").font = TOTAL_FONT
+            cell = ws.cell(row=row + 1, column=3, value=round(sum(m.get("amount") or 0 for m in other_money), 2))
+            cell.number_format, cell.font = MONEY, TOTAL_FONT
     return _bytes(wb)
 
 

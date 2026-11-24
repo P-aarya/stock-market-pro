@@ -1105,9 +1105,27 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <div class="kseg" role="group" aria-label="Break down by"><button class="kseg-b on" type="button" data-by="sector" onclick="setAllocBy('sector')">By sector</button><button class="kseg-b" type="button" data-by="type" onclick="setAllocBy('type')">By type</button></div></div>
       <div id="sec-alloc"><div class="load"><div class="spin"></div></div></div></div>
   </div>
-  <div class="card" style="margin-bottom:16px">
+  <div class="g2 pf-row2">
+  <div class="card pf-pnl-card">
     <div class="chdr"><div class="ctitle">P&L Per Holding</div><div class="pnl-key"><span class="pk-st"></span>Stocks<span class="pk-co"></span>Commodities</div></div>
-    <div style="height:190px"><canvas id="pnl-c"></canvas></div>
+    <div class="pf-pnl-box"><canvas id="pnl-c"></canvas></div>
+  </div>
+  <div class="card" id="money-card">
+    <div class="chdr"><div class="ctitle">Where your money is</div><button class="btn btnp money-add" type="button" id="money-add-btn" onclick="openMoneyForm()">+ Add</button></div>
+    <div class="money-wrap">
+      <div class="money-donut" id="money-donut"><canvas id="money-c"></canvas><div class="money-mid"><div class="money-total" id="money-total">$--</div><div class="money-cap">Total</div></div></div>
+      <div class="money-legend" id="money-legend"><div class="load"><div class="spin"></div>Loading...</div></div>
+    </div>
+    <div class="money-form" id="money-form" hidden>
+      <div><label class="flbl" for="money-kind">What is it?</label><select class="finp" id="money-kind"></select></div>
+      <div><label class="flbl" for="money-name">Name (optional)</label><input class="finp" id="money-name" maxlength="80" placeholder="e.g. Barclays savings"/></div>
+      <div><label class="flbl" for="money-amt">Amount (US$)</label><input class="finp" type="number" id="money-amt" min="0" step="any" placeholder="5000"/></div>
+      <div class="money-form-btns"><button class="btn btnp" type="button" id="money-save" onclick="saveMoney()">Add</button><button class="btn" type="button" onclick="closeMoneyForm()">Cancel</button></div>
+    </div>
+    <div id="money-msg" class="money-msg"></div>
+    <div class="money-items" id="money-items"></div>
+    <div class="peer-legend">Stocks and commodities come from your Transactions. Add savings, deposits, property and more yourself, in US$. Only you can see them.</div>
+  </div>
   </div>
   <div class="card" style="margin-bottom:16px">
     <div class="stitle">Holdings</div>
@@ -4958,7 +4976,7 @@ async function loadPortfolio(){
     return;
   }
   pfRows=h;
-  loadPortfolioPerformance();loadPortfolioTrend();
+  loadPortfolioPerformance();loadPortfolioTrend();if(moneyItems===null)loadMoney();else renderMoney();
   renderHoldings();renderAllocList();
   if(!h.length){
     drawAllocDonut('alloc-c','alloc-st-empty','alloc-st-v',[]);drawAllocDonut('alloc-c2','alloc-co-empty','alloc-co-v',[]);dc('pnl-c');
@@ -4977,6 +4995,77 @@ async function loadPortfolio(){
       borderColor:bars.map(x=>x&&isCommodity(x)?'#F5A623':'transparent'),borderWidth:bars.map(x=>x&&isCommodity(x)?2:0),borderRadius:4}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{filter:i=>bars[i.dataIndex]!=null,callbacks:{label:c=>{const x=bars[c.dataIndex];return x?`${kindLabel(x)}: ${(c.raw>=0?'+':'')+fb(c.raw)}`:'';}}}},
       scales:{x:{ticks:{color:'#c0cce0',font:{size:10,weight:'600'}},grid:{display:false}},y:{ticks:{color:'#58697a',callback:v=>fb(v)},grid:{color:'rgba(28,28,48,0.5)'}}}}});
+}
+// ── Where your money is: stocks and commodities (from Transactions) + what people add themselves (savings, FD, property...) ──
+const MONEY_COLORS={stocks:'#00c8ff',commodities:'#ffc800',savings:'#00e676',fd:'#a78bfa',real_estate:'#ff6b9d',pension:'#ff9f43',bonds:'#4dd0e1',crypto:'#f368e0',gold:'#d4a017',other:'#7a8ba0'};
+let moneyItems=null,moneyKinds={},moneyEditId=null;
+function moneySay(text,ok){const el=document.getElementById('money-msg');if(el){el.textContent=text||'';el.style.color=ok?'var(--green)':'var(--red)';}}
+async function loadMoney(){
+  const d=await api('/api/my-money');
+  if(d&&d.status==='success'){moneyItems=d.items||[];moneyKinds=d.kinds||{};}
+  else if(moneyItems===null){moneyItems=[];moneySay((d&&d.message)||"Couldn't load what you added. Reload to try again.",false);}
+  renderMoney();
+}
+function moneySlices(){
+  const rows=pfRows||[],st=rows.filter(x=>!isCommodity(x)),co=rows.filter(isCommodity),out=[];
+  const group=(key,label,list)=>{
+    const priced=list.filter(x=>x.current_value!=null);
+    const v=priced.reduce((a,x)=>a+(+x.current_value||0),0),inv=priced.reduce((a,x)=>a+(+x.invested_value||0),0);
+    if(v>0)out.push({key,label,value:v,pnl:inv>0?(v/inv-1)*100:null});
+  };
+  group('stocks','Stocks',st);group('commodities','Commodities',co);
+  const byKind={};
+  (moneyItems||[]).forEach(m=>{byKind[m.kind]=(byKind[m.kind]||0)+(+m.amount||0);});
+  Object.keys(byKind).forEach(k=>out.push({key:k,label:moneyKinds[k]||k,value:byKind[k],pnl:null}));
+  return out.sort((a,b)=>b.value-a.value);
+}
+function renderMoney(){
+  const legend=document.getElementById('money-legend'),donut=document.getElementById('money-donut');if(!legend||!donut)return;
+  const slices=moneySlices(),total=slices.reduce((a,x)=>a+x.value,0);
+  document.getElementById('money-total').textContent=total>0?fb(total):'$0';
+  dc('money-c');
+  if(!slices.length){
+    donut.style.display='none';
+    legend.innerHTML='<div class="empty" style="padding:14px 4px">Nothing here yet. Add a BUY on the Transactions tab, or press <b>+ Add</b> for your savings, fixed deposits, property and more.</div>';
+  }else{
+    donut.style.display='';
+    legend.innerHTML=slices.map(x=>`<div class="ml-row"><span class="ml-dot" style="background:${MONEY_COLORS[x.key]||MONEY_COLORS.other}"></span><span class="ml-l">${escapeHtml(x.label)}${x.pnl!=null?`<span class="ml-p ${x.pnl>=0?'g':'r'}">${x.pnl>=0?'▲ +':'▼ '}${f2(x.pnl,1)}%</span>`:''}</span><span class="ml-v">${fb(x.value)}</span><span class="ml-pc">${f2(x.value/total*100,1)}%</span></div>`).join('');
+    const ctx=document.getElementById('money-c')?.getContext('2d');
+    if(ctx)charts['money-c']=new Chart(ctx,{type:'doughnut',data:{labels:slices.map(x=>x.label),datasets:[{data:slices.map(x=>x.value),backgroundColor:slices.map(x=>MONEY_COLORS[x.key]||MONEY_COLORS.other),borderColor:'#0d1117',borderWidth:2,hoverOffset:6}]},
+      options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${fb(c.raw)} (${f2(c.raw/total*100,1)}%)`}}}}});
+  }
+  const items=document.getElementById('money-items');
+  if(items)items.innerHTML=(moneyItems||[]).length?`<div class="mi-h">Added by you</div>`+moneyItems.map(m=>`<div class="mi-row"><span class="ml-dot" style="background:${MONEY_COLORS[m.kind]||MONEY_COLORS.other}"></span><span class="mi-n">${escapeHtml(m.name||m.kind_label)}<span class="mi-k">${escapeHtml(m.kind_label)}</span></span><span class="ml-v">${fb(m.amount)}</span><span class="mi-a"><button class="bm-act" type="button" data-id="${m.id}" onclick="openMoneyForm(+this.dataset.id)">Edit</button><button class="bm-act" type="button" data-id="${m.id}" onclick="deleteMoney(+this.dataset.id)">Remove</button></span></div>`).join(''):'';
+}
+function openMoneyForm(id){
+  const f=document.getElementById('money-form');if(!f)return;
+  const sel=document.getElementById('money-kind');
+  sel.innerHTML=Object.entries(moneyKinds).map(([k,v])=>`<option value="${escapeHtml(k)}">${escapeHtml(v)}</option>`).join('');
+  const m=id?(moneyItems||[]).find(x=>x.id===id):null;
+  moneyEditId=m?m.id:null;
+  sel.value=m?m.kind:'savings';
+  document.getElementById('money-name').value=m?m.name:'';
+  document.getElementById('money-amt').value=m?m.amount:'';
+  document.getElementById('money-save').textContent=m?'Save':'Add';
+  f.hidden=false;moneySay('');document.getElementById('money-amt').focus();
+}
+function closeMoneyForm(){const f=document.getElementById('money-form');if(f)f.hidden=true;moneyEditId=null;}
+async function saveMoney(){
+  const body={kind:document.getElementById('money-kind').value,name:document.getElementById('money-name').value.trim(),amount:parseFloat(document.getElementById('money-amt').value)};
+  if(!(body.amount>0)){moneySay('Enter an amount more than $0.',false);return;}
+  const btn=document.getElementById('money-save');btn.disabled=true;
+  try{
+    const d=await api(moneyEditId?`/api/my-money/${moneyEditId}`:'/api/my-money',{method:moneyEditId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!d||d.status!=='success'){moneySay((d&&d.message)||"Couldn't save. Please try again.",false);return;}
+    closeMoneyForm();moneySay(d.message,true);await loadMoney();
+  }finally{btn.disabled=false;}
+}
+async function deleteMoney(id){
+  const m=(moneyItems||[]).find(x=>x.id===id);if(!m)return;
+  if(!confirm(`Remove ${m.name||m.kind_label} (${fb(m.amount)})?`))return;
+  const d=await api(`/api/my-money/${id}`,{method:'DELETE'});
+  if(!d||d.status!=='success'){moneySay((d&&d.message)||"Couldn't remove it. Please try again.",false);return;}
+  moneySay(d.message,true);await loadMoney();
 }
 function drawAllocDonut(id,emptyId,valueId,items){
   dc(id);
@@ -6808,6 +6897,32 @@ body.pg-home #bounty-btn,body.pg-home #bounty-win{display:none!important;}   /* 
 .wl-sig.g{color:var(--green);}.wl-sig.r{color:var(--red);}.wl-sig.y{color:var(--yellow);}
 .wl-lock{color:var(--t3);}
 .wl-wait{color:var(--t3);}
+.pf-row2{align-items:stretch;}
+.pf-row2 .card{margin-bottom:0;display:flex;flex-direction:column;}
+.pf-pnl-box{flex:1;min-height:220px;position:relative;}
+.money-add{padding:5px 12px;font-size:11px;}
+.money-wrap{display:flex;align-items:center;gap:16px;}
+.money-donut{position:relative;width:170px;height:170px;flex:0 0 170px;}
+.money-mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;}
+.money-total{font-family:var(--mono);font-size:15px;font-weight:800;color:var(--t1);}
+.money-cap{font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);margin-top:2px;}
+.money-legend{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px;}
+.ml-row,.mi-row{display:grid;grid-template-columns:10px minmax(0,1fr) auto auto;gap:8px;align-items:center;font-size:12px;}
+.ml-dot{width:10px;height:10px;border-radius:3px;display:inline-block;}
+.ml-l,.mi-n{font-weight:700;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ml-p{font-size:10px;font-weight:800;margin-left:6px;}.ml-p.g{color:var(--green);}.ml-p.r{color:var(--red);}
+.ml-v{font-family:var(--mono);font-weight:700;color:var(--t1);text-align:right;}
+.ml-pc{font-family:var(--mono);font-size:11px;color:var(--t3);min-width:44px;text-align:right;}
+.money-form[hidden]{display:none;}
+.money-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:8px;align-items:end;margin-top:14px;padding-top:12px;border-top:1px solid var(--b1);}
+.money-form-btns{display:flex;gap:6px;}
+.money-msg{font-size:12px;font-weight:700;min-height:14px;margin-top:8px;}
+.money-items{display:flex;flex-direction:column;gap:6px;}
+.mi-h{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);margin-top:4px;}
+.mi-row{grid-template-columns:10px minmax(0,1fr) auto auto;}
+.mi-k{font-size:10px;font-weight:600;color:var(--t3);margin-left:6px;}
+.mi-a{display:flex;gap:4px;}
+@media(max-width:700px){.money-wrap{flex-direction:column;align-items:stretch;}.money-donut{margin:0 auto;}.money-form{grid-template-columns:1fr;}}
 .wl-sec{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;}
 .wl-sec-n{font-family:var(--mono);font-size:10px;font-weight:800;opacity:.7;margin-left:4px;}
 .pft-sub{font-size:11px;font-weight:600;color:var(--t3);}

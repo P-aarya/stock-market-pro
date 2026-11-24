@@ -20,10 +20,11 @@ def owned_tables(cur):
     return [*PERSONAL_TABLES, *(t for t in OPTIONAL_PERSONAL_TABLES if _has_table(cur, t))]
 
 
-# Other tables that hold one account's data: Help Desk, notifications, password-reset and email-change links, the investing profile.
+# Other tables that hold one account's data: Help Desk, notifications, password-reset and email-change links, the investing profile,
+# and the savings / deposits / property people add on the Portfolio page (user_assets, created by my_money.py on first use).
 # They may not exist yet on a database that hasn't been migrated, so each is checked first. (restore_links is left over from an
 # earlier account-deletion feature; the current one signs a token instead of storing one.)
-OTHER_PERSONAL_TABLES = ("user_notifications", "password_resets", "email_changes", "restore_links", "user_profiles")
+OTHER_PERSONAL_TABLES = ("user_notifications", "password_resets", "email_changes", "restore_links", "user_profiles", "user_assets")
 
 
 def _delete_everything_of(cur, user_id):

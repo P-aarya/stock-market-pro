@@ -78,6 +78,10 @@ GET /api/admin/users/export
 GET /api/learn
 GET /api/portfolio/commodities
 GET /api/portfolio/history
+GET /api/my-money
+POST /api/my-money
+PUT /api/my-money/{item_id}
+DELETE /api/my-money/{item_id}
 GET /api/watchlist/extras
 GET /api/stocks/quotes
 GET /api/stocks/{ticker}/buy-sell

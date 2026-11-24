@@ -9,6 +9,7 @@ import mysql.connector
 import yfinance as yf
 import commodity_groups
 import market_history
+import my_money
 import pandas as pd
 from datetime import datetime, timezone
 from typing import Optional
@@ -2593,6 +2594,48 @@ def get_portfolio_summary(user_id: int = Depends(current_user_id)):
     return portfolio.summarize(portfolio.list_holdings(user_id))
 
 
+# ── Where your money is: savings, deposits, property... that people add themselves (my_money.py) ──
+class MoneyItemIn(BaseModel):
+    kind: str = Field(max_length=20)
+    name: str = Field(default="", max_length=200)
+    amount: float
+
+
+def _money_call(fn, *args):
+    try:
+        return {"status": "success", **fn(*args)}
+    except my_money.MoneyError as e:
+        return agent_error(e.status, e.message)
+    except Exception:
+        log.exception("Other money failed")
+        return agent_error(500, "Something went wrong. Please try again.")
+
+
+@app.get("/api/my-money")
+def my_money_list(user_id: int = Depends(current_user_id)):
+    """The things you added yourself (savings, fixed deposits, real estate...), largest first, plus the kinds you can add."""
+    try:
+        return {"status": "success", "items": my_money.list_items(user_id), "kinds": my_money.KINDS}
+    except Exception:
+        log.exception("Other money failed")
+        return agent_error(500, "Couldn't load your other money. Please try again.")
+
+
+@app.post("/api/my-money")
+def my_money_add(body: MoneyItemIn, user_id: int = Depends(current_user_id)):
+    return _money_call(my_money.add_item, user_id, body.kind, body.name, body.amount)
+
+
+@app.put("/api/my-money/{item_id}")
+def my_money_update(item_id: int, body: MoneyItemIn, user_id: int = Depends(current_user_id)):
+    return _money_call(my_money.update_item, user_id, item_id, body.kind, body.name, body.amount)
+
+
+@app.delete("/api/my-money/{item_id}")
+def my_money_delete(item_id: int, user_id: int = Depends(current_user_id)):
+    return _money_call(my_money.delete_item, user_id, item_id)
+
+
 @app.get("/api/portfolio/history")
 def portfolio_history(tickers: str = "", user_id: int = Depends(current_user_id)):
     """Up to 5 of your own holdings over the last 3 months, for the Portfolio chart: each with its daily closes and its
@@ -2921,13 +2964,19 @@ def _xlsx(data: bytes, filename: str):
 
 @app.get("/api/account/export")
 def export_my_data(user_id: int = Depends(current_user_id)):
-    """Your Portfolio and Transactions as one Excel file."""
+    """Your Portfolio, Transactions and Other money as one Excel file."""
     try:
         import exports
         user = auth.get_user(user_id)
         holdings = portfolio.list_holdings(user_id)
+        try:
+            other = my_money.list_items(user_id)
+        except Exception:
+            log.exception("Other money for the Excel download failed")
+            other = None
         data = exports.my_data_workbook((user or {}).get("email", ""), holdings, portfolio.summarize(holdings),
-                                        portfolio.list_transactions(user_id), portfolio.transaction_summary(user_id))
+                                        portfolio.list_transactions(user_id), portfolio.transaction_summary(user_id),
+                                        other_money=other)
     except Exception:
         log.exception("Making the Excel download failed")
         return agent_error(500, "Something went wrong making your file. Please try again.")
