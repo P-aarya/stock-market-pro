@@ -10,7 +10,7 @@ import _path  # noqa: F401
 import api
 import auth
 import support
-from _accounts import AccountsTestCase, add_user, signed_in_client
+from _accounts import AccountsTestCase, SIGNUP_ANSWERS, add_user, signed_in_client
 
 GOOD = "correct horse battery"
 FETCH = {"x-requested-with": "fetch"}
@@ -21,7 +21,7 @@ class SignUpAndSignIn(AccountsTestCase, unittest.TestCase):
         return TestClient(api.app, follow_redirects=False)
 
     def sign_up(self, email="new@example.com"):
-        return self.client().post("/register", data={"email": email, "password": GOOD, "confirm": GOOD})
+        return self.client().post("/register", data={"email": email, "password": GOOD, "confirm": GOOD, **SIGNUP_ANSWERS})
 
     def sign_in(self, email="new@example.com", password=GOOD):
         return self.client().post("/login", data={"email": email, "password": password})
@@ -35,7 +35,7 @@ class SignUpAndSignIn(AccountsTestCase, unittest.TestCase):
         self.assertEqual((row["status"], row["is_admin"]), ("pending", False))
 
     def test_a_new_account_can_never_make_itself_an_administrator_or_approved(self):
-        r = self.client().post("/register", data={"email": "sneaky@example.com", "password": GOOD, "confirm": GOOD, "status": "approved", "is_admin": "1"})
+        r = self.client().post("/register", data={"email": "sneaky@example.com", "password": GOOD, "confirm": GOOD, **SIGNUP_ANSWERS, "status": "approved", "is_admin": "1"})
         row = auth.store.find_by_email("sneaky@example.com")
         self.assertEqual((r.status_code, row["status"], row["is_admin"]), (200, "pending", False))
 

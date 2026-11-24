@@ -25,6 +25,11 @@ mysql.connector.connect = _no_database
 # A stand-in for the top plan. Ordinary tests use accounts on it so the plan limits don't get in their way; the tests about
 # the plans themselves (test_tiers.py) ask for the real tiers explicitly and take this one out while they run.
 FULL_TIER = 99
+
+# A complete, valid set of answers to the investor questions on the sign-up form. Every test that signs someone up through
+# /register sends these along (the questions are required), unless the test is about the questions themselves.
+SIGNUP_ANSWERS = {"expected_return": "5_10", "risk": "medium", "markets": ["us"], "salary": "prefer_not",
+                  "plan_stocks": "60", "plan_commodities": "30", "plan_ipos": "10"}
 tiers.TIERS[FULL_TIER] = tiers.Tier(FULL_TIER, "Everything", 0.0, tuple(tiers.FEATURES))
 
 
@@ -33,6 +38,7 @@ class FakeStore:
 
     def __init__(self):
         self.users, self.next_id = {}, 1
+        self.profiles = {}               # user_profiles rows by account id
         self.fail_with = None            # set to an exception to make every call raise it
         self.gets = 0                    # how many times the database would have been asked for one account
         self.purged = []                 # ids of accounts removed for good
@@ -67,6 +73,29 @@ class FakeStore:
         self.gets += 1
         u = self.users.get(user_id)
         return self._public(u) if u else None
+
+    # The optional profile details (user_profiles in the real database): one dict per account, kept as saved
+    def details(self, user_id):
+        self._check()
+        return dict(self.profiles[user_id]) if user_id in self.profiles else None
+
+    def all_details(self):
+        self._check()
+        return {uid: {"user_id": uid, **row} for uid, row in self.profiles.items()}
+
+    def save_details(self, user_id, fields, now):
+        self._check()
+        allowed = ("city", "birth_date", "gender", "profession", "notify_prefs", "invest_range", "interests", "recent_stocks")
+        self.profiles.setdefault(user_id, {}).update({k: v for k, v in fields.items() if k in allowed})
+
+    def profile(self, user_id):
+        self._check()
+        u = self.users.get(user_id)
+        return {**self._public(u), "full_name": u.get("full_name"), "last_login_at": u.get("last_login_at")} if u else None
+
+    def set_name(self, user_id, name):
+        self._check()
+        self.users[user_id]["full_name"] = name
 
     def list_users(self):
         self._check()

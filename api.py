@@ -210,9 +210,14 @@ def _start_session(request: Request, user_id: int) -> RedirectResponse:
     return response
 
 
-async def _read_form(request: Request) -> dict:
+async def _read_form_lists(request: Request) -> dict:
+    """Every field of a submitted form with all its values (a group of checkboxes sends the same name several times)."""
     body = (await request.body())[:10000]
-    return {k: v[0] for k, v in urllib.parse.parse_qs(body.decode("utf-8", "ignore"), keep_blank_values=True).items()}
+    return urllib.parse.parse_qs(body.decode("utf-8", "ignore"), keep_blank_values=True)
+
+
+async def _read_form(request: Request) -> dict:
+    return {k: v[0] for k, v in (await _read_form_lists(request)).items()}
 
 
 @app.get("/login", response_class=HTMLResponse)
@@ -294,12 +299,14 @@ def register_page(request: Request):
 async def register(request: Request):
     if not ALLOW_SIGNUP:
         return HTMLResponse(auth_pages.register_page(closed=True), status_code=403)
-    form = await _read_form(request)
+    lists = await _read_form_lists(request)
+    form = {k: v[0] for k, v in lists.items()}
     email, password = auth.normalize_email(form.get("email")), form.get("password", "")
     client = _client_id(request)
+    answers = {**form, "markets": lists.get("markets", [])}               # shown again, selected, if the page has to be redone
 
     def again(message, status):
-        return HTMLResponse(auth_pages.register_page(message, email, bool(SIGNUP_CODE)), status_code=status)
+        return HTMLResponse(auth_pages.register_page(message, email, bool(SIGNUP_CODE), answers=answers), status_code=status)
 
     if _signups.blocked(client):
         return again("Too many sign-up attempts from your network. Please try again later.", 429)
@@ -308,6 +315,11 @@ async def register(request: Request):
         return again("That invite code isn't right.", 403)
     if password != form.get("confirm", ""):
         return again("The two passwords don't match.", 400)
+    try:                                                                   # the investor questions are checked before any account is made
+        investor = auth.clean_investor_profile(form.get("expected_return"), form.get("risk"), lists.get("markets", []), form.get("salary"),
+                                               {k: form.get("plan_" + k) for k in auth.PLAN_BUCKETS}, required=True)
+    except auth.AuthError as e:
+        return again(e.message, 400)
     try:
         user = await run_in_threadpool(auth.register, email, password, "pending" if REQUIRE_APPROVAL else "approved")
     except auth.AuthError as e:
@@ -315,6 +327,10 @@ async def register(request: Request):
     except auth.AccountsNotSetUp:
         return HTMLResponse(auth_pages.notice_page("Accounts aren't set up yet", "The site owner needs to run: python manage_users.py migrate"), status_code=503)
     auth.record_signup(user)
+    try:
+        await run_in_threadpool(auth.save_investor_profile, user["id"], investor)
+    except Exception:                                                      # the account exists; a failed save must not undo or block the sign-up (Settings can take the answers later)
+        log.exception("Could not save the investor answers given at sign-up for account %s", user["id"])
     if user["status"] == "pending":
         return HTMLResponse(auth_pages.pending_page(user["email"]), status_code=200)      # no session until an administrator approves
     return _start_session(request, user["id"])
@@ -2868,7 +2884,8 @@ def get_account(user_id: int = Depends(current_user_id)):
         return {"status": "success", "account": {**profile, **auth.get_details(user_id)},
                 "choices": {"genders": auth.GENDERS, "professions": auth.PROFESSIONS, "invest_ranges": auth.INVEST_RANGES,
                             "purposes": auth.PURPOSES, "follows": auth.FOLLOWS, "sectors": auth.INTEREST_SECTORS,
-                            "commodities": auth.INTEREST_COMMODITIES}}
+                            "commodities": auth.INTEREST_COMMODITIES, "expected_returns": auth.EXPECTED_RETURNS, "risk_levels": auth.RISK_LEVELS,
+                            "risk_hints": auth.RISK_HINTS, "markets": auth.MARKETS, "salary_ranges": auth.SALARY_RANGES, "plan_buckets": auth.PLAN_BUCKETS}}
     return _account_call(work)
 
 
@@ -2886,6 +2903,14 @@ class ProfileBody(BaseModel):
     purposes_other: str = Field(default="", max_length=200)
     sectors_other: str = Field(default="", max_length=200)
     commodities_other: str = Field(default="", max_length=200)
+    # The investor answers asked at sign-up. None means the caller didn't send them (the saved ones are kept); an empty answer clears it.
+    expected_return: Optional[str] = Field(default=None, max_length=20)
+    risk: Optional[str] = Field(default=None, max_length=20)
+    markets: Optional[List[str]] = Field(default=None, max_length=10)
+    salary: Optional[str] = Field(default=None, max_length=20)
+    plan_stocks: Optional[str] = Field(default=None, max_length=10)
+    plan_commodities: Optional[str] = Field(default=None, max_length=10)
+    plan_ipos: Optional[str] = Field(default=None, max_length=10)
 
 
 class EmailChangeBody(BaseModel):
@@ -2896,10 +2921,17 @@ class EmailChangeBody(BaseModel):
 @app.put("/api/account/profile")
 def save_account_profile(body: ProfileBody, user_id: int = Depends(require_fetch)):
     """Name plus the optional details: region / city, date of birth, gender, profession, and the investing profile."""
-    return _account_call(lambda: {"status": "success", "profile": auth.save_profile(
-        user_id, body.name, body.city, body.birth_date, body.gender, body.profession, invest_range=body.invest_range,
-        purposes=body.purposes, follows=body.follows, sectors=body.sectors, commodities=body.commodities,
-        others={"purposes_other": body.purposes_other, "sectors_other": body.sectors_other, "commodities_other": body.commodities_other})})
+    def work():
+        sent = (body.expected_return, body.risk, body.markets, body.salary, body.plan_stocks, body.plan_commodities, body.plan_ipos)
+        investor = None if all(v is None for v in sent) else auth.clean_investor_profile(
+            body.expected_return, body.risk, body.markets, body.salary,
+            {"stocks": body.plan_stocks, "commodities": body.plan_commodities, "ipos": body.plan_ipos})
+        return {"status": "success", "profile": auth.save_profile(
+            user_id, body.name, body.city, body.birth_date, body.gender, body.profession, invest_range=body.invest_range,
+            purposes=body.purposes, follows=body.follows, sectors=body.sectors, commodities=body.commodities,
+            others={"purposes_other": body.purposes_other, "sectors_other": body.sectors_other, "commodities_other": body.commodities_other},
+            investor=investor)}
+    return _account_call(work)
 
 
 @app.get("/api/account/notifications")

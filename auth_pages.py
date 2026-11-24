@@ -1,6 +1,8 @@
 """The sign-in and sign-up pages. Plain server-rendered HTML, so they work before the dashboard's scripts have loaded."""
 import html
 
+import auth                  # only for the lists of choices the sign-up questions offer
+
 _CSS = """
 :root{--bg:#050508;--card:#0c0c16;--line:#1c1c30;--line2:#2e2e50;--text:#fff;--muted:#8a9ab0;--blue:#4f8ef7;--cyan:#00d4ff;--red:#ff5c5c}
 *{box-sizing:border-box}
@@ -42,6 +44,25 @@ a{color:var(--cyan);font-weight:700;text-decoration:none}a:hover{text-decoration
 .disclaimer li+li{margin-top:8px}
 .disclaimer b{color:#d5deeb}
 .disclaimer p{margin:10px 0 0}
+/* the investor questions on the sign-up form */
+select,input[type=number]{width:100%;padding:12px;border-radius:9px;border:1px solid var(--line2);background:#10101e;color:var(--text);font-size:16px;font-family:inherit}
+select:focus,input[type=number]:focus{outline:2px solid var(--blue);outline-offset:1px;border-color:var(--blue)}
+fieldset{margin:18px 0 0;padding:0;border:0;min-width:0}
+legend{padding:0;margin:0 0 6px;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+legend small{text-transform:none;letter-spacing:0;font-weight:600}
+.about{margin:26px 0 0;padding-top:18px;border-top:1px solid var(--line2)}
+.about h2{margin:0 0 4px;font-size:16px;letter-spacing:-.2px}
+.about .sub{margin-bottom:6px}
+.opts{display:grid;gap:8px}
+.opts.three{grid-template-columns:repeat(3,1fr)}
+.opt{display:flex;align-items:flex-start;gap:10px;margin:0;padding:10px 12px;border:1px solid var(--line2);border-radius:9px;background:#10101e;color:var(--text);font-size:14px;font-weight:700;letter-spacing:0;text-transform:none;cursor:pointer}
+.opt input{width:18px;height:18px;margin:1px 0 0;flex:none;accent-color:var(--blue)}
+.opt small{display:block;margin-top:1px;color:var(--muted);font-size:12px;font-weight:500}
+.alloc{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;align-items:end}
+.alloc>div{display:flex;flex-direction:column;justify-content:flex-end}      /* a label that wraps onto two lines must not push its box lower than the others */
+.alloc label{margin:0 0 6px}
+.total{margin:8px 0 0;color:var(--muted);font-size:13px;font-weight:600}
+.total.good{color:#5dffa5}.total.bad{color:var(--red)}
 """
 
 # Shown under the sign-up box, outside it, so it is read before the account is made.
@@ -52,6 +73,13 @@ DISCLAIMER = """<aside class="disclaimer" aria-labelledby="disclaimer-title"><h2
 <li><b>US stock market only.</b> Aymetrix covers the US stock market only. Stocks and markets in other countries are not included.</li>
 </ul>
 <p>By creating an account you confirm that you have read and accepted this.</p></aside>"""
+
+_PLAN_SCRIPT = """<script>
+(function(){var ids=['plan_stocks','plan_commodities','plan_ipos'],out=document.getElementById('plan-total');
+function update(){var total=0,any=false;ids.forEach(function(id){var v=document.getElementById(id).value.trim();if(v!==''){any=true;total+=parseInt(v,10)||0;}});
+out.textContent='Total: '+total+'%'+(total===100?' \u2713':'');out.className='total'+(any?(total===100?' good':' bad'):'');}
+ids.forEach(function(id){document.getElementById(id).addEventListener('input',update);});update();})();
+</script>"""
 
 _SHOW_SCRIPT = """<script>
 document.getElementById('show').addEventListener('change',function(){
@@ -99,7 +127,35 @@ def login_page(error: str = "", email: str = "", signup_open: bool = True, notic
 <button type="submit">Sign in</button></form>{alt}{_SHOW_SCRIPT}""")
 
 
-def register_page(error: str = "", email: str = "", needs_code: bool = False, closed: bool = False) -> str:
+def _investor_questions(answers=None) -> str:
+    """The five investor questions of the sign-up form. `answers` holds what was filled in before (after a mistake), so nothing is lost."""
+    a = answers or {}
+    esc = lambda v: html.escape(str(v), quote=True)
+
+    def select(name, label, choices):
+        options = '<option value="">Choose…</option>' + "".join(
+            f'<option value="{esc(k)}"{" selected" if a.get(name) == k else ""}>{html.escape(v)}</option>' for k, v in choices.items())
+        return f'<label for="{name}">{label}</label><select id="{name}" name="{name}" required>{options}</select>'
+
+    risk = "".join(f'<label class="opt"><input type="radio" name="risk" value="{esc(k)}"{" checked" if a.get("risk") == k else ""} required>'
+                   f'<span>{html.escape(v)}<small>{html.escape(auth.RISK_HINTS[k])}</small></span></label>' for k, v in auth.RISK_LEVELS.items())
+    chosen = a.get("markets") or []
+    markets = "".join(f'<label class="opt"><input type="checkbox" name="markets" value="{esc(k)}"{" checked" if k in chosen else ""}><span>{html.escape(v)}</span></label>'
+                      for k, v in auth.MARKETS.items())
+    alloc = "".join(f'<div><label for="plan_{k}">{html.escape(v)} %</label><input id="plan_{k}" name="plan_{k}" type="number" min="0" max="100" step="1" '
+                    f'inputmode="numeric" placeholder="0" value="{esc(a.get("plan_" + k) or "")}"></div>' for k, v in auth.PLAN_BUCKETS.items())
+    return f"""<section class="about" aria-labelledby="about-title"><h2 id="about-title">About your investing</h2>
+<p class="sub">Tells us how you invest, so we can make Aymetrix more useful to you. You can change these answers any time in Settings. Only you and our administrators can see them.</p>
+{select("expected_return", "Expected returns", auth.EXPECTED_RETURNS)}
+<fieldset><legend>Risk appetite</legend><div class="opts">{risk}</div></fieldset>
+<fieldset><legend>Markets you are interested in <small>(choose any)</small></legend><div class="opts three">{markets}</div>
+<p class="hint">Aymetrix covers the US stock market today.</p></fieldset>
+{select("salary", "Salary range (per year, US $)", auth.SALARY_RANGES)}
+<fieldset><legend>Investment plan</legend><p class="hint" style="margin:0 0 8px">How do you plan to split your investments? The three should add up to 100%.</p>
+<div class="alloc">{alloc}</div><p class="total" id="plan-total" aria-live="polite">Total: 0%</p></fieldset></section>"""
+
+
+def register_page(error: str = "", email: str = "", needs_code: bool = False, closed: bool = False, answers=None) -> str:
     if closed:
         return _page("Create account", """<h1>Sign-ups are closed</h1><p class="sub">New accounts can't be created right now. Ask the owner of this app for access.</p>
 <p class="alt"><a href="/login">Back to sign in</a></p>""", backdrop="register")
@@ -117,8 +173,9 @@ def register_page(error: str = "", email: str = "", needs_code: bool = False, cl
 <input id="confirm" type="password" name="confirm" data-pw autocomplete="new-password" minlength="8" required>
 {code}
 <label class="show"><input type="checkbox" id="show"> Show passwords</label>
+{_investor_questions(answers)}
 <button type="submit">Create account</button></form>
-<p class="alt">Already have an account? <a href="/login">Sign in</a></p>{_SHOW_SCRIPT}""", below=DISCLAIMER, backdrop="register")
+<p class="alt">Already have an account? <a href="/login">Sign in</a></p>{_SHOW_SCRIPT}{_PLAN_SCRIPT}""", below=DISCLAIMER, backdrop="register")
 
 
 def restore_page(email: str, token: str, deleted_on: str, remove_on: str, days_left: int) -> str:

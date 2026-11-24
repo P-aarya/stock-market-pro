@@ -12,7 +12,7 @@ import _path  # noqa: F401
 import agent
 import api
 import auth
-from _accounts import AccountsTestCase, FakeStore, add_user, signed_in_client
+from _accounts import AccountsTestCase, FakeStore, SIGNUP_ANSWERS, add_user, signed_in_client
 
 GOOD = "correct horse battery"
 
@@ -114,7 +114,7 @@ class Registration(AccountsTestCase, unittest.TestCase):
         return TestClient(api.app, follow_redirects=False)
 
     def post(self, c, **fields):
-        data = {"email": "new@example.com", "password": GOOD, "confirm": GOOD, **fields}
+        data = {"email": "new@example.com", "password": GOOD, "confirm": GOOD, **SIGNUP_ANSWERS, **fields}
         return c.post("/register", data=data)
 
     def test_the_sign_up_page_says_new_accounts_start_free(self):
@@ -166,7 +166,7 @@ class Registration(AccountsTestCase, unittest.TestCase):
         self.assertEqual(c.get("/api/auth/status").json()["user"], {"id": row["id"], "email": "new@example.com"})
 
     def test_the_cookie_is_marked_secure_behind_https(self):
-        r = self.client().post("/register", data={"email": "s@example.com", "password": GOOD, "confirm": GOOD}, headers={"x-forwarded-proto": "https"})
+        r = self.client().post("/register", data={"email": "s@example.com", "password": GOOD, "confirm": GOOD, **SIGNUP_ANSWERS}, headers={"x-forwarded-proto": "https"})
         self.assertIn("secure", r.headers["set-cookie"].lower())
 
     def test_each_mistake_is_explained_and_nothing_is_created(self):

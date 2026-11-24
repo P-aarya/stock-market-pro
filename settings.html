@@ -46,8 +46,11 @@ button{cursor:pointer;touch-action:manipulation}
 .card .lead{color:var(--t3);font-size:13px;margin-bottom:16px}
 label{display:block;margin:14px 0 6px;color:var(--t3);font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase}
 label:first-of-type{margin-top:0}
-input[type=text],input[type=password],select,textarea{width:100%;padding:11px 12px;border-radius:9px;border:1px solid var(--b2);background:var(--bg3);color:var(--t1);font-size:14px;outline:none}
+input[type=text],input[type=password],input[type=number],select,textarea{width:100%;padding:11px 12px;border-radius:9px;border:1px solid var(--b2);background:var(--bg3);color:var(--t1);font-size:14px;outline:none}
 input:focus,select:focus,textarea:focus{border-color:var(--blue)}
+.plan-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.plan-grid label{margin-top:0}
+.plan-total{margin:8px 0 0;color:var(--t3);font-size:13px;font-weight:600}.plan-total.good{color:#5dffa5}.plan-total.bad{color:#ff7d7d}
 input[readonly]{color:var(--t2);background:var(--bg1)}
 textarea{min-height:120px;resize:vertical;line-height:1.5}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -141,7 +144,7 @@ input[type=email]{width:100%;padding:11px 12px;border-radius:9px;border:1px soli
   .sec-btn .dot{margin-left:0}
   .card{padding:16px}
   .row2,.facts{grid-template-columns:minmax(0,1fr)}
-  input[type=text],input[type=password],input[type=date],select,textarea{font-size:16px}
+  input[type=text],input[type=password],input[type=date],input[type=number],select,textarea{font-size:16px}
   .actions .btn{flex:1 1 auto}
   .bubble{max-width:92%}
 }
@@ -200,6 +203,22 @@ input[type=email]{width:100%;padding:11px 12px;border-radius:9px;border:1px soli
             <input class="other-box" id="sectors-other" type="text" maxlength="60" placeholder="e.g. Crypto, Gaming" aria-label="Other sectors" hidden/></div>
           <div id="coms-wrap"><label>Commodities you're interested in</label><div class="chips" id="commodities"></div>
             <input class="other-box" id="commodities-other" type="text" maxlength="60" placeholder="e.g. Lithium, Uranium" aria-label="Other commodities" hidden/></div>
+          <div class="row2" style="margin-top:18px">
+            <div><label for="expected-return">Expected returns</label><select id="expected-return"><option value="">Choose…</option></select></div>
+            <div><label for="risk">Risk appetite</label><select id="risk" onchange="showRiskHint()"><option value="">Choose…</option></select><div class="hint" id="risk-hint"></div></div>
+          </div>
+          <label style="margin-top:18px">Markets you're interested in <span style="text-transform:none;letter-spacing:0;font-weight:600">(choose any)</span></label>
+          <div class="chips" id="markets"></div>
+          <div class="row2" style="margin-top:12px">
+            <div><label for="salary">Salary range (per year, US $)</label><select id="salary"><option value="">Choose…</option></select></div>
+          </div>
+          <label style="margin-top:18px">Investment plan <span style="text-transform:none;letter-spacing:0;font-weight:600">(how you plan to split your investments; the three add up to 100%)</span></label>
+          <div class="plan-grid">
+            <div><label for="plan-stocks">Stocks %</label><input id="plan-stocks" type="number" min="0" max="100" step="1" inputmode="numeric" placeholder="0" oninput="showPlanTotal()"/></div>
+            <div><label for="plan-commodities">Commodities %</label><input id="plan-commodities" type="number" min="0" max="100" step="1" inputmode="numeric" placeholder="0" oninput="showPlanTotal()"/></div>
+            <div><label for="plan-ipos">IPOs %</label><input id="plan-ipos" type="number" min="0" max="100" step="1" inputmode="numeric" placeholder="0" oninput="showPlanTotal()"/></div>
+          </div>
+          <div class="plan-total" id="plan-total" aria-live="polite"></div>
           <p class="privacy">Optional. These details help us improve Aymetrix. Only you and our administrators can see them.</p>
           <div class="actions"><button class="btn primary" type="submit" id="name-save">Save</button><span class="msg" id="name-msg" role="status"></span></div>
         </form>
@@ -378,9 +397,12 @@ function chipsHtml(name, items){
 function fillChoices(choices){
   const opts = (id, obj) => { const sel = document.getElementById(id); if(sel.options.length <= 1) Object.entries(obj || {}).forEach(([k, v]) => { const o = document.createElement('option'); o.value = k; o.textContent = v; sel.appendChild(o); }); };
   opts('invest-range', choices.invest_ranges); opts('follows', choices.follows);
+  opts('expected-return', choices.expected_returns); opts('risk', choices.risk_levels); opts('salary', choices.salary_ranges);
+  state.riskHints = choices.risk_hints || {};
   const fill = (id, items) => { const el = document.getElementById(id); if(!el.children.length) el.innerHTML = chipsHtml(id, items); };
   const OTHER = ['__other', 'Other'];
   fill('purposes', [...Object.entries(choices.purposes || {}), OTHER]);
+  fill('markets', Object.entries(choices.markets || {}));
   fill('sectors', [...(choices.sectors || []).map(x => [x, x]), OTHER]);
   fill('commodities', [...(choices.commodities || []).map(x => [x, x]), OTHER]);
   const g = document.getElementById('gender'), p = document.getElementById('profession');
@@ -389,6 +411,16 @@ function fillChoices(choices){
     (choices.professions || []).forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; p.appendChild(o); });
     const o = document.createElement('option'); o.value = '__other'; o.textContent = 'Other (type your own)'; p.appendChild(o);
   }
+}
+function showRiskHint(){ const el = document.getElementById('risk-hint'); if(el) el.textContent = (state.riskHints || {})[document.getElementById('risk').value] || ''; }
+// The three plan boxes should add up to 100: say so as they type.
+function showPlanTotal(){
+  const out = document.getElementById('plan-total'); if(!out) return;
+  const boxes = ['stocks', 'commodities', 'ipos'].map(k => document.getElementById('plan-' + k).value.trim());
+  if(boxes.every(v => v === '')){ out.textContent = ''; out.className = 'plan-total'; return; }
+  const total = boxes.reduce((sum, v) => sum + (parseInt(v, 10) || 0), 0);
+  out.textContent = `Total: ${total}%${total === 100 ? ' ✓' : ' (it should be 100%)'}`;
+  out.className = 'plan-total ' + (total === 100 ? 'good' : 'bad');
 }
 function showProfessionOther(){
   const other = document.getElementById('profession').value === '__other';
@@ -406,7 +438,14 @@ function renderProfile(){
   showProfessionOther(); showAge();
   document.getElementById('invest-range').value = a.invest_range || '';
   document.getElementById('follows').value = a.follows || '';
+  document.getElementById('expected-return').value = a.expected_return || '';
+  document.getElementById('risk').value = a.risk || ''; showRiskHint();
+  document.getElementById('salary').value = a.salary || '';
+  const plan = a.plan || {};
+  ['stocks', 'commodities', 'ipos'].forEach(k => { document.getElementById('plan-' + k).value = plan[k] === undefined ? '' : plan[k]; });
+  showPlanTotal();
   const tick = (id, list) => document.querySelectorAll(`#${id} input`).forEach(i => { i.checked = (list || []).includes(i.value); });
+  tick('markets', a.markets);
   tick('purposes', [...(a.purposes || []), ...(a.purposes_other ? ['__other'] : [])]);
   tick('sectors', [...(a.sectors || []), ...(a.sectors_other ? ['__other'] : [])]);
   tick('commodities', [...(a.commodities || []), ...(a.commodities_other ? ['__other'] : [])]);
@@ -450,6 +489,9 @@ function profileForm(){
            birth_date: document.getElementById('birth').value, gender: document.getElementById('gender').value,
            profession: prof === '__other' ? document.getElementById('profession-other').value : prof,
            invest_range: document.getElementById('invest-range').value, follows: document.getElementById('follows').value,
+           expected_return: document.getElementById('expected-return').value, risk: document.getElementById('risk').value, markets: picked('markets'),
+           salary: document.getElementById('salary').value, plan_stocks: document.getElementById('plan-stocks').value,
+           plan_commodities: document.getElementById('plan-commodities').value, plan_ipos: document.getElementById('plan-ipos').value,
            purposes: picked('purposes'),
            sectors: document.getElementById('sectors-wrap').hidden ? [] : picked('sectors'),
            commodities: document.getElementById('coms-wrap').hidden ? [] : picked('commodities'),

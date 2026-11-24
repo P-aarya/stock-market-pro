@@ -1152,6 +1152,19 @@ INTEREST_SECTORS = ["Technology", "Communication Services", "Healthcare", "Finan
 INTEREST_COMMODITIES = ["Gold", "Silver", "Platinum & palladium", "Copper & industrial metals", "Oil", "Natural gas",
                         "Grains (corn, wheat, soybeans)", "Coffee, sugar, cotton & cocoa", "Livestock"]
 
+# The investor questions asked when someone signs up (they can change the answers in Settings). They are saved with the
+# other interests, in the same JSON, so no new database columns are needed. Amounts are in US dollars.
+EXPECTED_RETURNS = {"under_5": "Under 5% a year", "5_10": "5% – 10% a year", "10_15": "10% – 15% a year", "15_25": "15% – 25% a year",
+                    "over_25": "Over 25% a year", "not_sure": "Not sure yet"}
+RISK_LEVELS = {"low": "Low", "medium": "Medium", "high": "High"}
+RISK_HINTS = {"low": "I want to protect my money first", "medium": "I accept some ups and downs for better returns",
+              "high": "I'm comfortable with big swings for the chance of big gains"}
+MARKETS = {"us": "US", "eu": "EU", "india": "India"}
+SALARY_RANGES = {"under_25k": "Under $25,000", "25k_50k": "$25,000 – $50,000", "50k_100k": "$50,000 – $100,000", "100k_200k": "$100,000 – $200,000",
+                 "over_200k": "Over $200,000", "prefer_not": "Prefer not to say"}
+PLAN_BUCKETS = {"stocks": "Stocks", "commodities": "Commodities", "ipos": "IPOs"}       # how they plan to split their investments (whole percentages, 100 in all)
+INVESTOR_KEYS = ("expected_return", "risk", "markets", "salary", "plan")
+
 
 def _pick_many(raw, allowed, what):
     """A list of choices from `allowed`, in the standard order, without repeats."""
@@ -1186,13 +1199,66 @@ def clean_interests(invest_range, purposes, follows, sectors, commodities, other
                                   "commodities": _pick_many(commodities, INTEREST_COMMODITIES, "commodities"), **typed}
 
 
+def investor_from(saved):
+    """The five investor answers from a saved interests dict: every key present, anything that isn't one of our choices dropped."""
+    saved = saved if isinstance(saved, dict) else {}
+    markets = saved.get("markets") if isinstance(saved.get("markets"), list) else []
+    plan = saved.get("plan") if isinstance(saved.get("plan"), dict) else {}
+    numbers = {k: plan.get(k) for k in PLAN_BUCKETS}
+    valid_plan = all(isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 100 for v in numbers.values()) and sum(numbers.values()) == 100
+    one_of = lambda value, choices: value if isinstance(value, str) and value in choices else ""          # a list or number saved by mistake is just "not given"
+    return {"expected_return": one_of(saved.get("expected_return"), EXPECTED_RETURNS), "risk": one_of(saved.get("risk"), RISK_LEVELS),
+            "markets": [m for m in MARKETS if m in markets], "salary": one_of(saved.get("salary"), SALARY_RANGES),
+            "plan": numbers if valid_plan else {}}
+
+
+def _clean_plan(plan, required):
+    """{"stocks": n, "commodities": n, "ipos": n} (whole numbers adding up to 100), or {} when nothing was filled in."""
+    plan = plan or {}
+    raw = {k: ("" if plan.get(k) is None else str(plan.get(k))).strip().rstrip("%").strip() for k in PLAN_BUCKETS}
+    if not any(raw.values()):
+        if required:
+            raise AuthError("Please split your investments between stocks, commodities and IPOs. The three should add up to 100%.")
+        return {}
+    out = {}
+    for key, label in PLAN_BUCKETS.items():
+        if raw[key] and not re.fullmatch(r"[0-9]{1,3}", raw[key]):
+            raise AuthError(f"Please enter {label.lower()} as a whole number from 0 to 100.")
+        out[key] = int(raw[key] or 0)
+        if out[key] > 100:
+            raise AuthError(f"Please enter {label.lower()} as a whole number from 0 to 100.")
+    total = sum(out.values())
+    if total != 100:
+        raise AuthError(f"Your investment plan adds up to {total}%. Please make stocks, commodities and IPOs add up to 100%.")
+    return out
+
+
+def clean_investor_profile(expected_return=None, risk=None, markets=None, salary=None, plan=None, required=False):
+    """The five investor answers, checked against our choices. With required=True (sign-up) every question must be answered;
+    otherwise (Settings) an empty answer just means 'not given'. Raises AuthError with a message to show the person."""
+    expected_return = str(expected_return or "").strip()
+    if expected_return not in EXPECTED_RETURNS and (expected_return or required):
+        raise AuthError("Please choose the return you expect from your investments.")
+    risk = str(risk or "").strip()
+    if risk not in RISK_LEVELS and (risk or required):
+        raise AuthError("Please choose how much risk you are comfortable with: low, medium or high.")
+    markets = _pick_many(markets, MARKETS, "a market")
+    if required and not markets:
+        raise AuthError("Please choose at least one market you are interested in: US, EU or India.")
+    salary = str(salary or "").strip()
+    if salary not in SALARY_RANGES and (salary or required):
+        raise AuthError("Please choose your salary range, or 'Prefer not to say'.")
+    return {"expected_return": expected_return, "risk": risk, "markets": markets, "salary": salary, "plan": _clean_plan(plan, required)}
+
+
 def interests_from(raw):
     """The saved interests (JSON) as a dict with every key present."""
-    out = {"purposes": [], "follows": "", "sectors": [], "commodities": [], **{k: "" for k in OTHER_KEYS}}
+    out = {"purposes": [], "follows": "", "sectors": [], "commodities": [], **{k: "" for k in OTHER_KEYS}, **investor_from({})}
     if raw:
         try:
             saved = json.loads(raw)
             if isinstance(saved, dict):
+                out.update(investor_from(saved))
                 out["purposes"] = [p for p in saved.get("purposes") or [] if p in PURPOSES]
                 out["follows"] = saved.get("follows") if saved.get("follows") in FOLLOWS else ""
                 out["sectors"] = [x for x in saved.get("sectors") or [] if x in INTEREST_SECTORS]
@@ -1276,8 +1342,9 @@ def get_details(user_id, today=None):
 
 
 def save_profile(user_id, name, city, birth_date, gender, profession, now=None, invest_range=None, purposes=None, follows=None,
-                 sectors=None, commodities=None, others=None):
-    """Save the Profile card: name plus the optional details and investing profile. Empty means 'not given'."""
+                 sectors=None, commodities=None, others=None, investor=None):
+    """Save the Profile card: name plus the optional details and investing profile. Empty means 'not given'. `investor` is the
+    checked dict from clean_investor_profile; when it is None (a caller that doesn't send those answers) the saved ones are kept."""
     now = int(time.time() if now is None else now)
     name = clean_name(name)
     city = _clean_text(city, MAX_CITY, "Region / city")
@@ -1287,11 +1354,23 @@ def save_profile(user_id, name, city, birth_date, gender, profession, now=None, 
         raise AuthError("Please choose a gender from the list.")
     profession = clean_profession(profession)
     invest_range, interests = clean_interests(invest_range, purposes, follows, sectors, commodities, others)
+    if investor is None:
+        current = get_details(user_id)
+        investor = {k: current[k] for k in INVESTOR_KEYS}
+    interests.update({k: investor[k] for k in INVESTOR_KEYS})
     store.set_name(user_id, name)
     store.save_details(user_id, {"city": city or None, "birth_date": birth, "gender": gender or None, "profession": profession or None,
                                  "invest_range": invest_range, "interests": json.dumps(interests, sort_keys=True)}, now)
     access_cache.invalidate(user_id)
     return {"name": name, **{k: v for k, v in get_details(user_id).items() if k != "notifications"}}
+
+
+def save_investor_profile(user_id, investor, now=None):
+    """Save the investor answers given at sign-up (already checked by clean_investor_profile), keeping anything else saved."""
+    now = int(time.time() if now is None else now)
+    interests = interests_from((store.details(user_id) or {}).get("interests"))
+    interests.update({k: investor[k] for k in INVESTOR_KEYS})
+    store.save_details(user_id, {"interests": json.dumps(interests, sort_keys=True)}, now)
 
 
 def save_notifications(user_id, choices, now=None):

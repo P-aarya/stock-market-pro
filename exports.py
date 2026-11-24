@@ -186,7 +186,8 @@ def my_data_workbook(email, holdings, summary, transactions, tx_summary, now=Non
 USER_COLUMNS = [("Email", 32, None), ("Name", 22, None), ("Status", 11, None), ("Admin", 8, None), ("Joined", 13, DATE),
                 ("Last sign-in", 17, "dd mmm yyyy hh:mm"), ("Region / city", 20, None), ("Date of birth", 13, DATE), ("Age", 7, None),
                 ("Gender", 16, None), ("Profession", 24, None), ("Investing range", 20, None), ("Main purpose", 34, None),
-                ("Follows", 13, None), ("Sectors of interest", 40, None), ("Commodities of interest", 40, None)]
+                ("Follows", 13, None), ("Sectors of interest", 40, None), ("Commodities of interest", 40, None),
+                ("Expected returns", 20, None), ("Risk appetite", 12, None), ("Markets", 16, None), ("Salary range (US $)", 22, None), ("Investment plan", 40, None)]
 STATUS_LABELS = {"approved": "Approved", "pending": "Pending", "blocked": "Blocked"}
 
 
@@ -197,6 +198,12 @@ def _when(seconds):
 def _with_other(chosen, typed):
     """"Technology, Energy, Other: Crypto" """
     return ", ".join(list(chosen) + ([f"Other: {typed}"] if typed else []))
+
+
+def _plan_text(plan):
+    """"Stocks 60% · Commodities 30% · IPOs 10%" (empty when they never gave a plan)."""
+    import auth
+    return " · ".join(f"{label} {plan[key]}%" for key, label in auth.PLAN_BUCKETS.items()) if plan else ""
 
 
 def users_workbook(users, details, genders, age_on, now=None):
@@ -216,7 +223,9 @@ def users_workbook(users, details, genders, age_on, now=None):
                   _when(u.get("created_at")), _when(u.get("last_login_at")), d.get("city") or "", birth,
                   age_on(birth) if birth else None, genders.get(d.get("gender") or "", d.get("gender") or ""), d.get("profession") or "",
                   auth.INVEST_RANGES.get(d.get("invest_range") or "", ""), _with_other([auth.PURPOSES[p] for p in it["purposes"]], it["purposes_other"]),
-                  auth.FOLLOWS.get(it["follows"], ""), _with_other(it["sectors"], it["sectors_other"]), _with_other(it["commodities"], it["commodities_other"])]
+                  auth.FOLLOWS.get(it["follows"], ""), _with_other(it["sectors"], it["sectors_other"]), _with_other(it["commodities"], it["commodities_other"]),
+                  auth.EXPECTED_RETURNS.get(it["expected_return"], ""), auth.RISK_LEVELS.get(it["risk"], ""), ", ".join(auth.MARKETS[m] for m in it["markets"]),
+                  auth.SALARY_RANGES.get(it["salary"], ""), _plan_text(it["plan"])]
         _write_row(ws, row, USER_COLUMNS, values)
         row += 1
     ws.auto_filter.ref = f"A4:{get_column_letter(len(USER_COLUMNS))}{max(4, row - 1)}"
@@ -248,7 +257,11 @@ def users_workbook(users, details, genders, age_on, now=None):
                 ("Main purpose", [(label, sum(1 for p in picks if key in p["purposes"])) for key, label in auth.PURPOSES.items()] + other("purposes_other")),
                 ("Follows", [(label, sum(1 for p in picks if p["follows"] == key)) for key, label in auth.FOLLOWS.items()]),
                 ("Sectors of interest", [(x, sum(1 for p in picks if x in p["sectors"])) for x in auth.INTEREST_SECTORS] + other("sectors_other")),
-                ("Commodities of interest", [(x, sum(1 for p in picks if x in p["commodities"])) for x in auth.INTEREST_COMMODITIES] + other("commodities_other"))]
+                ("Commodities of interest", [(x, sum(1 for p in picks if x in p["commodities"])) for x in auth.INTEREST_COMMODITIES] + other("commodities_other")),
+                ("Expected returns", [(label, sum(1 for p in picks if p["expected_return"] == key)) for key, label in auth.EXPECTED_RETURNS.items()]),
+                ("Risk appetite", [(label, sum(1 for p in picks if p["risk"] == key)) for key, label in auth.RISK_LEVELS.items()]),
+                ("Markets of interest (people can pick several)", [(label, sum(1 for p in picks if key in p["markets"])) for key, label in auth.MARKETS.items()]),
+                ("Salary range (US $)", [(label, sum(1 for p in picks if p["salary"] == key)) for key, label in auth.SALARY_RANGES.items()])]
     for title, counts in sections:
         s.append([])
         s.append([title, "People"])

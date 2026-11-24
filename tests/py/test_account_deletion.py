@@ -8,7 +8,7 @@ from unittest import mock
 from fastapi.testclient import TestClient
 
 import _path  # noqa: F401
-from _accounts import AccountsTestCase, add_user, signed_in_client
+from _accounts import AccountsTestCase, SIGNUP_ANSWERS, add_user, signed_in_client
 import api
 import auth
 import tiers
@@ -291,7 +291,7 @@ class SigningUpAgainWithTheSameEmail(WithAClock, unittest.TestCase):
         self.delete_account()
 
     def sign_up(self):
-        return self.browser().post("/register", data={"email": "me@example.com", "password": PW, "confirm": PW})
+        return self.browser().post("/register", data={"email": "me@example.com", "password": PW, "confirm": PW, **SIGNUP_ANSWERS})
 
     def test_while_it_can_still_be_restored_the_address_is_taken(self):
         self.at(10 * DAY)
