@@ -1111,7 +1111,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     <div class="pf-pnl-box"><canvas id="pnl-c"></canvas></div>
   </div>
   <div class="card" id="money-card">
-    <div class="chdr"><div class="ctitle">Where your money is</div><button class="btn btnp money-add" type="button" id="money-add-btn" onclick="openMoneyForm()">+ Add</button></div>
+    <div class="chdr"><div class="ctitle">Where your money is</div><div class="money-btns"><button class="btn money-add" type="button" id="money-edit-btn" onclick="toggleMoneyEdit()" hidden>Edit</button><button class="btn btnp money-add" type="button" id="money-add-btn" onclick="openMoneyForm()">+ Add</button></div></div>
     <div class="money-wrap">
       <div class="money-donut" id="money-donut"><canvas id="money-c"></canvas><div class="money-mid"><div class="money-total" id="money-total">$--</div><div class="money-cap">Total</div></div></div>
       <div class="money-legend" id="money-legend"><div class="load"><div class="spin"></div>Loading...</div></div>
@@ -1123,7 +1123,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <div class="money-form-btns"><button class="btn btnp" type="button" id="money-save" onclick="saveMoney()">Add</button><button class="btn" type="button" onclick="closeMoneyForm()">Cancel</button></div>
     </div>
     <div id="money-msg" class="money-msg"></div>
-    <div class="money-items" id="money-items"></div>
+    <div class="money-items" id="money-items" hidden></div>
     <div class="peer-legend">Stocks and commodities come from your Transactions. Add savings, deposits, property and more yourself, in US$. Only you can see them.</div>
   </div>
   </div>
@@ -4998,7 +4998,8 @@ async function loadPortfolio(){
 }
 // ── Where your money is: stocks and commodities (from Transactions) + what people add themselves (savings, FD, property...) ──
 const MONEY_COLORS={stocks:'#00c8ff',commodities:'#ffc800',savings:'#00e676',fd:'#a78bfa',real_estate:'#ff6b9d',pension:'#ff9f43',bonds:'#4dd0e1',crypto:'#f368e0',gold:'#d4a017',other:'#7a8ba0'};
-let moneyItems=null,moneyKinds={},moneyEditId=null;
+let moneyItems=null,moneyKinds={},moneyEditId=null,moneyEditing=false;
+const fbw=v=>'$'+Math.round(+v||0).toLocaleString('en-US');      // whole dollars for this card
 function moneySay(text,ok){const el=document.getElementById('money-msg');if(el){el.textContent=text||'';el.style.color=ok?'var(--green)':'var(--red)';}}
 async function loadMoney(){
   const d=await api('/api/my-money');
@@ -5022,21 +5023,30 @@ function moneySlices(){
 function renderMoney(){
   const legend=document.getElementById('money-legend'),donut=document.getElementById('money-donut');if(!legend||!donut)return;
   const slices=moneySlices(),total=slices.reduce((a,x)=>a+x.value,0);
-  document.getElementById('money-total').textContent=total>0?fb(total):'$0';
+  document.getElementById('money-total').textContent=fbw(total);
   dc('money-c');
   if(!slices.length){
     donut.style.display='none';
     legend.innerHTML='<div class="empty" style="padding:14px 4px">Nothing here yet. Add a BUY on the Transactions tab, or press <b>+ Add</b> for your savings, fixed deposits, property and more.</div>';
   }else{
     donut.style.display='';
-    legend.innerHTML=slices.map(x=>`<div class="ml-row"><span class="ml-dot" style="background:${MONEY_COLORS[x.key]||MONEY_COLORS.other}"></span><span class="ml-l">${escapeHtml(x.label)}${x.pnl!=null?`<span class="ml-p ${x.pnl>=0?'g':'r'}">${x.pnl>=0?'▲ +':'▼ '}${f2(x.pnl,1)}%</span>`:''}</span><span class="ml-v">${fb(x.value)}</span><span class="ml-pc">${f2(x.value/total*100,1)}%</span></div>`).join('');
+    legend.innerHTML=slices.map(x=>`<div class="ml-row"><span class="ml-dot" style="background:${MONEY_COLORS[x.key]||MONEY_COLORS.other}"></span><span class="ml-l">${escapeHtml(x.label)}${x.pnl!=null?`<span class="ml-p ${x.pnl>=0?'g':'r'}">${x.pnl>=0?'▲ +':'▼ '}${f2(x.pnl,1)}%</span>`:''}</span><span class="ml-v">${fbw(x.value)}</span><span class="ml-pc">${f2(x.value/total*100,1)}%</span></div>`).join('');
     const ctx=document.getElementById('money-c')?.getContext('2d');
     if(ctx)charts['money-c']=new Chart(ctx,{type:'doughnut',data:{labels:slices.map(x=>x.label),datasets:[{data:slices.map(x=>x.value),backgroundColor:slices.map(x=>MONEY_COLORS[x.key]||MONEY_COLORS.other),borderColor:'#0d1117',borderWidth:2,hoverOffset:6}]},
-      options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${fb(c.raw)} (${f2(c.raw/total*100,1)}%)`}}}}});
+      options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: $${(+c.raw).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} (${f2(c.raw/total*100,1)}%)`}}}}});
   }
+  // The items you added: hidden until "Edit" is pressed, so the card stays the same size however many there are
+  const has=(moneyItems||[]).length>0;
+  if(!has)moneyEditing=false;
+  const eb=document.getElementById('money-edit-btn');
+  if(eb){eb.hidden=!has;eb.textContent=moneyEditing?'Done':'Edit';eb.classList.toggle('on',moneyEditing);}
   const items=document.getElementById('money-items');
-  if(items)items.innerHTML=(moneyItems||[]).length?`<div class="mi-h">Added by you</div>`+moneyItems.map(m=>`<div class="mi-row"><span class="ml-dot" style="background:${MONEY_COLORS[m.kind]||MONEY_COLORS.other}"></span><span class="mi-n">${escapeHtml(m.name||m.kind_label)}<span class="mi-k">${escapeHtml(m.kind_label)}</span></span><span class="ml-v">${fb(m.amount)}</span><span class="mi-a"><button class="bm-act" type="button" data-id="${m.id}" onclick="openMoneyForm(+this.dataset.id)">Edit</button><button class="bm-act" type="button" data-id="${m.id}" onclick="deleteMoney(+this.dataset.id)">Remove</button></span></div>`).join(''):'';
+  if(items){
+    items.hidden=!moneyEditing;
+    items.innerHTML=moneyEditing?moneyItems.map(m=>`<div class="mi-row"><span class="ml-dot" style="background:${MONEY_COLORS[m.kind]||MONEY_COLORS.other}"></span><span class="mi-n">${escapeHtml(m.name||m.kind_label)}${m.name?`<span class="mi-k">${escapeHtml(m.kind_label)}</span>`:''}</span><span class="ml-v">${fbw(m.amount)}</span><span class="mi-a"><button class="mi-ic" type="button" data-id="${m.id}" title="Edit" aria-label="Edit ${escapeHtml(m.name||m.kind_label)}" onclick="openMoneyForm(+this.dataset.id)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button><button class="mi-ic mi-del" type="button" data-id="${m.id}" title="Remove" aria-label="Remove ${escapeHtml(m.name||m.kind_label)}" onclick="deleteMoney(+this.dataset.id)">${X_ICON}</button></span></div>`).join(''):'';
+  }
 }
+function toggleMoneyEdit(){moneyEditing=!moneyEditing;if(!moneyEditing)closeMoneyForm();renderMoney();}
 function openMoneyForm(id){
   const f=document.getElementById('money-form');if(!f)return;
   const sel=document.getElementById('money-kind');
@@ -6924,8 +6934,14 @@ body.pg-home #bounty-btn,body.pg-home #bounty-win{display:none!important;}   /* 
 .money-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:8px;align-items:end;margin-top:14px;padding-top:12px;border-top:1px solid var(--b1);}
 .money-form-btns{display:flex;gap:6px;}
 .money-msg{font-size:12px;font-weight:700;min-height:14px;margin-top:8px;}
-.money-items{display:flex;flex-direction:column;gap:6px;}
-.mi-h{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);margin-top:4px;}
+.money-btns{display:flex;gap:6px;}
+.money-btns .btn[hidden]{display:none;}
+.money-btns .btn.on{border-color:var(--accent,#4f8cff);color:var(--t1);}
+.money-items{display:flex;flex-direction:column;gap:4px;margin-top:12px;padding-top:10px;border-top:1px solid var(--b1);}
+.money-items[hidden]{display:none;}
+.mi-ic{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;border:1px solid var(--b2);background:transparent;color:var(--t2);cursor:pointer;padding:0;}
+.mi-ic:hover{color:var(--t1);border-color:var(--t3);}
+.mi-del:hover{color:var(--red);border-color:rgba(255,68,68,.5);background:rgba(255,68,68,.1);}
 .mi-row{grid-template-columns:10px minmax(0,1fr) auto auto;}
 .mi-k{font-size:10px;font-weight:600;color:var(--t3);margin-left:6px;}
 .mi-a{display:flex;gap:4px;}
