@@ -10,11 +10,18 @@ const functions = [...script.matchAll(/^(?:async\s+)?function\s+([A-Za-z_$][\w$]
 
 (async () => {
   await t('everything Abheek built is on the page', () => {
-    for (const id of ['page-ipos', 'ntab-ipos', 'fss-peers', 'sent-card', 'pf-perf-card', 'tx-form-card', 'pf-form-card', 'pf-ai-result', 'period-bar', 'pred-period-view',
+    for (const id of ['page-ipos', 'ntab-ipos', 'fss-peers', 'sent-card', 'pf-perf-card', 'tx-form-card', 'pf-ai-result', 'period-bar', 'pred-period-view',
                       'bounty-btn', 'bounty-win', 'tb-wl', 'wl-add-input'])
       assert(ids.has(id) || new RegExp(`id=\\\\?["']${id}`).test(script), `missing #${id}`);
     for (const fn of ['loadIPOs', 'loadPeers', 'loadNewsSentiment', 'loadPortfolioPerformance', 'applyPeriod', 'sendBounty', 'initWatchlist', 'addAdminLink', 'adoptLegacyBounty'])
       assert(functions.includes(fn), `missing function ${fn}`);
+  });
+
+  await t('the Portfolio page has no add-holding form of its own: holdings come from Transactions, and the page points there', () => {
+    // The Portfolio page used to have an "add holding" card (#pf-form-card). Holdings are now worked out from the Transactions tab, so that card is gone on purpose.
+    assert(!ids.has('pf-form-card'), 'the old add-holding card is back on the Portfolio page; holdings are meant to come from Transactions');
+    assert(ids.has('tx-form-card'), 'the Transactions tab is where a buy or a sell is entered');
+    assert(/class="info-note pf-from-tx"/.test(markup) && /goTab\('transactions'\)/.test(markup), 'the Portfolio page tells people to add their buys on the Transactions tab');
   });
 
   await t('everything Aarya built is on the page', () => {
