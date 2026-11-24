@@ -94,8 +94,8 @@ class ThePageStaysReadable(unittest.TestCase):
         self.assertTrue(values, selector)
         return values
 
-    def test_the_price_table_the_sign_up_panel_and_the_figures_are_nearly_opaque(self):
-        for selector in (".wrap", ".plan", ".stat"):
+    def test_the_price_table_and_the_sign_up_panel_are_nearly_opaque(self):
+        for selector in (".wrap", ".plan"):
             self.assertGreaterEqual(min(self.alphas(selector)), 0.9, selector)
 
     def test_the_header_stays_nearly_solid(self):
@@ -112,7 +112,7 @@ class ThePageStaysReadable(unittest.TestCase):
 
     def test_text_that_sits_straight_on_the_picture_has_a_dark_halo(self):
         # a chart line passing behind a letter would swallow it; measured in a browser, the halo is what keeps every letter above 4.5:1
-        halo = self.rule("h1,.lead,.meta,.foot,.tabs button")
+        halo = self.rule("h1,.lead,.meta,.foot")
         self.assertGreaterEqual(halo.count("var(--bg)"), 2)
         self.assertIn("text-shadow", halo)
 

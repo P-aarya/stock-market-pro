@@ -385,19 +385,24 @@ class Visitors(AccountsTestCase, unittest.TestCase):
         text = self.c.get("/").text
         self.assertIn("<b>Create a free account.</b> It opens the Home tab.", text)
         self.assertIn("The Basic plan, $9.99 a month, adds market tab, portfolio management and raising tickets.", text)        # read from tiers.py, not typed in
-        portfolio = text.split('id="view-portfolio"')[1]
-        self.assertIn("Adding holdings and transactions comes with the Basic plan, $9.99 a month.", portfolio)
         self.assertNotIn("<!--PLAN", text); self.assertNotIn("You're viewing the free plan", text)                     # a visitor is not "on" a plan
 
-    def test_the_free_plan_has_a_read_only_portfolio_page_that_asks_the_server_for_nothing(self):
+    def test_the_public_page_has_no_portfolio_tab_because_nobody_is_signed_in_to_have_one(self):
         text = self.c.get("/").text
-        self.assertIn('id="tab-portfolio"', text); self.assertIn('id="view-portfolio"', text)
-        portfolio = text.split('id="view-portfolio"')[1].split("</main>")[0]
-        for word in ("Portfolio value", "Total invested", "Unrealized P&amp;L", "Shares", "Avg cost", "read-only"):
-            self.assertIn(word, portfolio)
-        for editing in ("<form", "<input", "<textarea", "fetch(", "Add holding"):
-            self.assertNotIn(editing, portfolio, editing)               # visible, not editable: nothing to type into or save
-        self.assertNotIn("<!--PLAN", portfolio)
+        for gone in ('id="tab-portfolio"', 'id="view-portfolio"', 'id="view-prices"', 'class="tabs"', "#portfolio", "showView", "Portfolio value",
+                     "Total invested", "Adding holdings and transactions", "No holdings to show"):
+            self.assertNotIn(gone, text, gone)
+        self.assertIsNone(re.search(r">\s*Portfolio\s*<", text))                       # no tab, heading or link called Portfolio
+        self.assertIn("Live stock prices", text); self.assertIn('id="rows"', text)        # what the page is for is still there
+        self.assertIn('href="/login"', text); self.assertIn('href="/register"', text)
+
+    def test_a_free_account_that_is_signed_in_still_has_its_read_only_portfolio_in_the_dashboard(self):
+        # only the signed-out page lost the tab: Free still includes the Portfolio feature once there is an account
+        self.assertIn("portfolio_view", tiers.features_for(1))
+        self.assertEqual(tiers.feature_for("GET", "/api/portfolio"), "portfolio_view")
+        page = signed_in_client(1, tier=1).get("/").text                                   # the dashboard a signed-in Free account gets at "/"
+        self.assertIn('id="ntab-portfolio"', page)
+        self.assertIn("portfolio_view", re.search(r'name="smp-features" content="([^"]*)"', page).group(1).split(","))
 
     def test_the_price_list_has_only_ticker_name_sector_price_and_change(self):
         r = self.c.get("/api/public/stocks")

@@ -72,23 +72,9 @@ td.more,th.more{width:1%;padding-left:6px;padding-right:10px;text-align:center}
 .moreRow button:hover{border-color:var(--blue)}
 .foot{margin-top:18px;color:var(--muted);font-size:12px}
 .subname{display:none}
-.tabs{display:flex;gap:4px;margin:0 0 18px;border-bottom:1px solid var(--line)}
-.tabs button{all:unset;box-sizing:border-box;display:block;padding:0 16px;min-height:44px;line-height:44px;cursor:pointer;font-weight:700;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
-.tabs button:hover{color:var(--text)}
-.tabs button[aria-current=page]{color:var(--text);border-bottom-color:var(--blue)}
-.tabs button:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
 /* text that sits straight on the picture (not inside a panel) gets a thin dark halo, so a chart line passing behind it never swallows a letter */
-h1,.lead,.meta,.foot,.tabs button{text-shadow:0 0 2px var(--bg),0 0 7px var(--bg)}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:0 0 16px}
-.stat{padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:rgba(12,12,22,.92);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
-.stat small{display:block;color:var(--muted);font-size:11px;letter-spacing:1px;text-transform:uppercase;font-weight:700}
-.stat b{display:block;margin-top:4px;font:700 20px var(--mono);color:var(--muted)}
-#view-portfolio th{padding:11px 14px}
-#view-portfolio td.state{white-space:normal}
-.moreRow .btn{margin:0 3px}
+h1,.lead,.meta,.foot{text-shadow:0 0 2px var(--bg),0 0 7px var(--bg)}
 @media(max-width:640px){
-  .stats{grid-template-columns:repeat(2,1fr)}
-  #view-portfolio th{padding:11px 6px;font-size:10px;letter-spacing:.4px}      /* six short column names fit a phone without sideways scrolling */
   h1{font-size:21px}.btn{padding:0 12px;min-height:38px;font-size:13px}.brand small{display:none}
   /* on a phone the company name moves under the ticker, so price and change always fit without sideways scrolling */
   .sec,.name,th[data-key=name],td.more,th.more{display:none}
@@ -96,7 +82,7 @@ h1,.lead,.meta,.foot,.tabs button{text-shadow:0 0 2px var(--bg),0 0 7px var(--bg
   th,td{padding:10px 8px}th button{padding:11px 8px}
   .subname{display:block;max-width:38vw;overflow:hidden;text-overflow:ellipsis;font:500 11px/1.3 Inter,system-ui,sans-serif;color:var(--muted)}
 }
-@media(max-width:380px){.btn.ghost{display:none}#view-portfolio th{padding:11px 3px;letter-spacing:0}}
+@media(max-width:380px){.btn.ghost{display:none}}
 </style>
 </head>
 <body>
@@ -107,12 +93,6 @@ h1,.lead,.meta,.foot,.tabs button{text-shadow:0 0 2px var(--bg),0 0 7px var(--bg
 </header>
 
 <main>
-  <nav class="tabs" aria-label="Sections">
-    <button type="button" id="tab-prices" aria-current="page">Prices</button>
-    <button type="button" id="tab-portfolio">Portfolio</button>
-  </nav>
-
-  <div id="view-prices">
   <h1>Live stock prices</h1>
   <p class="lead">Every stock we track, with today's price and change.</p>
 
@@ -148,36 +128,6 @@ h1,.lead,.meta,.foot,.tabs button{text-shadow:0 0 2px var(--bg),0 0 7px var(--bg
   </div>
 
   <p class="foot">Prices are refreshed regularly and may be delayed. For information only. Not investment advice. Data from Yahoo Finance.</p>
-  </div>
-
-  <!-- Portfolio visibility comes with every plan: the page is there to look at, but holdings can only be added and changed
-       with an account on a plan that has portfolio management. Nothing here asks the server for anything. -->
-  <div id="view-portfolio" hidden>
-    <h1>Portfolio</h1>
-    <p class="lead">This is where your holdings, their value and your gains and losses appear. You haven't signed in, so the page is read-only.</p>
-
-    <section class="plan" aria-label="Plans">
-      <p><b>Create a free account</b> to see your own portfolio. Adding holdings and transactions comes with the <!--PLAN_NAME--> plan, $<!--PLAN_PRICE--> a month.</p>
-      <a class="btn primary" href="/register">Create an account</a>
-    </section>
-
-    <div class="stats">
-      <div class="stat"><small>Portfolio value</small><b>$--</b></div>
-      <div class="stat"><small>Total invested</small><b>$--</b></div>
-      <div class="stat"><small>Unrealized P&amp;L</small><b>$--</b></div>
-      <div class="stat"><small>Today's change</small><b>$--</b></div>
-    </div>
-
-    <div class="wrap">
-      <div class="scroll">
-        <table>
-          <thead><tr><th scope="col">Ticker</th><th scope="col" class="r">Shares</th><th scope="col" class="r">Avg cost</th><th scope="col" class="r">Price</th><th scope="col" class="r">Value</th><th scope="col" class="r">P&amp;L</th></tr></thead>
-          <tbody><tr><td colspan="6" class="state">No holdings to show. Sign in to see yours; holdings can be added on the <!--PLAN_NAME--> plan or higher.</td></tr></tbody>
-        </table>
-      </div>
-      <div class="moreRow"><a class="btn" href="/login">Sign in</a> <a class="btn primary" href="/register">Create an account</a></div>
-    </div>
-  </div>
 </main>
 
 <script>
@@ -280,20 +230,6 @@ h1,.lead,.meta,.foot,.tabs button{text-shadow:0 0 2px var(--bg),0 0 7px var(--bg
       state.shown = PAGE; render();
     });
   });
-  /** Prices and Portfolio are two views of the same page; #portfolio in the address opens the second. */
-  function showView(name) {
-    var portfolio = name === 'portfolio';
-    $('view-prices').hidden = portfolio; $('view-portfolio').hidden = !portfolio;
-    if (portfolio) $('tab-portfolio').setAttribute('aria-current', 'page'); else $('tab-portfolio').removeAttribute('aria-current');
-    if (portfolio) $('tab-prices').removeAttribute('aria-current'); else $('tab-prices').setAttribute('aria-current', 'page');
-    document.title = (portfolio ? 'Portfolio' : 'Live Stock Prices') + ' · Aymetrix';
-    if (history.replaceState) history.replaceState(null, '', portfolio ? '#portfolio' : location.pathname + location.search);
-    window.scrollTo(0, 0);
-  }
-  $('tab-prices').addEventListener('click', function () { showView('prices'); });
-  $('tab-portfolio').addEventListener('click', function () { showView('portfolio'); });
-  if (location.hash === '#portfolio') showView('portfolio');
-  window.addEventListener('hashchange', function () { showView(location.hash === '#portfolio' ? 'portfolio' : 'prices'); });   // an address typed or linked while the page is open
   setInterval(function () { if (!document.hidden) load(); }, REFRESH_MS);
   load();
 })();

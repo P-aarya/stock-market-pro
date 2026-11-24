@@ -89,7 +89,7 @@ _APP_ASSETS = {
 }
 _OPEN_PATHS = {"/login", "/register", "/restore", "/logout", "/forgot-password", "/reset-password", "/confirm-email", "/health", "/api/auth/status", "/favicon.ico"} | set(_APP_ASSETS)
 # The Free tier is a visitor with no account (tiers.py). They may load "/", which shows them only the public page (the price
-# list and a read-only portfolio page), and that list's own feed. Everything else still needs a sign-in.
+# list), and that list's own feed. Everything else still needs a sign-in.
 _ANONYMOUS_PATHS = {"/", "/api/public/stocks"}
 _public_hits = auth.RateLimiter(120, 60)            # price-list requests per visitor per minute
 
@@ -481,7 +481,7 @@ def _locked_features(request: Request) -> dict:
 
 
 def _public_response():
-    """What someone who isn't signed in sees at "/": the public price list and read-only portfolio page (public.html)."""
+    """What someone who isn't signed in sees at "/": the public price list (public.html). It has no Portfolio tab: there is nothing to show before a sign-in."""
     path = os.path.join(_BASE_DIR, "public.html")
     if not os.path.exists(path):
         return RedirectResponse("/login", status_code=302)
