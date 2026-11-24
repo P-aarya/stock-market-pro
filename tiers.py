@@ -165,9 +165,18 @@ def catalog() -> list:
     return out
 
 
+PUBLIC_STOCK_LIMIT = 10          # the most stocks anyone who hasn't signed in can see in the public price list
+
+
 def public_stock_row(row) -> list:
     """One stock as the free tier sees it: [ticker, name, sector, price, change %]. Nothing else leaves the server."""
     return [row.get("ticker"), row.get("company_name"), row.get("sector"), row.get("current_price"), row.get("price_change_pct")]
+
+
+def public_stock_rows(rows) -> list:
+    """The public price list: the first PUBLIC_STOCK_LIMIT stocks of `rows` (the stock directory is ordered biggest first), and never more.
+    The cap is applied here, on the server, so asking the endpoint for more (a bigger page, a query string) gets nothing extra."""
+    return [public_stock_row(r) for r in list(rows)[:PUBLIC_STOCK_LIMIT]]
 
 
 # ── which route needs which feature ──

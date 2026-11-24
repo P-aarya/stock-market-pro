@@ -67,13 +67,10 @@ td.more,th.more{width:1%;padding-left:6px;padding-right:10px;text-align:center}
 .state button{margin-top:12px;min-height:40px;padding:0 16px;border-radius:9px;border:1px solid var(--line2);background:var(--bg3);color:var(--text);font:inherit;font-weight:700;cursor:pointer}
 .spin{width:22px;height:22px;margin:0 auto 10px;border:3px solid var(--line2);border-top-color:var(--blue);border-radius:50%;animation:s .8s linear infinite}
 @keyframes s{to{transform:rotate(360deg)}}
-.moreRow{padding:14px;text-align:center;border-top:1px solid var(--line)}
-.moreRow button{min-height:42px;padding:0 20px;border-radius:9px;border:1px solid var(--line2);background:var(--bg3);color:var(--text);font:inherit;font-weight:700;cursor:pointer}
-.moreRow button:hover{border-color:var(--blue)}
 .foot{margin-top:18px;color:var(--muted);font-size:12px}
 .subname{display:none}
 /* text that sits straight on the picture (not inside a panel) gets a thin dark halo, so a chart line passing behind it never swallows a letter */
-h1,.lead,.meta,.foot{text-shadow:0 0 2px var(--bg),0 0 7px var(--bg)}
+h1,.lead,.meta,.foot{text-shadow:0 0 2px var(--bg),0 0 2px var(--bg),0 0 6px var(--bg),0 0 10px var(--bg)}
 @media(max-width:640px){
   h1{font-size:21px}.btn{padding:0 12px;min-height:38px;font-size:13px}.brand small{display:none}
   /* on a phone the company name moves under the ticker, so price and change always fit without sideways scrolling */
@@ -94,7 +91,7 @@ h1,.lead,.meta,.foot{text-shadow:0 0 2px var(--bg),0 0 7px var(--bg)}
 
 <main>
   <h1>Live stock prices</h1>
-  <p class="lead">Every stock we track, with today's price and change.</p>
+  <p class="lead">The <!--STOCK_LIMIT--> largest stocks we track, with today's price and change.</p>
 
   <section class="plan" aria-label="Plans">
     <p><b>Create a free account.</b> It opens the Home tab. The <!--PLAN_NAME--> plan, $<!--PLAN_PRICE--> a month, adds <!--PLAN_PERKS-->.</p>
@@ -124,7 +121,6 @@ h1,.lead,.meta,.foot{text-shadow:0 0 2px var(--bg),0 0 7px var(--bg)}
       </table>
     </div>
     <div id="state" class="state" role="status"><div class="spin"></div>Loading prices&hellip;</div>
-    <div id="moreRow" class="moreRow" hidden><button type="button" id="more">Show more</button></div>
   </div>
 
   <p class="foot">Prices are refreshed regularly and may be delayed. For information only. Not investment advice. Data from Yahoo Finance.</p>
@@ -133,8 +129,8 @@ h1,.lead,.meta,.foot{text-shadow:0 0 2px var(--bg),0 0 7px var(--bg)}
 <script>
 (function () {
   'use strict';
-  var PAGE = 50, REFRESH_MS = 60000;
-  var state = { rows: [], q: '', sector: '', key: 'rank', dir: 1, shown: PAGE, updated: null, loaded: false };
+  var REFRESH_MS = 60000;                  // how many stocks there are is the server's decision (it sends at most ten); the page shows what it is sent
+  var state = { rows: [], q: '', sector: '', key: 'rank', dir: 1, updated: null, loaded: false };
   var $ = function (id) { return document.getElementById(id); };
 
   function fmtPrice(n) { return n == null ? '—' : '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -173,7 +169,7 @@ h1,.lead,.meta,.foot{text-shadow:0 0 2px var(--bg),0 0 7px var(--bg)}
 
   function render() {
     var all = view(), body = $('rows'), frag = document.createDocumentFragment();
-    all.slice(0, state.shown).forEach(function (r) {
+    all.forEach(function (r) {
       var tr = document.createElement('tr'), chg = fmtChange(r.change);
       [['sym', r.ticker], ['name', r.name], ['sec', r.sector || '—'], ['num r', fmtPrice(r.price)], ['num r ' + chg.cls, chg.text]].forEach(function (c) {
         var td = document.createElement('td'); td.className = c[0]; td.textContent = c[1]; tr.appendChild(td);
@@ -186,9 +182,9 @@ h1,.lead,.meta,.foot{text-shadow:0 0 2px var(--bg),0 0 7px var(--bg)}
       more.appendChild(a); tr.appendChild(more); frag.appendChild(tr);
     });
     body.textContent = ''; body.appendChild(frag);
-    $('moreRow').hidden = all.length <= state.shown;
     if (!all.length) setState(state.loaded ? 'No stocks match your search.' : 'loading'); else setState('');
-    $('count').textContent = state.loaded ? 'Showing ' + Math.min(state.shown, all.length) + ' of ' + all.length + ' stocks' : '';
+    var total = state.rows.length;
+    $('count').textContent = !state.loaded ? '' : all.length === total ? total + (total === 1 ? ' stock' : ' stocks') : 'Showing ' + all.length + ' of ' + total + ' stocks';
     Array.prototype.forEach.call(document.querySelectorAll('th[data-key]'), function (th) {
       th.setAttribute('aria-sort', th.dataset.key === state.key ? (state.dir > 0 ? 'ascending' : 'descending') : 'none');
     });
@@ -220,14 +216,13 @@ h1,.lead,.meta,.foot{text-shadow:0 0 2px var(--bg),0 0 7px var(--bg)}
     });
   }
 
-  $('q').addEventListener('input', function () { state.q = this.value; state.shown = PAGE; render(); });
-  $('sector').addEventListener('change', function () { state.sector = this.value; state.shown = PAGE; render(); });
-  $('more').addEventListener('click', function () { state.shown += PAGE; render(); });
+  $('q').addEventListener('input', function () { state.q = this.value; render(); });
+  $('sector').addEventListener('change', function () { state.sector = this.value; render(); });
   Array.prototype.forEach.call(document.querySelectorAll('th[data-key]'), function (th) {
     th.querySelector('button').addEventListener('click', function () {
       var k = th.dataset.key;
       if (state.key === k) state.dir = -state.dir; else { state.key = k; state.dir = (k === 'price' || k === 'change') ? -1 : 1; }
-      state.shown = PAGE; render();
+      render();
     });
   });
   setInterval(function () { if (!document.hidden) load(); }, REFRESH_MS);

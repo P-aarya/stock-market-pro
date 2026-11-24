@@ -29,6 +29,7 @@ ROWS = [{"ticker": "AAPL", "company_name": "Apple Inc.", "sector": "Technology",
          "market_cap": 3e12, "_low": "apple inc.", "_plain": "appleinc"},
         {"ticker": "KO", "company_name": "Coca-Cola", "sector": "Consumer Staples", "current_price": 60.0, "price_change_pct": -0.4,
          "market_cap": 2.6e11, "_low": "coca-cola", "_plain": "cocacola"}]
+REAL_STOCK_DIRECTORY = api._stock_directory            # the real function, kept before any test swaps it for a fake
 FULL_ROW = {"ticker": "AAPL", "company_name": "Apple Inc.", "sector": "Technology", "industry": "Consumer Electronics", "current_price": 190.5,
             "price_change": 2.3, "price_change_pct": 1.25, "pe_ratio": 31.2, "eps": 6.1, "rsi_14": 55.0, "macd": 0.4, "beta": 1.2,
             "dividend_yield": 0.5, "target_price": 210.0, "analyst_rating": "buy", "upside_pct": 10.2, "institutional_ownership": 0.6}
@@ -412,6 +413,58 @@ class Visitors(AccountsTestCase, unittest.TestCase):
         self.assertEqual(body["stocks"], [["AAPL", "Apple Inc.", "Technology", 190.5, 1.25], ["KO", "Coca-Cola", "Consumer Staples", 60.0, -0.4]])
         self.assertNotIn("market_cap", r.text); self.assertNotIn("appleinc", r.text)
         self.assertIn("max-age", r.headers["cache-control"])
+
+    def many_stocks(self, n):
+        """n stocks in the directory's order (biggest first): S01 is the biggest."""
+        return [{"ticker": f"S{i:02d}", "company_name": f"Company {i}", "sector": "Technology", "current_price": 100.0 + i, "price_change_pct": 0.5,
+                 "market_cap": 1e12 - i * 1e9, "_low": f"company {i}", "_plain": f"company{i}"} for i in range(1, n + 1)]
+
+    def test_the_public_price_list_never_has_more_than_ten_stocks_and_they_are_the_biggest_ten(self):
+        self.assertEqual(tiers.PUBLIC_STOCK_LIMIT, 10)
+        with mock.patch.object(api, "_stock_directory", return_value=self.many_stocks(60)):
+            body = self.c.get("/api/public/stocks").json()
+        self.assertEqual(len(body["stocks"]), 10)
+        self.assertEqual([row[0] for row in body["stocks"]], [f"S{i:02d}" for i in range(1, 11)])        # the first ten of the biggest-first list
+        self.assertNotIn("S11", json.dumps(body))
+
+    def test_asking_the_public_endpoint_for_more_gets_nothing_extra(self):
+        with mock.patch.object(api, "_stock_directory", return_value=self.many_stocks(60)):
+            for query in ("?limit=50", "?limit=1000", "?page=2", "?offset=10", "?all=1", "?n=100", "?per_page=500", "?limit=-1", "?page_size=100&start=10"):
+                r = self.c.get("/api/public/stocks" + query)
+                self.assertEqual(r.status_code, 200, query)
+                self.assertEqual([row[0] for row in r.json()["stocks"]], [f"S{i:02d}" for i in range(1, 11)], query)
+            for method in ("post", "put"):
+                self.assertGreaterEqual(getattr(self.c, method)("/api/public/stocks").status_code, 400)
+
+    def test_fewer_than_ten_stocks_are_all_shown_and_the_directory_itself_is_left_whole(self):
+        for count in (0, 1, 3, 9, 10):
+            with mock.patch.object(api, "_stock_directory", return_value=self.many_stocks(count)):
+                self.assertEqual(len(self.c.get("/api/public/stocks").json()["stocks"]), count, count)
+        rows = self.many_stocks(25)
+        self.assertEqual(len(tiers.public_stock_rows(rows)), 10)
+        self.assertEqual(len(rows), 25)                                                                  # the signed-in search still sees every stock
+        self.assertEqual(len(tiers.public_stock_rows(iter(rows))), 10)
+
+    def test_the_public_page_says_ten_from_the_same_number_and_has_no_show_more_button(self):
+        text = self.c.get("/").text
+        self.assertIn("The 10 largest stocks we track", text)
+        self.assertNotIn("Every stock we track", text)
+        for gone in ("Show more", 'id="more"', "moreRow", "state.shown", "PAGE"):
+            self.assertNotIn(gone, text, gone)
+        self.assertNotIn("<!--", text)                                                                   # every placeholder was filled in
+        with mock.patch.object(tiers, "PUBLIC_STOCK_LIMIT", 7):
+            self.assertIn("The 7 largest stocks we track", self.c.get("/").text)                          # the page follows the one number
+
+    def test_the_real_stock_directory_is_not_capped_by_the_public_limit(self):
+        # only the signed-out list is limited: the search box and Home tab of an account use the whole directory, so the cap must not
+        # live in the function that builds it
+        self.assertNotIsInstance(REAL_STOCK_DIRECTORY, mock.Mock)
+        raw = [{"ticker": f"S{i:02d}", "company_name": f"Company {i}", "sector": "Technology", "current_price": 100.0 + i,
+                "price_change_pct": 0.5, "market_cap": 1e12 - i * 1e9} for i in range(1, 61)]
+        with mock.patch.object(api, "query", return_value=raw), mock.patch.object(api, "_directory_cache", {"rows": [], "at": 0}):
+            rows = REAL_STOCK_DIRECTORY()
+        self.assertEqual(len(rows), 60)
+        self.assertEqual(len(tiers.public_stock_rows(rows)), 10)
 
     def test_everything_else_still_needs_a_sign_in(self):
         for path in ("/api/stocks", "/api/stocks/AAPL", "/api/stocks/directory", "/api/market/summary", "/api/portfolio", "/api/watchlist",

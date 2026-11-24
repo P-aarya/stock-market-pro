@@ -491,7 +491,7 @@ def _public_response():
     perks = [tiers.FEATURES[f].lower() for f in plan.adds]
     perk_text = ", ".join(perks[:-1]) + " and " + perks[-1] if len(perks) > 1 else perks[0]
     page = (page.replace("<!--PLAN_NAME-->", _escape_html(plan.name)).replace("<!--PLAN_PRICE-->", f"{plan.price:.2f}")
-                .replace("<!--PLAN_PERKS-->", _escape_html(perk_text)))
+                .replace("<!--PLAN_PERKS-->", _escape_html(perk_text)).replace("<!--STOCK_LIMIT-->", str(tiers.PUBLIC_STOCK_LIMIT)))
     return HTMLResponse(page, headers={"Cache-Control": "private, no-cache"})
 
 
@@ -551,7 +551,7 @@ for _route, (_file, _type) in _APP_ASSETS.items():
 @app.get("/api/public/stocks")
 def public_stocks(request: Request, response: Response):
     """The Free tier's price list for visitors without an account: ticker, name, sector, price and today's change for
-    every stock, and nothing more. Answered from the same in-memory list as the search box, so a crowd of visitors never
+    the biggest tiers.PUBLIC_STOCK_LIMIT stocks (ten), and nothing more. Answered from the same in-memory list as the search box, so a crowd of visitors never
     reaches the database; each visitor is limited to a modest number of requests a minute."""
     client = _client_id(request)
     if _public_hits.blocked(client):
@@ -561,7 +561,7 @@ def public_stocks(request: Request, response: Response):
     rows = _stock_directory()
     response.headers["Cache-Control"] = "public, max-age=30"
     return {"fields": ["ticker", "company_name", "sector", "current_price", "price_change_pct"],
-            "stocks": [tiers.public_stock_row(r) for r in rows], "updated": _directory_cache["at"] or None}
+            "stocks": tiers.public_stock_rows(rows), "updated": _directory_cache["at"] or None}
 
 
 # ── removing deleted accounts for good ──
