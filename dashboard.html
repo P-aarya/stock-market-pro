@@ -1218,6 +1218,79 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 </div>
 
 <!-- ═══════════ COMMODITIES PAGE ═══════════ -->
+<!-- ═══ YOUR FINANCES (profile menu): questions on the left, answers on the right; tips only when asked (my_finance.py) ═══ -->
+<div class="page" id="page-finance">
+  <div class="fin-head">
+    <h2 class="fin-h">Your finances</h2>
+    <p class="fin-sub">Answer the questions in each section and the answers update as you type. Amounts in US dollars. General guidance, not financial advice.</p>
+  </div>
+  <div class="fin-kpis" id="fin-kpis"></div>
+  <div class="fin-tabs" role="tablist" aria-label="Your finances sections">
+    <button class="fin-tab on" type="button" role="tab" data-t="monthly" onclick="finTab('monthly')">Monthly money</button>
+    <button class="fin-tab" type="button" role="tab" data-t="invest" onclick="finTab('invest')">Investments</button>
+    <button class="fin-tab" type="button" role="tab" data-t="goals" onclick="finTab('goals')">Goals</button>
+    <button class="fin-tab" type="button" role="tab" data-t="give" onclick="finTab('give')">Donations</button>
+    <button class="fin-tab" type="button" role="tab" data-t="calc" onclick="finTab('calc')">Calculators</button>
+  </div>
+  <div class="fin-msg" id="fin-msg" role="status" aria-live="polite"></div>
+
+  <!-- 1 Monthly money -->
+  <section class="fin-panel on" id="fin-p-monthly" role="tabpanel">
+    <div class="card fin-q"><div class="chdr"><div class="ctitle">Questions</div><div class="fin-acts" id="fm-acts"></div></div><div id="fm-body"></div></div>
+    <div class="card fin-a"><div class="chdr"><div class="ctitle">Your answer</div><button class="fin-sugg" type="button" data-s="monthly" onclick="finSuggest('monthly')">Suggestions</button></div>
+      <div id="fm-ans"></div><div class="fin-tips" id="fin-tips-monthly" hidden></div></div>
+  </section>
+
+  <!-- 2 Investments -->
+  <section class="fin-panel" id="fin-p-invest" role="tabpanel">
+    <div class="card fin-q"><div class="chdr"><div class="ctitle">What you own</div><button class="btn btnp fin-sbtn" type="button" onclick="finInvForm()">+ Add</button></div>
+      <div id="fi-body"></div>
+      <div class="fin-form" id="fi-form" hidden>
+        <label class="fin-fl">Type<select class="sel" id="fi-kind"></select></label>
+        <label class="fin-fl">Name <small>(optional)</small><input class="srch" id="fi-name" maxlength="80" placeholder="e.g. HSBC savings"></label>
+        <label class="fin-fl">Amount ($)<input class="srch" id="fi-amt" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 5000"></label>
+        <div class="fin-fbtns"><button class="btn btnp" type="button" id="fi-save" onclick="finInvSave()">Add</button><button class="btn" type="button" onclick="finInvClose()">Cancel</button></div>
+      </div>
+      <p class="fin-note">The same items as “Where your money is” on the Portfolio page: add them once, they show in both. Shares and commodities come from your Transactions.</p>
+    </div>
+    <div class="card fin-a"><div class="chdr"><div class="ctitle">Your answer</div><button class="fin-sugg" type="button" data-s="invest" onclick="finSuggest('invest')">Suggestions</button></div>
+      <div id="fi-ans"></div><div class="fin-tips" id="fin-tips-invest" hidden></div></div>
+  </section>
+
+  <!-- 3 Goals -->
+  <section class="fin-panel" id="fin-p-goals" role="tabpanel">
+    <div class="card fin-q"><div class="chdr"><div class="ctitle" id="fg-title">Add a goal</div></div>
+      <div class="fin-form fin-form-open">
+        <label class="fin-fl">What is it for?<input class="srch" id="fg-name" maxlength="80" placeholder="e.g. Car, Home deposit, Holiday" oninput="finRenderGoals()"></label>
+        <label class="fin-fl">How much does it cost? ($)<input class="srch" id="fg-target" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 25000" oninput="finRenderGoals()"></label>
+        <label class="fin-fl">By when?<input class="srch" id="fg-date" type="month" oninput="finRenderGoals()"></label>
+        <label class="fin-fl">Already saved for it ($)<input class="srch" id="fg-saved" type="number" min="0" step="any" inputmode="decimal" placeholder="0" oninput="finRenderGoals()"></label>
+        <div class="fin-preview" id="fg-preview"></div>
+        <div class="fin-fbtns"><button class="btn btnp" type="button" id="fg-save" onclick="finGoalSave()">Save goal</button><button class="btn" type="button" id="fg-cancel" hidden onclick="finGoalReset()">Cancel</button></div>
+      </div>
+    </div>
+    <div class="card fin-a"><div class="chdr"><div class="ctitle">Your goals</div><button class="fin-sugg" type="button" data-s="goals" onclick="finSuggest('goals')">Suggestions</button></div>
+      <div id="fg-list"></div><div class="fin-tips" id="fin-tips-goals" hidden></div></div>
+  </section>
+
+  <!-- 4 Donations (optional) -->
+  <section class="fin-panel" id="fin-p-give" role="tabpanel">
+    <div class="card fin-q"><div class="chdr"><div class="ctitle">Questions</div><div class="fin-acts" id="fd-acts"></div></div><div id="fd-body"></div></div>
+    <div class="card fin-a"><div class="chdr"><div class="ctitle">Your answer</div><button class="fin-sugg" type="button" data-s="give" onclick="finSuggest('give')">Suggestions</button></div>
+      <div id="fd-ans"></div><div class="fin-tips" id="fin-tips-give" hidden></div></div>
+  </section>
+
+  <!-- 5 Calculators: anyone can use them; nothing is saved -->
+  <section class="fin-panel" id="fin-p-calc" role="tabpanel">
+    <div class="card">
+      <div class="chdr"><div class="ctitle">Calculators</div><span class="fin-mini">Nothing here is saved</span></div>
+      <div class="fin-calcs" id="fc-pick"></div>
+      <div class="fin-calc-grid"><div id="fc-in"></div><div class="fin-calc-out" id="fc-out"></div></div>
+    </div>
+  </section>
+  <p class="fin-foot">General guidance worked out from your own numbers, not financial advice. Your answers are only visible to you, are included in “Download my data”, and are deleted with your account.</p>
+</div>
+
 <!-- ═══ NEWS: headlines from the past 30 days, collected every 30 minutes by the price updater (news_store.py) ═══ -->
 <div class="page" id="page-news">
   <div class="card">
@@ -1838,11 +1911,14 @@ function addAccountMenu(nav){
   prof.innerHTML='<svg class="lic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg><span>Profile and plan</span>';
   const out=document.createElement('a');out.href='/logout';out.className='nsignout';out.setAttribute('role','menuitem');
   out.innerHTML='<svg class="lic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Sign out</span>';
-  menu.appendChild(nm);menu.appendChild(em);menu.appendChild(hr);menu.appendChild(prof);menu.appendChild(out);
+  const fin=document.createElement('button');fin.type='button';fin.className='nmenu-item';fin.id='nprof-finance';fin.setAttribute('role','menuitem');
+  fin.innerHTML='<svg class="lic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M16 15h2"/><path d="M6 6V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/></svg><span>Your finances</span>';
+  menu.appendChild(nm);menu.appendChild(em);menu.appendChild(hr);menu.appendChild(prof);menu.appendChild(fin);menu.appendChild(out);
   wrap.appendChild(btn);wrap.appendChild(menu);nav.appendChild(wrap);
   const setOpen=(open)=>{menu.classList.toggle('open',open);btn.setAttribute('aria-expanded',open?'true':'false');};
   btn.addEventListener('click',(e)=>{e.stopPropagation();setOpen(!menu.classList.contains('open'));});
   prof.addEventListener('click',()=>{setOpen(false);openProfile();});
+  fin.addEventListener('click',()=>{setOpen(false);showPage('finance');});
   document.addEventListener('click',(e)=>{if(!wrap.contains(e.target))setOpen(false);});
   document.addEventListener('keydown',(e)=>{if(e.key==='Escape')setOpen(false);});
   return {gear,btn,menu};
@@ -2042,6 +2118,7 @@ function showPage(n,btn){
   if(n==='watchlist')loadWatchlist();
   if(n==='learn')loadLearn();
   if(n==='news')loadNews();
+  if(n==='finance')loadFinance();
   if(typeof moreTabsState==='function')moreTabsState(n);
   if(n==='profile')loadProfile();
   if(n==='ipos'&&(!ipoFetchedAt||Date.now()-ipoFetchedAt>IPO_REFRESH_MS))loadIPOs();
@@ -3630,6 +3707,428 @@ function renderWorldNews(){
       </div>
     </div>`;
   }).join('')}</div>`;
+}
+
+// ═══ YOUR FINANCES: Monthly money, Investments, Goals, Donations (optional) and Calculators ═══
+// Answers are saved per account (/api/finance); the numbers on the right are worked out here as people type. Suggestions only show
+// when the Suggestions button is pressed, and Clear hides them. The calculators work for everyone and save nothing.
+const FIN_Q=[['income','How much comes in each month?','Pay after tax, plus any other income'],['housing','Rent or home loan',''],
+  ['bills','Bills','Power, water, phone, internet'],['food','Food and shopping',''],['transport','Transport','Fuel, fares, car costs'],
+  ['repayments','Loan or card repayments',''],['other_spend','Everything else','Fun, subscriptions, gifts…']];
+const FIN_SPEND=[['housing','Home','#4f8ef7'],['bills','Bills','#06b6d4'],['food','Food','#f5a623'],['transport','Transport','#a855f7'],
+  ['repayments','Repayments','#ff4444'],['other_spend','Other','#7a8ba0']];
+let finData=null,finHold=null,finTabNow='monthly',finEditM=false,finEditG=false,finGoalId=null,finCalc='loan',finOpen={},finLoading=false;
+const finN=v=>{const x=parseFloat(v);return isFinite(x)?x:null;};
+const finUsd=v=>v==null||!isFinite(v)?'—':(v<0?'-':'')+'$'+Math.abs(v).toLocaleString('en-US',{maximumFractionDigits:0});
+const finUsd2=v=>v==null||!isFinite(v)?'—':(v<0?'-':'')+'$'+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const finPct=(v,d=0)=>v==null||!isFinite(v)?'—':(+v.toFixed(d)).toString()+'%';          // 1.5% stays, 1.0% shows as 1%
+function finSay(text,ok){const el=document.getElementById('fin-msg');if(!el)return;el.textContent=text||'';el.className='fin-msg'+(text?(ok?' ok':' bad'):'');
+  clearTimeout(finSay.t);if(text&&ok)finSay.t=setTimeout(()=>{el.textContent='';el.className='fin-msg';},4000);}
+async function finSend(method,url,body){
+  try{
+    const res=await fetch(API+url,{method,headers:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
+    let d=null;try{d=await res.json();}catch(e){}
+    if(!res.ok||!d||d.status!=='success'){finSay(apiMessage(d,res),false);return null;}
+    finSay(d.message,true);return d;
+  }catch(e){finSay("Couldn't reach the server. Please try again.",false);return null;}
+}
+const finLocked=()=>typeof can==='function'&&!can('portfolio_view');
+
+async function loadFinance(){
+  finTab(finTabNow,true);
+  if(finLocked()){finRenderAll();return;}
+  if(finLoading)return;finLoading=true;
+  try{
+    const [d,h]=await Promise.all([api('/api/finance'),api('/api/portfolio'),moneyItems===null?loadMoney():null]);
+    if(d&&d.status==='success')finData=d;
+    else if(!finData){finData={monthly:{},has_monthly:false,giving:{on:false},goals:[]};finSay((d&&d.message)||"Couldn't load your answers. Reload to try again.",false);}
+    finHold=Array.isArray(h)?h:(finHold||[]);
+    finEditM=!finData.has_monthly;
+  }finally{finLoading=false;}
+  finRenderAll();
+}
+function finTab(t,quiet){
+  finTabNow=t;
+  document.querySelectorAll('.fin-tab').forEach(b=>{const on=b.dataset.t===t;b.classList.toggle('on',on);b.setAttribute('aria-selected',on);});
+  document.querySelectorAll('.fin-panel').forEach(p=>p.classList.toggle('on',p.id==='fin-p-'+t));
+  if(t==='calc')finRenderCalc();
+  if(!quiet&&t==='invest')finRenderInvest();
+}
+function finRenderAll(){
+  if(finLocked()){
+    const box=`<div class="fin-lock">${LOCK_ICON}<div><b>${escapeHtml(lockText('portfolio_view').label)} isn’t part of your plan.</b> ${escapeHtml(lockText('portfolio_view').where)}. The Calculators tab works on every plan.</div><button class="btn btnp" type="button" onclick="seePlans()">See plans</button></div>`;
+    ['monthly','invest','goals','give'].forEach(t=>{document.getElementById('fin-p-'+t).innerHTML=box;});
+    document.getElementById('fin-kpis').innerHTML='';
+    if(finTabNow!=='calc')finTab('calc');
+    return;
+  }
+  if(!finData)return;
+  finRenderMonthly();finRenderInvest();finRenderGoals();finRenderGive();finRenderKpis();
+}
+
+/* ---- numbers everyone else uses ---- */
+function finMonthlyNow(){                       // the answers being typed (while editing) or the saved ones
+  const m={};
+  if(finEditM&&document.getElementById('fm-income'))FIN_Q.forEach(([k])=>{m[k]=finN(document.getElementById('fm-'+k).value);});
+  else FIN_Q.forEach(([k])=>{m[k]=finData&&finData.monthly?finData.monthly[k]:null;});
+  const spend=FIN_SPEND.reduce((a,[k])=>a+(m[k]||0),0);
+  const ok=m.income!=null;
+  return {m,spend,ok,save:ok?m.income-spend:null,rate:ok&&m.income>0?(m.income-spend)/m.income*100:null};
+}
+function finGiveNow(){                          // the giving plan being typed or the saved one: {on, monthly}
+  let g=finData&&finData.giving||{on:false};
+  if(document.getElementById('fd-on')&&finEditGive)g={on:document.getElementById('fd-on').checked,mode:document.getElementById('fd-mode').value,value:finN(document.getElementById('fd-value').value),causes:document.getElementById('fd-causes').value};
+  if(!g.on)return {on:false,monthly:0,g};
+  const inc=finMonthlyNow().m.income;
+  const monthly=g.mode==='pct'?(inc!=null&&g.value!=null?inc*g.value/100:null):g.value;
+  return {on:true,monthly,g};
+}
+function finSavings(){return (moneyItems||[]).filter(x=>x.kind==='savings').reduce((a,x)=>a+(+x.amount||0),0);}
+function finOwn(){
+  const h=finHold||[],items=moneyItems||[];
+  const st=h.filter(x=>!isCommodity(x)&&x.current_value!=null).reduce((a,x)=>a+(+x.current_value||0),0);
+  const co=h.filter(x=>isCommodity(x)&&x.current_value!=null).reduce((a,x)=>a+(+x.current_value||0),0);
+  const slices=[];if(st>0)slices.push({key:'stocks',label:'Shares',value:st});if(co>0)slices.push({key:'commodities',label:'Commodities',value:co});
+  const by={};items.forEach(m=>{by[m.kind]=(by[m.kind]||0)+(+m.amount||0);});
+  Object.keys(by).forEach(k=>slices.push({key:k,label:moneyKinds[k]||k,value:by[k]}));
+  slices.sort((a,b)=>b.value-a.value);
+  return {shares:st,commod:co,total:slices.reduce((a,x)=>a+x.value,0),slices};
+}
+function finMonthsTo(dateStr){                  // whole months from now until the goal's month (at least 1)
+  const d=new Date(String(dateStr).slice(0,7)+'-01T00:00:00'),n=new Date();
+  return Math.max(1,(d.getFullYear()-n.getFullYear())*12+(d.getMonth()-n.getMonth()));
+}
+function finGoalPlan(){                         // each goal's monthly need, and which ones the monthly saving covers (earliest first)
+  const mm=finMonthlyNow(),gv=finGiveNow();
+  const avail=mm.save!=null?mm.save-(gv.on&&gv.monthly?gv.monthly:0):null;
+  let left=avail;
+  return (finData&&finData.goals||[]).map(g=>{
+    const months=finMonthsTo(g.target_date),rest=Math.max(0,g.target-g.saved),need=rest/months,done=rest<=0;
+    let status=null;
+    if(done)status='done';else if(left!=null){status=need<=left+0.005?'ok':'behind';if(status==='ok')left-=need;}
+    return {...g,months,rest,need,done,status};
+  });
+}
+function finRenderKpis(){
+  const own=finOwn(),mm=finMonthlyNow(),gv=finGiveNow(),plan=finGoalPlan();
+  const ok=plan.filter(g=>g.status==='ok'||g.status==='done').length,known=plan.some(g=>g.status);
+  const k=(l,v,s,c='')=>`<div class="fin-kpi"><div class="fin-kl">${l}</div><div class="fin-kv ${c}">${v}</div><div class="fin-ks">${s}</div></div>`;
+  document.getElementById('fin-kpis').innerHTML=
+    k('What you own',finUsd(own.total),own.total?'shares + savings + other':'add it under Investments')+
+    k('You save each month',mm.ok?finUsd(mm.save):'—',mm.ok?finPct(mm.rate)+' of what comes in':'answer Monthly money',mm.ok?(mm.save>=0?'g':'r'):'')+
+    k('Goals on track',plan.length?(known?`${ok} of ${plan.length}`:String(plan.length)+' goal'+(plan.length>1?'s':'')):'—',plan.length?(known?(ok===plan.length?'all on track':'some need more each month'):'answer Monthly money to check'):'add one under Goals')+
+    (gv.on?k('Giving this year',gv.monthly!=null?finUsd(gv.monthly*12):'—','optional · '+(gv.g.mode==='pct'?finPct(gv.g.value,1)+' of income':'fixed amount')):k('Giving','Off','optional · see Donations'));
+}
+
+/* ---- Suggestions: shown only when asked, with Clear to close ---- */
+function finSuggest(sec){finOpen[sec]=true;finTips(sec);}
+function finClearTips(sec){finOpen[sec]=false;const el=document.getElementById('fin-tips-'+sec);if(el){el.hidden=true;el.innerHTML='';}
+  const b=document.querySelector(`.fin-sugg[data-s="${sec}"]`);if(b){b.hidden=false;b.focus();}}
+function finTips(sec){
+  const el=document.getElementById('fin-tips-'+sec),b=document.querySelector(`.fin-sugg[data-s="${sec}"]`);if(!el)return;
+  if(!finOpen[sec]){el.hidden=true;if(b)b.hidden=false;return;}
+  const list={monthly:finTipsMonthly,invest:finTipsInvest,goals:finTipsGoals,give:finTipsGive}[sec]();
+  const dot={good:'var(--green)',warn:'#f5a623',bad:'var(--red)',info:'var(--t3)'};
+  el.innerHTML=`<div class="fin-tips-h"><span>Suggestions</span><button class="fin-clear" type="button" onclick="finClearTips('${sec}')">Clear</button></div>`+
+    (list.length?list.map(([t,h,x])=>`<div class="fin-tip"><span class="fin-dot" style="background:${dot[t]}"></span><div><b>${h}</b> ${x}</div></div>`).join(''):'<div class="fin-tip"><div>Nothing to suggest yet. Answer the questions first.</div></div>');
+  el.hidden=false;if(b)b.hidden=true;
+}
+function finTipsMonthly(){
+  const mm=finMonthlyNow(),m=mm.m,out=[];
+  if(!mm.ok)return [['info','Start with what comes in.','Enter your monthly income and spending to see suggestions.']];
+  if(mm.save<0)out.push(['bad','You spend more than comes in.',`You're short by ${finUsd(-mm.save)} a month. Look at the biggest spending colour in the bar first.`]);
+  else if(mm.rate>=20)out.push(['good','Good saving rate.',`You save ${finPct(mm.rate)} of what comes in. Saving 20% or more is a common target.`]);
+  else if(mm.rate>=10)out.push(['warn','A fair saving rate.',`You save ${finPct(mm.rate)}. A common target is 20% (${finUsd(m.income*0.2)} a month).`]);
+  else out.push(['warn','Low saving rate.',`You save ${finPct(mm.rate)}. Even 10% (${finUsd(m.income*0.1)} a month) builds a safety cushion over time.`]);
+  const sav=finSavings();
+  if(mm.spend>0){
+    if(!sav)out.push(['info','Safety money.',`Add your savings under Investments to see how many months of spending they cover. A common aim is 3–6 months (${finUsd(mm.spend*3)}–${finUsd(mm.spend*6)}).`]);
+    else{const mo=sav/mm.spend;
+      if(mo<3)out.push(['warn',`Safety money: ${mo.toFixed(1)} months.`,`Your savings (${finUsd(sav)}) cover ${mo.toFixed(1)} months of spending. A common aim is 3–6 months (${finUsd(mm.spend*3)}–${finUsd(mm.spend*6)}).`]);
+      else if(mo<=12)out.push(['good',`Safety money: ${mo.toFixed(1)} months.`,'Your savings cover at least 3 months of spending.']);
+      else out.push(['info',`Safety money: ${mo.toFixed(0)} months.`,'That is a lot of cash. Money beyond 6–12 months of spending could be put to work for your goals.']);}
+  }
+  if(m.income>0&&m.housing!=null){const p=m.housing/m.income*100;
+    out.push(p>35?['warn',`Home costs ${finPct(p)} of income.`,'That is above the usual 35% limit, which leaves less room to save.']:['good',`Home costs ${finPct(p)} of income.`,'Under the usual 35% limit.']);}
+  if(m.income>0&&m.repayments){const p=m.repayments/m.income*100;
+    if(p>20)out.push(['warn',`Repayments take ${finPct(p)} of income.`,'Paying off the most expensive loan or card first saves the most interest.']);}
+  const gv=finGiveNow();if(gv.on&&gv.monthly)out.push(['info','Giving.',`After your planned giving (${finUsd(gv.monthly)} a month) you save ${finUsd(mm.save-gv.monthly)} a month.`]);
+  return out;
+}
+function finTipsInvest(){
+  const own=finOwn(),out=[],h=(finHold||[]).filter(x=>!isCommodity(x)&&x.current_value>0);
+  if(!own.total)return [['info','Nothing here yet.','Add your savings, deposits or property with + Add, and buy shares in Transactions.']];
+  if(own.shares>0&&h.length){
+    const top=[...h].sort((a,b)=>b.current_value-a.current_value)[0],p=top.current_value/own.shares*100;
+    if(p>40)out.push(['warn',`${finPct(p)} of your shares are in one company (${escapeHtml(top.ticker)}).`,'Spreading across more companies lowers the risk of one bad result.']);
+    const sec={};h.forEach(x=>{const s=x.sector||'Other';sec[s]=(sec[s]||0)+x.current_value;});
+    const [sn,sv]=Object.entries(sec).sort((a,b)=>b[1]-a[1])[0];
+    if(sv/own.shares>0.6&&Object.keys(sec).length>=1&&h.length>1)out.push(['warn',`Most of your shares are in ${escapeHtml(sn)} (${finPct(sv/own.shares*100)}).`,'Other sectors often move differently when one sector falls.']);
+    if(h.length<5)out.push(['info',`You own ${h.length} compan${h.length===1?'y':'ies'}.`,'Owning more companies, or a fund, spreads the risk.']);
+  }
+  const cash=own.slices.filter(s=>s.key==='savings'||s.key==='fd').reduce((a,s)=>a+s.value,0);
+  if(cash/own.total>0.6)out.push(['info',`${finPct(cash/own.total*100)} of your money is cash or deposits.`,'Safe, but it may grow slower than prices rise. Keep your safety money, and think about what the rest is for.']);
+  if(own.slices.length>=4)out.push(['good','A good mix.',`Your money is spread over ${own.slices.length} kinds of assets.`]);
+  else if(own.slices.length<=2)out.push(['warn','Few kinds of assets.','Most of your money is in one or two kinds. A mix behaves better when one kind falls.']);
+  return out;
+}
+function finTipsGoals(){
+  const plan=finGoalPlan(),mm=finMonthlyNow(),gv=finGiveNow(),out=[];
+  if(!plan.length)return [['info','No goals yet.','Add something you are saving for, like a car or a home deposit.']];
+  const need=plan.filter(g=>!g.done).reduce((a,g)=>a+g.need,0);
+  if(!mm.ok)out.push(['info','Answer Monthly money.',`Your goals need ${finUsd(need)} a month. Fill in Monthly money to check whether that fits.`]);
+  else{const avail=mm.save-(gv.on&&gv.monthly?gv.monthly:0);
+    if(need<=avail)out.push(['good','Your goals fit.',`They need ${finUsd(need)} a month and you save ${finUsd(avail)}.`]);
+    else out.push(['warn','Your goals need more than you save.',`They need ${finUsd(need)} a month but you save ${finUsd(avail)}. Push a date back, lower a goal, or save for one at a time.`]);}
+  plan.filter(g=>g.done).forEach(g=>out.push(['good',`${escapeHtml(g.name)}: reached!`,'You have already saved enough for this goal.']));
+  plan.filter(g=>!g.done&&g.months<=6&&g.rest>0).forEach(g=>out.push(['info',`${escapeHtml(g.name)} is soon.`,`Money needed within ${g.months} month${g.months>1?'s':''} is usually best kept in savings rather than shares, whose prices can fall.`]));
+  return out;
+}
+function finTipsGive(){
+  const gv=finGiveNow(),mm=finMonthlyNow(),out=[];
+  if(!gv.on)return [['info','Giving is off.','Donations are optional. Switch it on if you would like to plan regular giving.']];
+  if(gv.monthly==null)return [['info','Answer Monthly money.','Enter what comes in each month to see how much a share of income comes to.']];
+  if(mm.ok){const after=mm.save-gv.monthly;
+    out.push(after>=0?['good','Fits your budget.',`After giving you still save ${finUsd(after)} a month.`]:['warn','More than you save.',`Giving ${finUsd(gv.monthly)} a month leaves you ${finUsd(-after)} short. A smaller amount you can keep up is better than a bigger one you have to stop.`]);
+    if(mm.m.income>0){const p=gv.monthly/mm.m.income*100;out.push(['info',`That is ${finPct(p,1)} of what comes in.`,'Many people give 1–10%. Any amount you can keep up helps.']);}}
+  out.push(['info','Records.','Keep receipts for donations: in many countries gifts to registered charities can reduce your tax.']);
+  return out;
+}
+
+/* ---- 1 Monthly money ---- */
+function finRenderMonthly(){
+  const body=document.getElementById('fm-body'),acts=document.getElementById('fm-acts');if(!body)return;
+  if(finEditM){
+    body.innerHTML=FIN_Q.map(([k,l,h])=>`<label class="fin-qr"><span>${l}${h?`<small>${h}</small>`:''}</span><span class="fin-in"><i>$</i><input id="fm-${k}" type="number" min="0" step="any" inputmode="decimal" placeholder="0" value="${finData.monthly&&finData.monthly[k]!=null?finData.monthly[k]:''}" oninput="finLive()"></span></label>`).join('')+
+      `<div class="fin-fbtns"><button class="btn btnp" type="button" id="fm-save" onclick="finSaveMonthly()">Save answers</button>${finData.has_monthly?'<button class="btn" type="button" onclick="finCancelMonthly()">Cancel</button>':''}</div>`;
+    acts.innerHTML='';
+  }else{
+    body.innerHTML=FIN_Q.map(([k,l])=>`<div class="fin-qr fin-ro"><span>${l}</span><b>${finData.monthly[k]!=null?finUsd2(finData.monthly[k]):'<span class="fin-mini">not answered</span>'}</b></div>`).join('');
+    acts.innerHTML=`<button class="fin-ic" type="button" onclick="finEditMonthly()">Edit</button><button class="fin-ic fin-rm" type="button" onclick="finRemoveMonthly()">Remove</button>`;
+  }
+  finRenderMonthlyAns();
+}
+function finRenderMonthlyAns(){
+  const el=document.getElementById('fm-ans');if(!el)return;
+  const mm=finMonthlyNow(),m=mm.m;
+  if(!mm.ok){el.innerHTML='<div class="fin-empty">Enter how much comes in each month, and your spending, to see what you save.</div>';finTips('monthly');return;}
+  const base=Math.max(m.income,mm.spend)||1;
+  const parts=FIN_SPEND.filter(([k])=>m[k]>0).map(([k,l,c])=>({l,c,v:m[k]}));
+  if(mm.save>0)parts.push({l:'Saved',c:'var(--green)',v:mm.save});
+  el.innerHTML=`<div class="fin-mini">You save each month</div><div class="fin-big ${mm.save>=0?'g':'r'}">${finUsd(mm.save)} <span class="fin-mini">(${finPct(mm.rate)})</span></div>
+    <div class="fin-bar">${parts.map(p=>`<i style="width:${p.v/base*100}%;background:${p.c}" title="${p.l}: ${finUsd(p.v)}"></i>`).join('')}</div>
+    <div class="fin-leg">${parts.map(p=>`<span><b style="background:${p.c}"></b>${p.l} ${m.income>0?finPct(p.v/m.income*100):''}</span>`).join('')}</div>
+    <div class="fin-rows"><div><span>Comes in</span><b>${finUsd(m.income)}</b></div><div><span>Goes out</span><b>${finUsd(mm.spend)}</b></div><div><span>Left over</span><b class="${mm.save>=0?'g':'r'}">${finUsd(mm.save)}</b></div></div>`;
+  finTips('monthly');
+}
+function finLive(){finRenderMonthlyAns();finRenderKpis();finRenderGoals(true);finRenderGiveAns();}
+function finEditMonthly(){finEditM=true;finRenderMonthly();document.getElementById('fm-income')?.focus();}
+function finCancelMonthly(){finEditM=false;finRenderMonthly();finLive();}
+async function finSaveMonthly(){
+  const body={};FIN_Q.forEach(([k])=>{body[k]=finN(document.getElementById('fm-'+k).value);});
+  if(body.income==null){finSay('Enter how much comes in each month.',false);return;}
+  const b=document.getElementById('fm-save');b.disabled=true;
+  const d=await finSend('PUT','/api/finance/monthly',body);b.disabled=false;
+  if(d){finData.monthly=d.monthly;finData.has_monthly=true;finEditM=false;finRenderMonthly();finLive();}
+}
+async function finRemoveMonthly(){
+  if(!confirm('Remove all your Monthly money answers?'))return;
+  const d=await finSend('DELETE','/api/finance/monthly');
+  if(d){FIN_Q.forEach(([k])=>{finData.monthly[k]=null;});finData.has_monthly=false;finEditM=true;finRenderMonthly();finLive();}
+}
+
+/* ---- 2 Investments ---- */
+let finInvId=null,finPieKey='';
+function finRenderInvest(){
+  const body=document.getElementById('fi-body');if(!body||finLocked())return;
+  const own=finOwn(),items=moneyItems||[];
+  const rows=[];
+  if(own.shares>0)rows.push(`<tr><td>Shares</td><td class="fin-mini">from Transactions</td><td class="n">${finUsd(own.shares)}</td><td class="fin-mini">auto</td></tr>`);
+  if(own.commod>0)rows.push(`<tr><td>Commodities</td><td class="fin-mini">from Transactions</td><td class="n">${finUsd(own.commod)}</td><td class="fin-mini">auto</td></tr>`);
+  items.forEach(m=>rows.push(`<tr><td>${escapeHtml(m.name||m.kind_label)}</td><td>${escapeHtml(m.kind_label)}</td><td class="n">${finUsd(m.amount)}</td><td class="fin-rowacts"><button class="fin-ic" type="button" onclick="finInvForm(${m.id})" aria-label="Edit ${escapeHtml(m.name||m.kind_label)}">Edit</button><button class="fin-ic fin-rm" type="button" onclick="finInvDelete(${m.id})" aria-label="Remove ${escapeHtml(m.name||m.kind_label)}">Remove</button></td></tr>`));
+  body.innerHTML=rows.length?`<table class="fin-tbl"><thead><tr><th>Item</th><th>Type</th><th class="n">Value</th><th></th></tr></thead><tbody>${rows.join('')}</tbody>
+    <tfoot><tr><td>Total</td><td></td><td class="n">${finUsd(own.total)}</td><td></td></tr></tfoot></table>`:'<div class="fin-empty">Nothing yet. Press + Add for savings, deposits, property or a pension.</div>';
+  const ans=document.getElementById('fi-ans');
+  if(!own.total){ans.innerHTML='<div class="fin-empty">Add what you own to see how your money is spread.</div>';dc('fin-pie');finPieKey='';finTips('invest');return;}
+  const key=JSON.stringify(own.slices.map(s=>[s.key,Math.round(s.value)]));
+  if(key!==finPieKey||!document.getElementById('fin-pie')){
+    ans.innerHTML=`<div class="fin-piewrap"><div class="fin-pie"><canvas id="fin-pie" aria-label="How your money is spread"></canvas></div>
+      <div class="fin-leg fin-legcol">${own.slices.map(s=>`<span><b style="background:${MONEY_COLORS[s.key]||MONEY_COLORS.other}"></b>${escapeHtml(s.label)} <em>${finPct(s.value/own.total*100)}</em></span>`).join('')}</div></div>`;
+    finPieKey=key;dc('fin-pie');
+    const ctx=document.getElementById('fin-pie').getContext&&document.getElementById('fin-pie').getContext('2d');
+    if(ctx&&typeof Chart!=='undefined')charts['fin-pie']=new Chart(ctx,{type:'doughnut',data:{labels:own.slices.map(s=>s.label),datasets:[{data:own.slices.map(s=>s.value),backgroundColor:own.slices.map(s=>MONEY_COLORS[s.key]||MONEY_COLORS.other),borderColor:'#0d1117',borderWidth:2}]},
+      options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${finUsd(c.raw)} (${finPct(c.raw/own.total*100)})`}}}}});
+  }
+  finTips('invest');
+}
+function finInvForm(id){
+  const f=document.getElementById('fi-form'),sel=document.getElementById('fi-kind');
+  sel.innerHTML=Object.entries(moneyKinds).map(([k,v])=>`<option value="${escapeHtml(k)}">${escapeHtml(v)}</option>`).join('');
+  const m=id?(moneyItems||[]).find(x=>x.id===id):null;finInvId=m?m.id:null;
+  sel.value=m?m.kind:'savings';document.getElementById('fi-name').value=m?m.name:'';document.getElementById('fi-amt').value=m?m.amount:'';
+  document.getElementById('fi-save').textContent=m?'Save':'Add';f.hidden=false;document.getElementById('fi-amt').focus();
+}
+function finInvClose(){document.getElementById('fi-form').hidden=true;finInvId=null;}
+async function finInvSave(){
+  const body={kind:document.getElementById('fi-kind').value,name:document.getElementById('fi-name').value.trim(),amount:parseFloat(document.getElementById('fi-amt').value)};
+  if(!(body.amount>0)){finSay('Enter an amount more than $0.',false);return;}
+  const b=document.getElementById('fi-save');b.disabled=true;
+  const d=await finSend(finInvId?'PUT':'POST',finInvId?`/api/my-money/${encodeURIComponent(finInvId)}`:'/api/my-money',body);b.disabled=false;
+  if(d){finInvClose();await loadMoney();finRenderInvest();finRenderKpis();finTips('monthly');}
+}
+async function finInvDelete(id){
+  const m=(moneyItems||[]).find(x=>x.id===id);if(!m||!confirm(`Remove ${m.name||m.kind_label} (${finUsd(m.amount)})?`))return;
+  const d=await finSend('DELETE',`/api/my-money/${encodeURIComponent(id)}`);
+  if(d){await loadMoney();finRenderInvest();finRenderKpis();finTips('monthly');}
+}
+
+/* ---- 3 Goals ---- */
+function finGoalForm(){return {name:document.getElementById('fg-name').value.trim(),target:finN(document.getElementById('fg-target').value),
+  date:document.getElementById('fg-date').value,saved:finN(document.getElementById('fg-saved').value)||0};}
+function finRenderGoals(listOnly){
+  const list=document.getElementById('fg-list');if(!list||!finData)return;
+  if(!listOnly){                                   // the preview under the form: what this goal needs a month
+    const f=finGoalForm(),pv=document.getElementById('fg-preview');
+    if(f.target>0&&f.date){const months=finMonthsTo(f.date),need=Math.max(0,f.target-f.saved)/months;
+      pv.innerHTML=`Save <b>${finUsd(need)} a month</b> for ${months} month${months>1?'s':''} to reach ${finUsd(f.target)}.`;}
+    else pv.innerHTML='';
+  }
+  const plan=finGoalPlan();
+  list.innerHTML=plan.length?plan.map(g=>{
+    const pct=Math.min(100,g.target?g.saved/g.target*100:0),when=new Date(g.target_date+'T00:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'});
+    const st=g.status==='done'?'<span class="g">Reached</span>':g.status==='ok'?'<span class="g">On track</span>':g.status==='behind'?'<span class="r">Needs more than you save</span>':'';
+    return `<div class="fin-goal"><div class="fin-gh"><span>${escapeHtml(g.name)} <em>· ${when}</em></span><span>${finUsd(g.saved)} / ${finUsd(g.target)}</span></div>
+      <div class="fin-bar"><i style="width:${pct}%;background:${g.status==='behind'?'#f5a623':'var(--green)'}"></i></div>
+      <div class="fin-gf"><span class="fin-mini">${g.done?'Done.':`Save <b>${finUsd(g.need)} a month</b> for ${g.months} month${g.months>1?'s':''}.`} ${st}</span>
+      <span class="fin-rowacts"><button class="fin-ic" type="button" onclick="finGoalEdit(${g.id})">Edit</button><button class="fin-ic fin-rm" type="button" onclick="finGoalDelete(${g.id})">Remove</button></span></div></div>`;
+  }).join(''):'<div class="fin-empty">No goals yet. Add one on the left: a car, a home deposit, a holiday…</div>';
+  finTips('goals');
+}
+function finGoalEdit(id){
+  const g=(finData.goals||[]).find(x=>x.id===id);if(!g)return;
+  finGoalId=id;document.getElementById('fg-title').textContent='Edit goal';
+  document.getElementById('fg-name').value=g.name;document.getElementById('fg-target').value=g.target;
+  document.getElementById('fg-date').value=g.target_date.slice(0,7);document.getElementById('fg-saved').value=g.saved||'';
+  document.getElementById('fg-save').textContent='Save changes';document.getElementById('fg-cancel').hidden=false;
+  finRenderGoals();document.getElementById('fg-name').focus();
+}
+function finGoalReset(){
+  finGoalId=null;document.getElementById('fg-title').textContent='Add a goal';
+  ['fg-name','fg-target','fg-date','fg-saved'].forEach(i=>{document.getElementById(i).value='';});
+  document.getElementById('fg-save').textContent='Save goal';document.getElementById('fg-cancel').hidden=true;finRenderGoals();
+}
+async function finGoalSave(){
+  const f=finGoalForm();
+  if(!f.name){finSay('Say what the goal is for, e.g. Car.',false);return;}
+  if(!(f.target>0)){finSay('Enter how much it costs.',false);return;}
+  if(!f.date){finSay('Choose when you want it by.',false);return;}
+  // a month is chosen; the goal is due at the end of that month
+  const [y,mo]=f.date.split('-').map(Number),last=new Date(y,mo,0).getDate();
+  const body={name:f.name,target:f.target,target_date:`${f.date}-${String(last).padStart(2,'0')}`,saved:f.saved};
+  const b=document.getElementById('fg-save');b.disabled=true;
+  const d=await finSend(finGoalId?'PUT':'POST',finGoalId?`/api/finance/goals/${encodeURIComponent(finGoalId)}`:'/api/finance/goals',body);b.disabled=false;
+  if(d){const r=await api('/api/finance');if(r&&r.status==='success')finData.goals=r.goals;finGoalReset();finRenderKpis();}
+}
+async function finGoalDelete(id){
+  const g=(finData.goals||[]).find(x=>x.id===id);if(!g||!confirm(`Remove the goal “${g.name}”?`))return;
+  const d=await finSend('DELETE',`/api/finance/goals/${encodeURIComponent(id)}`);
+  if(d){finData.goals=finData.goals.filter(x=>x.id!==id);if(finGoalId===id)finGoalReset();else finRenderGoals();finRenderKpis();}
+}
+
+/* ---- 4 Donations (optional) ---- */
+let finEditGive=false;
+function finRenderGive(){
+  const body=document.getElementById('fd-body'),acts=document.getElementById('fd-acts');if(!body)return;
+  const g=finData.giving||{on:false};
+  if(finEditGive){
+    body.innerHTML=`<label class="fin-qr"><span>Do you want to plan giving?<small>Optional. Planning only: no money moves through Aymetrix.</small></span><span class="fin-sw"><input type="checkbox" id="fd-on" ${g.on||!g.mode?'checked':''} onchange="finGiveToggle()"><i></i><em id="fd-onl"></em></span></label>
+      <div id="fd-more">
+      <label class="fin-qr"><span>How do you want to give?</span><select class="sel" id="fd-mode" onchange="finGiveModeChanged()"><option value="pct">A share of income (%)</option><option value="fixed">A fixed amount each month ($)</option></select></label>
+      <label class="fin-qr"><span id="fd-vl">How much?</span><span class="fin-in"><i id="fd-unit">%</i><input id="fd-value" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 1" oninput="finRenderGiveAns();finRenderKpis()"></span></label>
+      <label class="fin-qr"><span>Causes you care about<small>Optional, just for you</small></span><input class="srch fin-txt" id="fd-causes" maxlength="80" placeholder="e.g. Education"></label></div>
+      <div class="fin-fbtns"><button class="btn btnp" type="button" id="fd-save" onclick="finGiveSave()">Save</button><button class="btn" type="button" onclick="finGiveCancel()">Cancel</button></div>`;
+    document.getElementById('fd-mode').value=g.mode||'pct';document.getElementById('fd-value').value=g.value!=null?g.value:'';document.getElementById('fd-causes').value=g.causes||'';
+    acts.innerHTML='';finGiveToggle(true);finGiveModeChanged(true);
+  }else if(g.on){
+    body.innerHTML=`<div class="fin-qr fin-ro"><span>Plan giving</span><b>On</b></div>
+      <div class="fin-qr fin-ro"><span>How</span><b>${g.mode==='pct'?finPct(g.value,1)+' of income':finUsd2(g.value)+' a month'}</b></div>
+      <div class="fin-qr fin-ro"><span>Causes</span><b>${g.causes?escapeHtml(g.causes):'<span class="fin-mini">not answered</span>'}</b></div>`;
+    acts.innerHTML=`<button class="fin-ic" type="button" onclick="finGiveEdit()">Edit</button><button class="fin-ic fin-rm" type="button" onclick="finGiveRemove()">Remove</button>`;
+  }else{
+    body.innerHTML=`<div class="fin-empty">Giving is off. Donations are optional. If you would like to plan regular giving, set it up here.</div><div class="fin-fbtns"><button class="btn btnp" type="button" onclick="finGiveEdit()">Set up giving</button></div>`;
+    acts.innerHTML='';
+  }
+  finRenderGiveAns();
+}
+function finGiveToggle(quiet){const on=document.getElementById('fd-on').checked;document.getElementById('fd-more').hidden=!on;document.getElementById('fd-onl').textContent=on?'On':'Off';if(!quiet){finRenderGiveAns();finRenderKpis();}}
+function finGiveModeChanged(quiet){const pct=document.getElementById('fd-mode').value==='pct';document.getElementById('fd-unit').textContent=pct?'%':'$';
+  document.getElementById('fd-vl').textContent=pct?'What share of income?':'How much each month?';document.getElementById('fd-value').placeholder=pct?'e.g. 1':'e.g. 50';if(!quiet){finRenderGiveAns();finRenderKpis();}}
+function finRenderGiveAns(){
+  const el=document.getElementById('fd-ans');if(!el||!finData)return;
+  const gv=finGiveNow(),mm=finMonthlyNow();
+  if(!gv.on)el.innerHTML='<div class="fin-empty">Giving is off, so it isn’t counted in your monthly money or goals.</div>';
+  else if(gv.monthly==null)el.innerHTML=`<div class="fin-empty">${gv.g.mode==='pct'?'Answer Monthly money (what comes in) to see how much this is.':'Enter how much to give each month.'}</div>`;
+  else el.innerHTML=`<div class="fin-mini">You’d give</div><div class="fin-big">${finUsd(gv.monthly)} a month · ${finUsd(gv.monthly*12)} a year</div>
+    ${mm.ok?`<div class="fin-rows"><div><span>You save now</span><b>${finUsd(mm.save)}</b></div><div><span>After giving</span><b class="${mm.save-gv.monthly>=0?'g':'r'}">${finUsd(mm.save-gv.monthly)}</b></div></div>`:''}
+    <p class="fin-note">Planning only: no money moves through Aymetrix.</p>`;
+  finTips('give');
+}
+function finGiveEdit(){finEditGive=true;finRenderGive();}
+function finGiveCancel(){finEditGive=false;finRenderGive();finRenderKpis();finRenderGoals(true);}
+async function finGiveSave(){
+  const on=document.getElementById('fd-on').checked;
+  const body={on,mode:on?document.getElementById('fd-mode').value:null,value:on?finN(document.getElementById('fd-value').value):null,causes:document.getElementById('fd-causes').value.trim()};
+  if(on&&!(body.value>0)){finSay(body.mode==='pct'?'Enter a share of income, e.g. 1.':'Enter how much to give each month.',false);return;}
+  const b=document.getElementById('fd-save');b.disabled=true;
+  const d=await finSend('PUT','/api/finance/giving',body);b.disabled=false;
+  if(d){finData.giving=d.giving;finEditGive=false;finRenderGive();finRenderKpis();finRenderGoals(true);finTips('monthly');}
+}
+async function finGiveRemove(){
+  if(!confirm('Remove your giving plan?'))return;
+  const d=await finSend('DELETE','/api/finance/giving');
+  if(d){finData.giving={on:false,mode:null,value:null,causes:''};finRenderGive();finRenderKpis();finRenderGoals(true);finTips('monthly');}
+}
+
+/* ---- 5 Calculators (everyone; nothing saved) ---- */
+const FIN_CALCS={
+  loan:{name:'Loan',fields:[['amt','Loan amount','$',20000],['rate','Interest rate (per year)','%',7.5],['yrs','Length (years)','yrs',5]],
+    run:v=>{const n=Math.round(v.yrs*12),i=v.rate/100/12;if(!(v.amt>0)||!(n>0)||v.rate<0)return null;
+      const pay=i?v.amt*i/(1-Math.pow(1+i,-n)):v.amt/n,tot=pay*n;
+      return {big:['Monthly payment',finUsd2(pay)],rows:[['Total paid',finUsd(tot)],['Total interest',finUsd(tot-v.amt),'r']],bar:[['Amount borrowed',v.amt,'var(--blue)'],['Interest',tot-v.amt,'var(--red)']]};}},
+  stock:{name:'Stock return',fields:[['buy','Buy price (per share)','$',100],['sell','Sell or current price (per share)','$',125],['qty','Number of shares','',10]],
+    run:v=>{if(!(v.buy>0)||!(v.qty>0)||!(v.sell>=0))return null;const cost=v.buy*v.qty,val=v.sell*v.qty,p=val-cost;
+      return {big:[p>=0?'Profit':'Loss',`<span class="${p>=0?'g':'r'}">${p>=0?'+':'-'}${finUsd2(Math.abs(p))} (${p>=0?'+':''}${(p/cost*100).toFixed(2)}%)</span>`],rows:[['You paid',finUsd2(cost)],['Worth now / sold for',finUsd2(val)]]};}},
+  grow:{name:'Savings growth',fields:[['amt','Amount you put in now','$',10000],['rate','Growth per year','%',6],['yrs','Years','yrs',10]],
+    run:v=>{if(!(v.amt>0)||!(v.yrs>0))return null;const fv=v.amt*Math.pow(1+v.rate/100,v.yrs);
+      return {big:[`After ${v.yrs} year${v.yrs>1?'s':''}`,finUsd(fv)],rows:[['You put in',finUsd(v.amt)],['Growth',finUsd(fv-v.amt),fv>=v.amt?'g':'r']],bar:[['You put in',v.amt,'var(--blue)'],['Growth',Math.max(0,fv-v.amt),'var(--green)']]};}},
+  sip:{name:'Monthly investing',fields:[['m','Amount each month','$',300],['rate','Growth per year','%',8],['yrs','Years','yrs',10]],
+    run:v=>{const n=Math.round(v.yrs*12),i=Math.pow(1+v.rate/100,1/12)-1;if(!(v.m>0)||!(n>0))return null;
+      const fv=i?v.m*(Math.pow(1+i,n)-1)/i:v.m*n,put=v.m*n;
+      return {big:[`After ${v.yrs} year${v.yrs>1?'s':''}`,finUsd(fv)],rows:[['You put in',finUsd(put)],['Growth',finUsd(fv-put),fv>=put?'g':'r']],bar:[['You put in',put,'var(--blue)'],['Growth',Math.max(0,fv-put),'var(--green)']]};}},
+  goal:{name:'Saving for a goal',fields:[['target','Goal amount','$',25000],['have','Already saved','$',5000],['yrs','Years to get there','yrs',3],['rate','Growth per year (0 for a bank account)','%',3]],
+    run:v=>{const n=Math.round(v.yrs*12),i=Math.pow(1+(v.rate||0)/100,1/12)-1;if(!(v.target>0)||!(n>0))return null;
+      const grown=(v.have||0)*Math.pow(1+i,n),left=v.target-grown;
+      if(left<=0)return {big:['Each month','$0'],rows:[['What you have grows to',finUsd(grown),'g']],note:'You already have enough, if it grows as expected.'};
+      const pm=i?left*i/(Math.pow(1+i,n)-1):left/n;
+      return {big:['Save each month',finUsd2(pm)],rows:[['You put in',finUsd(pm*n+(v.have||0))],['Growth',finUsd(v.target-pm*n-(v.have||0)),'g']]};}},
+};
+function finRenderCalc(){
+  const pick=document.getElementById('fc-pick');if(!pick)return;
+  pick.innerHTML=Object.entries(FIN_CALCS).map(([k,c])=>`<button type="button" class="${k===finCalc?'on':''}" onclick="finPickCalc('${k}')">${c.name}</button>`).join('');
+  const c=FIN_CALCS[finCalc];
+  document.getElementById('fc-in').innerHTML=c.fields.map(([k,l,u,d])=>`<label class="fin-qr"><span>${l}</span><span class="fin-in">${u&&u!=='yrs'?`<i>${u}</i>`:''}<input id="fc-${k}" type="number" min="0" step="any" inputmode="decimal" value="${d}" oninput="finCalcRun()">${u==='yrs'?'<i class="fin-after">years</i>':''}</span></label>`).join('');
+  finCalcRun();
+}
+function finPickCalc(k){finCalc=k;finRenderCalc();}
+function finCalcRun(){
+  const c=FIN_CALCS[finCalc],v={};c.fields.forEach(([k])=>{v[k]=finN(document.getElementById('fc-'+k).value);});
+  const r=c.run(v),out=document.getElementById('fc-out');
+  if(!r){out.innerHTML='<div class="fin-empty">Fill in every box with a number above 0.</div>';return;}
+  const tot=r.bar?r.bar.reduce((a,x)=>a+x[1],0):0;
+  out.innerHTML=`<div class="fin-mini">${r.big[0]}</div><div class="fin-big">${r.big[1]}</div>
+    <div class="fin-rows">${r.rows.map(([l,x,c])=>`<div><span>${l}</span><b class="${c||''}">${x}</b></div>`).join('')}</div>
+    ${r.bar&&tot>0?`<div class="fin-bar">${r.bar.map(([l,x,col])=>`<i style="width:${x/tot*100}%;background:${col}"></i>`).join('')}</div><div class="fin-leg">${r.bar.map(([l,x,col])=>`<span><b style="background:${col}"></b>${l} ${finPct(x/tot*100)}</span>`).join('')}</div>`:''}
+    ${r.note?`<p class="fin-note">${r.note}</p>`:''}<p class="fin-note">An estimate: real returns go up and down, and fees and taxes aren’t included.</p>`;
 }
 
 // ═══ NEWS TAB: stored headlines (GET /api/news), with categories, period, search, one stock or "My stocks" ═══
@@ -6877,6 +7376,88 @@ function loadPortfolioTickers() {
 <!-- ═══════════ BOUNTY — AI CHATBOT ═══════════ -->
 <style>
 /* World News Cards — Compact */
+/* ═══ Your finances ═══ */
+#page-finance{max-width:1240px;margin:0 auto}
+.fin-head{margin:4px 0 14px}.fin-h{font-size:22px;font-weight:800;margin:0 0 4px;color:var(--t1)}
+.fin-sub{font-size:12.5px;color:var(--t3);margin:0;line-height:1.5}
+.fin-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.fin-kpi{background:var(--bg2);border:1px solid var(--b2);border-radius:12px;padding:13px 14px;min-width:0}
+.fin-kl{font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--t3)}
+.fin-kv{font-size:21px;font-weight:800;color:var(--t1);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fin-ks{font-size:11.5px;color:var(--t3)}
+.fin-kv.g,.fin-tbl .g,.fin-big.g,.fin-rows .g,#page-finance .g{color:var(--green)}#page-finance .r{color:var(--red)}
+.fin-tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.fin-tab{background:none;border:1px solid var(--b2);border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;color:var(--t2);cursor:pointer;font-family:var(--sans)}
+.fin-tab:hover{color:var(--t1);border-color:var(--b3)}.fin-tab.on{background:#fff;border-color:#fff;color:#000}
+.fin-msg{min-height:18px;font-size:12.5px;font-weight:600;margin-bottom:6px}.fin-msg.ok{color:var(--green)}.fin-msg.bad{color:var(--red)}
+.fin-panel{display:none;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:14px;align-items:start}
+.fin-panel.on{display:grid}#fin-p-calc.on{display:block}
+#page-finance .card{margin-bottom:0}
+.fin-acts,.fin-rowacts{display:flex;gap:6px}
+.fin-ic{background:none;border:1px solid var(--b2);border-radius:6px;padding:4px 10px;font-size:11.5px;font-weight:700;color:var(--t2);cursor:pointer;font-family:var(--sans)}
+.fin-ic:hover{color:var(--t1);border-color:var(--t3)}.fin-ic.fin-rm:hover{color:var(--red);border-color:var(--red)}
+.fin-sugg{background:rgba(79,142,247,.12);border:1px solid rgba(79,142,247,.5);color:var(--blue);border-radius:6px;padding:5px 12px;font-size:12px;font-weight:800;cursor:pointer;font-family:var(--sans)}
+.fin-sugg:hover{background:rgba(79,142,247,.22)}
+.fin-qr{display:grid;grid-template-columns:minmax(0,1fr) 170px;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--b1);font-size:13px;font-weight:600;color:var(--t1)}
+.fin-qr:last-of-type{border-bottom:0}.fin-qr small{display:block;font-size:11.5px;font-weight:400;color:var(--t3)}
+.fin-qr.fin-ro b{text-align:right;font-size:13.5px}
+.fin-in{display:flex;align-items:center;background:var(--bg3);border:1px solid var(--b2);border-radius:8px;padding:0 10px;min-width:0}
+.fin-in:focus-within{border-color:var(--blue)}
+.fin-in i{font-style:normal;color:var(--t3);font-weight:700;font-size:12.5px}.fin-in .fin-after{margin-left:4px}
+.fin-in input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--t1);font:700 13.5px var(--sans);padding:8px 0 8px 6px;text-align:right}
+.fin-qr .sel,.fin-txt{width:100%;margin:0}
+.fin-fbtns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.fin-sbtn{padding:6px 12px;font-size:12px}
+.fin-form{display:grid;gap:10px;margin:12px 0 4px;padding:12px;border:1px solid var(--b2);border-radius:10px;background:var(--bg3)}
+.fin-form[hidden]{display:none}.fin-form-open{background:none;border:0;padding:0;margin:0}
+.fin-fl{display:grid;gap:5px;font-size:12px;font-weight:700;color:var(--t2)}.fin-fl small{font-weight:400;color:var(--t3)}
+.fin-fl .srch,.fin-fl .sel{width:100%;margin:0}
+.fin-preview{font-size:12.5px;color:var(--t2);min-height:18px}
+.fin-empty{font-size:13px;color:var(--t3);padding:6px 0;line-height:1.5}
+.fin-mini{font-size:12px;color:var(--t3);font-weight:500}
+.fin-big{font-size:26px;font-weight:800;color:var(--t1);margin:2px 0 10px;line-height:1.2}
+.fin-bar{display:flex;height:10px;border-radius:6px;background:var(--bg3);overflow:hidden;margin:8px 0}.fin-bar i{display:block;height:100%}
+.fin-leg{display:flex;flex-wrap:wrap;gap:5px 14px;font-size:12px;color:var(--t2)}
+.fin-leg b{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:0}.fin-leg em{font-style:normal;color:var(--t3);margin-left:4px}
+.fin-legcol{flex-direction:column;gap:7px}
+.fin-rows{display:grid;gap:6px;margin-top:12px;font-size:13px}.fin-rows div{display:flex;justify-content:space-between;color:var(--t2)}.fin-rows b{color:var(--t1)}
+.fin-tips{margin-top:14px;border-top:1px solid var(--b1);padding-top:12px;display:grid;gap:8px}.fin-tips[hidden]{display:none}
+.fin-tips-h{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--t2)}
+.fin-clear{background:none;border:1px solid var(--b2);border-radius:6px;padding:3px 10px;font-size:11.5px;font-weight:700;color:var(--t2);cursor:pointer;text-transform:none;letter-spacing:0;font-family:var(--sans)}
+.fin-clear:hover{color:var(--t1);border-color:var(--t3)}
+.fin-tip{display:flex;gap:10px;padding:10px 12px;border-radius:9px;background:var(--bg3);border:1px solid var(--b2);font-size:13px;color:var(--t2);line-height:1.45}.fin-tip b{color:var(--t1)}
+.fin-dot{width:8px;height:8px;border-radius:50%;margin-top:6px;flex-shrink:0}
+.fin-tbl{width:100%;border-collapse:collapse;font-size:13px}.fin-tbl th,.fin-tbl td{padding:8px 6px;border-bottom:1px solid var(--b1);text-align:left;color:var(--t1)}
+.fin-tbl th{font-size:10.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em}.fin-tbl .n{text-align:right;white-space:nowrap}
+.fin-tbl tfoot td{font-weight:800;border-bottom:0}.fin-tbl .fin-rowacts{justify-content:flex-end}
+.fin-note{font-size:11.5px;color:var(--t3);margin:10px 0 0;line-height:1.5}
+.fin-piewrap{display:flex;gap:18px;align-items:center}.fin-pie{position:relative;width:160px;height:160px;flex-shrink:0}
+.fin-goal{padding:10px 0;border-bottom:1px solid var(--b1)}.fin-goal:last-of-type{border-bottom:0}
+.fin-gh{display:flex;justify-content:space-between;gap:10px;font-weight:700;font-size:13.5px;color:var(--t1)}.fin-gh em{font-style:normal;color:var(--t3);font-weight:500}
+.fin-gf{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.fin-gf b{color:var(--t1)}
+.fin-sw{display:inline-flex;align-items:center;gap:8px;justify-self:end;position:relative;cursor:pointer}
+.fin-sw input{position:absolute;opacity:0;width:38px;height:22px;margin:0;cursor:pointer}
+.fin-sw i{width:38px;height:22px;border-radius:12px;background:var(--b3);position:relative;transition:background .15s}
+.fin-sw i:after{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .15s}
+.fin-sw input:checked+i{background:var(--green)}.fin-sw input:checked+i:after{left:19px}.fin-sw input:focus-visible+i{outline:2px solid var(--blue);outline-offset:2px}
+.fin-sw em{font-style:normal;font-weight:700;font-size:12.5px;min-width:22px}
+#fd-more[hidden]{display:none}
+.fin-calcs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-bottom:12px}
+.fin-calcs button{background:none;border:1px solid var(--b2);border-radius:8px;padding:9px 6px;font:700 12.5px var(--sans);color:var(--t2);cursor:pointer}
+.fin-calcs button.on{border-color:var(--blue);color:var(--blue);background:rgba(79,142,247,.1)}
+.fin-calc-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px;align-items:start}
+.fin-lock{grid-column:1/-1;display:flex;gap:14px;align-items:center;padding:18px;border:1px dashed var(--b3);border-radius:12px;color:var(--t2);font-size:13px}
+.fin-lock svg{width:22px;height:22px;flex-shrink:0;color:var(--t3)}
+.fin-foot{font-size:11.5px;color:var(--t3);margin:16px 0 0;line-height:1.5}
+@media(max-width:900px){.fin-panel{grid-template-columns:1fr}.fin-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.fin-calc-grid{grid-template-columns:1fr}}
+@media(max-width:560px){
+  .fin-tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-right:-4px}.fin-tabs::-webkit-scrollbar{display:none}.fin-tab{flex-shrink:0;min-height:40px}
+  .fin-qr{grid-template-columns:minmax(0,1fr) 130px}.fin-kv{font-size:18px}.fin-big{font-size:22px}
+  .fin-calcs{grid-template-columns:repeat(2,minmax(0,1fr))}.fin-calcs button{min-height:40px}
+  .fin-piewrap{flex-direction:column;align-items:flex-start}
+  .fin-tbl th:nth-child(2),.fin-tbl td:nth-child(2){display:none}
+  .fin-lock{flex-direction:column;align-items:flex-start}
+}
 /* ═══ News tab ═══ */
 .nw-intro{font-size:12.5px;color:var(--t3);margin:4px 0 12px;line-height:1.5}
 .nw-reset{background:none;border:1px solid var(--b2);border-radius:6px;padding:4px 10px;color:var(--t2);font-size:11px;font-weight:700;cursor:pointer}

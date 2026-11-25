@@ -9,6 +9,7 @@ import mysql.connector
 import yfinance as yf
 import commodity_groups
 import market_history
+import my_finance
 import my_money
 import news_store
 import pandas as pd
@@ -2665,6 +2666,81 @@ def my_money_delete(item_id: int, user_id: int = Depends(current_user_id)):
     return _money_call(my_money.delete_item, user_id, item_id)
 
 
+# ── Your finances (profile menu): monthly money, optional giving and goals (my_finance.py) ──
+class MonthlyIn(BaseModel):
+    income: Optional[float] = None
+    housing: Optional[float] = None
+    bills: Optional[float] = None
+    food: Optional[float] = None
+    transport: Optional[float] = None
+    repayments: Optional[float] = None
+    other_spend: Optional[float] = None
+
+
+class GivingIn(BaseModel):
+    on: bool = False
+    mode: Optional[str] = Field(default=None, max_length=10)
+    value: Optional[float] = None
+    causes: str = Field(default="", max_length=200)
+
+
+class GoalIn(BaseModel):
+    name: str = Field(max_length=200)
+    target: float
+    target_date: str = Field(max_length=10)
+    saved: Optional[float] = 0
+
+
+def _finance_call(fn, *args):
+    try:
+        return {"status": "success", **fn(*args)}
+    except my_finance.FinanceError as e:
+        return agent_error(e.status, e.message)
+    except Exception:
+        log.exception("Your finances failed")
+        return agent_error(500, "Something went wrong. Please try again.")
+
+
+@app.get("/api/finance")
+def finance_get(user_id: int = Depends(current_user_id)):
+    return _finance_call(my_finance.get_all, user_id)
+
+
+@app.put("/api/finance/monthly")
+def finance_monthly_save(body: MonthlyIn, user_id: int = Depends(current_user_id)):
+    return _finance_call(my_finance.save_monthly, user_id, body.model_dump() if hasattr(body, "model_dump") else body.dict())
+
+
+@app.delete("/api/finance/monthly")
+def finance_monthly_clear(user_id: int = Depends(current_user_id)):
+    return _finance_call(my_finance.clear_monthly, user_id)
+
+
+@app.put("/api/finance/giving")
+def finance_giving_save(body: GivingIn, user_id: int = Depends(current_user_id)):
+    return _finance_call(my_finance.save_giving, user_id, body.on, body.mode, body.value, body.causes)
+
+
+@app.delete("/api/finance/giving")
+def finance_giving_clear(user_id: int = Depends(current_user_id)):
+    return _finance_call(my_finance.clear_giving, user_id)
+
+
+@app.post("/api/finance/goals")
+def finance_goal_add(body: GoalIn, user_id: int = Depends(current_user_id)):
+    return _finance_call(my_finance.add_goal, user_id, body.name, body.target, body.target_date, body.saved)
+
+
+@app.put("/api/finance/goals/{goal_id}")
+def finance_goal_update(goal_id: int, body: GoalIn, user_id: int = Depends(current_user_id)):
+    return _finance_call(my_finance.update_goal, user_id, goal_id, body.name, body.target, body.target_date, body.saved)
+
+
+@app.delete("/api/finance/goals/{goal_id}")
+def finance_goal_delete(goal_id: int, user_id: int = Depends(current_user_id)):
+    return _finance_call(my_finance.delete_goal, user_id, goal_id)
+
+
 @app.get("/api/portfolio/history")
 def portfolio_history(tickers: str = "", user_id: int = Depends(current_user_id)):
     """Up to 5 of your own holdings over the last 3 months, for the Portfolio chart: each with its daily closes and its
@@ -2993,7 +3069,7 @@ def _xlsx(data: bytes, filename: str):
 
 @app.get("/api/account/export")
 def export_my_data(user_id: int = Depends(current_user_id)):
-    """Your Portfolio, Transactions and Other money as one Excel file."""
+    """Your Portfolio, Transactions, Other money and Your finances as one Excel file."""
     try:
         import exports
         user = auth.get_user(user_id)
@@ -3003,9 +3079,14 @@ def export_my_data(user_id: int = Depends(current_user_id)):
         except Exception:
             log.exception("Other money for the Excel download failed")
             other = None
+        try:
+            finance = my_finance.get_all(user_id)
+        except Exception:
+            log.exception("Your finances for the Excel download failed")
+            finance = None
         data = exports.my_data_workbook((user or {}).get("email", ""), holdings, portfolio.summarize(holdings),
                                         portfolio.list_transactions(user_id), portfolio.transaction_summary(user_id),
-                                        other_money=other)
+                                        other_money=other, finance=finance)
     except Exception:
         log.exception("Making the Excel download failed")
         return agent_error(500, "Something went wrong making your file. Please try again.")

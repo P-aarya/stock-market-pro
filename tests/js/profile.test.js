@@ -188,20 +188,22 @@ function profile({ fetchImpl, signedOut = () => false } = {}) {
   function accountMenu({ name = '' } = {}) {
     const docListeners = {}, calls = [];
     const document = { createElement: tag => new El(tag), addEventListener: (ev, fn) => { (docListeners[ev] = docListeners[ev] || []).push(fn); } };
-    const ctx = { document, ME: { name, email: 'abheek@example.com' }, openProfile: () => calls.push('openProfile') };
+    const ctx = { document, ME: { name, email: 'abheek@example.com' }, openProfile: () => calls.push('openProfile'), showPage: n => calls.push('showPage:' + n) };
     vm.createContext(ctx); vm.runInContext(between('function addAccountMenu(nav){', "(()=>{const nav=document.querySelector('.nav-r')"), ctx);
     const nav = new El('nav'), parts = ctx.addAccountMenu(nav);
     return { nav, parts, calls, docListeners, press: (ev, e) => (docListeners[ev] || []).forEach(fn => fn(e)) };
   }
 
-  await t('the account menu lists the name, the email, then Profile and plan, then Sign out', () => {
+  await t('the account menu lists the name, the email, then Profile and plan, Your finances, then Sign out', () => {
     const { parts } = accountMenu({ name: 'Abheek Das' });
-    assert.deepStrictEqual(parts.menu.children.map(c => c.className), ['nprof-name', 'nprof-email', 'nprof-hr', 'nmenu-item', 'nsignout']);
+    assert.deepStrictEqual(parts.menu.children.map(c => c.className), ['nprof-name', 'nprof-email', 'nprof-hr', 'nmenu-item', 'nmenu-item', 'nsignout']);
     assert.strictEqual(parts.btn.id, 'nprof-btn', 'the account icon can be found, so it can be lit while Profile is open');
-    const [name, email, , prof, out] = parts.menu.children;
+    const [name, email, , prof, fin, out] = parts.menu.children;
     assert.strictEqual(name.textContent, 'Abheek Das'); assert.strictEqual(email.textContent, 'abheek@example.com');
     assert.deepStrictEqual([prof.tag, prof.type, prof.id, prof.attrs.role], ['button', 'button', 'nprof-profile', 'menuitem']);
     assert(prof.innerHTML.includes('<span>Profile and plan</span>'));
+    assert.deepStrictEqual([fin.tag, fin.id, fin.attrs.role], ['button', 'nprof-finance', 'menuitem']);
+    assert(fin.innerHTML.includes('<span>Your finances</span>'));
     assert.deepStrictEqual([out.tag, out.href, out.attrs.role], ['a', '/logout', 'menuitem']);
     assert.strictEqual(accountMenu().parts.menu.children[0].textContent, 'Your account', 'with no name the menu says Your account');
   });
@@ -212,6 +214,13 @@ function profile({ fetchImpl, signedOut = () => false } = {}) {
     parts.menu.children[3].fire('click');
     assert(!parts.menu.classList.contains('open')); assert.strictEqual(parts.btn.attrs['aria-expanded'], 'false');
     assert.deepStrictEqual(calls, ['openProfile']);
+  });
+
+  await t('choosing Your finances closes the menu and opens that page', () => {
+    const { parts, calls } = accountMenu();
+    parts.btn.fire('click'); parts.menu.children[4].fire('click');
+    assert(!parts.menu.classList.contains('open'));
+    assert.deepStrictEqual(calls, ['showPage:finance']);
   });
 
   await t('the menu still closes on Escape and on a click elsewhere, and opens only from its button', () => {

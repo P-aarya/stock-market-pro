@@ -113,9 +113,13 @@ TX_TYPES = {"BUY": "Buy", "SELL": "Sell", "DIVIDEND": "Dividend"}
 
 
 MONEY_COLUMNS = [("Kind", 20, None), ("Name", 30, None), ("Amount (US$)", 16, MONEY), ("Last updated", 13, DATE)]
+FINANCE_COLUMNS = [("Question", 36, None), ("Your answer", 22, None), ("Amount (US$)", 16, MONEY)]
+GOAL_COLUMNS = [("Goal", 30, None), ("Cost (US$)", 16, MONEY), ("By", 13, DATE), ("Already saved (US$)", 18, MONEY)]
+MONTHLY_QUESTIONS = [("income", "Comes in each month"), ("housing", "Rent or home loan"), ("bills", "Bills"), ("food", "Food and shopping"),
+                     ("transport", "Transport"), ("repayments", "Loan or card repayments"), ("other_spend", "Everything else")]
 
 
-def my_data_workbook(email, holdings, summary, transactions, tx_summary, now=None, other_money=None):
+def my_data_workbook(email, holdings, summary, transactions, tx_summary, now=None, other_money=None, finance=None):
     """Portfolio, Transactions and (when given) Other money sheets. `holdings` come from portfolio.list_holdings (with values),
     `summary` from portfolio.summarize, `transactions` from portfolio.list_transactions,
     `tx_summary` from portfolio.transaction_summary."""
@@ -192,6 +196,29 @@ def my_data_workbook(email, holdings, summary, transactions, tx_summary, now=Non
             ws.cell(row=row + 1, column=2, value="Total").font = TOTAL_FONT
             cell = ws.cell(row=row + 1, column=3, value=round(sum(m.get("amount") or 0 for m in other_money), 2))
             cell.number_format, cell.font = MONEY, TOTAL_FONT
+    if finance is not None:
+        ws = wb.create_sheet("Your finances")
+        row = _sheet_header(ws, "Aymetrix · Your finances", f"{email} · your answers on the Your finances page", FINANCE_COLUMNS)
+        monthly = finance.get("monthly") or {}
+        for key, label in MONTHLY_QUESTIONS:
+            row = _write_row(ws, row, FINANCE_COLUMNS, [label, "" if monthly.get(key) is not None else "not answered", monthly.get(key)])
+        g = finance.get("giving") or {}
+        if g.get("on"):
+            how = f"{g.get('value'):g}% of income" if g.get("mode") == "pct" else "a fixed amount each month"
+            row = _write_row(ws, row, FINANCE_COLUMNS, ["Giving (donations)", how, g.get("value") if g.get("mode") == "fixed" else None])
+            if g.get("causes"):
+                row = _write_row(ws, row, FINANCE_COLUMNS, ["Causes", g.get("causes"), None])
+        else:
+            row = _write_row(ws, row, FINANCE_COLUMNS, ["Giving (donations)", "off", None])
+        row += 1
+        for col, (title, _w, _f) in enumerate(GOAL_COLUMNS, start=1):
+            ws.cell(row=row, column=col, value=title).font = TOTAL_FONT
+        row += 1
+        goals = finance.get("goals") or []
+        if not goals:
+            ws.cell(row=row, column=1, value="No goals yet.").font = NOTE_FONT
+        for goal in goals:
+            row = _write_row(ws, row, GOAL_COLUMNS, [goal.get("name"), goal.get("target"), _date(goal.get("target_date")), goal.get("saved")])
     return _bytes(wb)
 
 

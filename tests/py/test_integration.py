@@ -83,6 +83,14 @@ GET /api/my-money
 POST /api/my-money
 PUT /api/my-money/{item_id}
 DELETE /api/my-money/{item_id}
+GET /api/finance
+PUT /api/finance/monthly
+DELETE /api/finance/monthly
+PUT /api/finance/giving
+DELETE /api/finance/giving
+POST /api/finance/goals
+PUT /api/finance/goals/{goal_id}
+DELETE /api/finance/goals/{goal_id}
 GET /api/watchlist/extras
 GET /api/stocks/quotes
 GET /api/stocks/{ticker}/buy-sell
