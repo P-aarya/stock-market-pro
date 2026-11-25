@@ -1226,6 +1226,9 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     <div class="nw-bar">
       <input class="srch nw-q" id="nw-q" type="search" placeholder="Search headlines" maxlength="80" oninput="nwSoon()" aria-label="Search headlines">
       <input class="srch nw-tk" id="nw-tk" type="search" placeholder="Stock, e.g. AAPL" maxlength="10" oninput="nwTickerTyped()" aria-label="News about one stock">
+      <select class="sel nw-cat" id="nw-cat" onchange="nwSaveAndLoad()" aria-label="Category">
+        <option value="">All categories</option><option value="world">World</option><option value="global">Global</option><option value="finance">Finance</option><option value="business">Business</option><option value="economic">Economic</option><option value="tax">Tax</option><option value="retail">Retail</option><option value="tech">Tech</option><option value="crypto">Crypto</option><option value="commodities">Commodities</option><option value="stocks">Stock news</option><option value="entertainment">Entertainment</option><option value="sport">Sport</option>
+      </select>
       <select class="sel" id="nw-days" onchange="nwSaveAndLoad()" aria-label="Period">
         <option value="1">Last 24 hours</option><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option>
       </select>
@@ -1234,7 +1237,6 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
         <button class="fbtn" type="button" id="nw-mine" onclick="nwSetMine(true)">My stocks</button>
       </div>
     </div>
-    <div class="nw-cats" id="nw-cats" role="group" aria-label="Categories"></div>
     <div class="nw-note" id="nw-note" hidden></div>
     <div id="nw-list"></div>
     <div class="nw-more"><button class="fbtn" type="button" id="nw-more" hidden onclick="nwLoad(true)">Load more</button></div>
@@ -3631,37 +3633,36 @@ function renderWorldNews(){
 }
 
 // ═══ NEWS TAB: stored headlines (GET /api/news), with categories, period, search, one stock or "My stocks" ═══
-// The category list matches news_store.CATEGORIES (a test checks). Entertainment and Sport start switched off.
-const NW_CATS=[['world','World',1],['global','Global',1],['finance','Finance',1],['business','Business',1],['economic','Economic',1],
-  ['tax','Tax',1],['retail','Retail',1],['tech','Tech',1],['crypto','Crypto',1],['commodities','Commodities',1],['stocks','Stock news',1],
-  ['entertainment','Entertainment',0],['sport','Sport',0]];
+// The category list matches news_store.CATEGORIES (a test checks). One category at a time, from a dropdown; "All categories" = every one.
+const NW_CATS=[['world','World'],['global','Global'],['finance','Finance'],['business','Business'],['economic','Economic'],
+  ['tax','Tax'],['retail','Retail'],['tech','Tech'],['crypto','Crypto'],['commodities','Commodities'],['stocks','Stock news'],
+  ['entertainment','Entertainment'],['sport','Sport']];
 const NW_PAGE=20;
-let nwCats=null,nwMine=false,nwItems=[],nwSeq=0,nwTimer=null,nwLoadedAt=0;
-function nwDefaultCats(){return new Set(NW_CATS.filter(c=>c[2]).map(c=>c[0]));}
+let nwReady=false,nwMine=false,nwItems=[],nwSeq=0,nwTimer=null,nwLoadedAt=0;
+/** The chosen category: '' = all of them (the dropdown shows one at a time). */
+function nwCat(){const v=document.getElementById('nw-cat')?.value||'';return NW_CATS.some(c=>c[0]===v)?v:'';}
 function nwRestore(){
-  if(nwCats)return;
-  nwCats=nwDefaultCats();
+  if(nwReady)return;
+  nwReady=true;
   try{
     const saved=JSON.parse(localStorage.getItem('nw-filters')||'null');
     if(saved){
-      if(Array.isArray(saved.cats))nwCats=new Set(saved.cats.filter(k=>NW_CATS.some(c=>c[0]===k)));
+      const c=document.getElementById('nw-cat');if(c&&NW_CATS.some(x=>x[0]===saved.cat))c.value=saved.cat;
       const d=document.getElementById('nw-days');if(d&&['1','7','30'].includes(String(saved.days)))d.value=String(saved.days);
       nwMine=!!saved.mine;
     }
   }catch(e){}
 }
 function nwSave(){
-  try{localStorage.setItem('nw-filters',JSON.stringify({cats:[...nwCats],days:+document.getElementById('nw-days').value,mine:nwMine}));}catch(e){}
+  try{localStorage.setItem('nw-filters',JSON.stringify({cat:nwCat(),days:+document.getElementById('nw-days').value,mine:nwMine}));}catch(e){}
 }
 function nwTicker(){const v=(document.getElementById('nw-tk')?.value||'').trim().toUpperCase();return /^[A-Z0-9.\-]{1,10}$/.test(v)?v:'';}
-/** Categories don't apply while one stock or "My stocks" is chosen: every story about those stocks is shown. */
+/** The category doesn't apply while one stock or "My stocks" is chosen: every story about those stocks is shown. */
 function nwCatsApply(){return !nwMine&&!nwTicker();}
 function renderNwFilters(){
-  const box=document.getElementById('nw-cats');if(!box)return;
+  const sel=document.getElementById('nw-cat');if(!sel)return;
   const on=nwCatsApply();
-  box.classList.toggle('nw-off',!on);
-  box.innerHTML=`<button class="fbtn nw-allc" type="button" onclick="nwAllCats()">${nwCats.size===NW_CATS.length?'Clear all':'Select all'}</button>`+
-    NW_CATS.map(([k,l])=>`<button class="fbtn${nwCats.has(k)?' on':''}" type="button" aria-pressed="${nwCats.has(k)}" onclick="nwToggleCat('${k}')">${l}</button>`).join('');
+  sel.disabled=!on;
   document.getElementById('nw-all').classList.toggle('on',!nwMine);
   document.getElementById('nw-mine').classList.toggle('on',nwMine);
   const note=document.getElementById('nw-note'),t=nwTicker();
@@ -3669,14 +3670,12 @@ function renderNwFilters(){
   if(!on)note.innerHTML=t?`Showing every story about <b>${escapeHtml(t)}</b>. <button type="button" class="nw-link" onclick="nwClearTicker()">Show all news</button>`
                          :'Showing every story about the stocks in your portfolio and watchlist.';
 }
-function nwToggleCat(k){if(nwCats.has(k))nwCats.delete(k);else nwCats.add(k);nwSaveAndLoad();}
-function nwAllCats(){nwCats=nwCats.size===NW_CATS.length?new Set():new Set(NW_CATS.map(c=>c[0]));nwSaveAndLoad();}
 function nwSetMine(v){nwMine=!!v;if(v)document.getElementById('nw-tk').value='';nwSaveAndLoad();}
 function nwClearTicker(){document.getElementById('nw-tk').value='';nwSaveAndLoad();}
 function nwPickTicker(ev,t){if(ev)ev.stopPropagation();document.getElementById('nw-tk').value=t;nwMine=false;nwSaveAndLoad();
   if(typeof window!=='undefined'&&window.scrollTo)window.scrollTo(0,0);}
 function nwResetFilters(){
-  nwCats=nwDefaultCats();nwMine=false;
+  nwMine=false;document.getElementById('nw-cat').value='';
   document.getElementById('nw-q').value='';document.getElementById('nw-tk').value='';document.getElementById('nw-days').value='30';
   nwSaveAndLoad();
 }
@@ -3719,11 +3718,8 @@ async function nwLoad(more){
   else{btn.disabled=true;btn.textContent='Loading...';}
   const p=new URLSearchParams({days:document.getElementById('nw-days').value,offset:more?nwItems.length:0,limit:NW_PAGE});
   const t=nwTicker(),q=(document.getElementById('nw-q').value||'').trim();
-  if(t)p.set('ticker',t);else if(nwMine)p.set('mine','true');else p.set('cats',[...nwCats].join(','));
+  if(t)p.set('ticker',t);else if(nwMine)p.set('mine','true');else if(nwCat())p.set('cats',nwCat());       // no cats = every category
   if(q)p.set('q',q);
-  if(!t&&!nwMine&&!nwCats.size){                                     // nothing chosen: say so instead of asking the server
-    list.innerHTML='<div class="empty">Choose at least one category above to see news.</div>';btn.hidden=true;return;
-  }
   const d=await api('/api/news?'+p.toString());
   if(seq!==nwSeq)return;                                             // a newer filter change has already asked again
   btn.disabled=false;btn.textContent='Load more';
@@ -6891,11 +6887,8 @@ function loadPortfolioTickers() {
 .nw-tk{flex:1 1 150px;min-width:0;text-transform:uppercase}
 .nw-tk::placeholder{text-transform:none}
 .nw-bar .sel{flex:0 0 auto}
+.nw-bar .sel:disabled{opacity:.45;cursor:default}
 .nw-scope{display:flex;gap:4px;flex:0 0 auto}
-.nw-cats{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
-.nw-cats .fbtn{padding:6px 11px}
-.nw-cats .nw-allc{background:none;border-style:dashed}
-.nw-cats.nw-off .fbtn{opacity:.4;pointer-events:none}
 .nw-note{font-size:12px;color:var(--t2);margin:-4px 0 12px}
 .nw-link{background:none;border:0;padding:0;color:var(--t1);text-decoration:underline;font:inherit;cursor:pointer}
 .nw-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
@@ -6920,9 +6913,7 @@ function loadPortfolioTickers() {
 @media(max-width:560px){
   .nw-q{flex-basis:100%}
   .nw-tk{flex:1 1 120px}
-  .nw-cats{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;margin-right:-4px;padding-bottom:2px}
-  .nw-cats::-webkit-scrollbar{display:none}
-  .nw-cats .fbtn{flex:0 0 auto;min-height:38px}
+  .nw-bar .sel{flex:1 1 140px;min-height:40px}
   .nw-scope{flex:1 1 100%}.nw-scope .fbtn{flex:1;min-height:40px}
   .nw-img{width:72px;height:72px}
   .nw-title{font-size:13px}

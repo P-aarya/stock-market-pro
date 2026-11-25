@@ -27,11 +27,10 @@ EVERY = 30 * 60                  # seconds between collection rounds
 PER_FEED = 25                    # headlines taken from each feed per round
 STOCKS_PER_ROUND = 40            # stock-news feeds per round (the rest wait for the next round)
 
-CATEGORIES = [                   # key, label, on by default in the News tab
-    ("world", "World", True), ("global", "Global", True), ("finance", "Finance", True), ("business", "Business", True),
-    ("economic", "Economic", True), ("tax", "Tax", True), ("retail", "Retail", True), ("tech", "Tech", True),
-    ("crypto", "Crypto", True), ("commodities", "Commodities", True), ("stocks", "Stock news", True),
-    ("entertainment", "Entertainment", False), ("sport", "Sport", False),
+CATEGORIES = [                   # key, label: the News tab's category dropdown, in this order ("All categories" = every one)
+    ("world", "World"), ("global", "Global"), ("finance", "Finance"), ("business", "Business"), ("economic", "Economic"),
+    ("tax", "Tax"), ("retail", "Retail"), ("tech", "Tech"), ("crypto", "Crypto"), ("commodities", "Commodities"),
+    ("stocks", "Stock news"), ("entertainment", "Entertainment"), ("sport", "Sport"),
 ]
 CATEGORY_KEYS = [c[0] for c in CATEGORIES]
 

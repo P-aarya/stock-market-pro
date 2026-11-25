@@ -49,7 +49,7 @@ class Feeds(unittest.TestCase):
 
     def test_every_category_has_feeds(self):
         self.assertEqual(set(ns.FEEDS) | {"stocks"}, set(ns.CATEGORY_KEYS))
-        self.assertEqual([k for k, _, on in ns.CATEGORIES if not on], ["entertainment", "sport"])
+        self.assertEqual(ns.CATEGORY_KEYS[-2:], ["entertainment", "sport"])
 
 
 class Storing(unittest.TestCase):
@@ -137,8 +137,10 @@ class Page(unittest.TestCase):
         with open(os.path.join(ROOT, "dashboard.html"), encoding="utf-8") as f:
             html = f.read()
         block = re.search(r"const NW_CATS=\[(.*?)\];", html, re.S).group(1)
-        page = [(k, l, bool(int(on))) for k, l, on in re.findall(r"\['(\w+)','([^']+)',(\d)\]", block)]
+        page = re.findall(r"\['(\w+)','([^']+)'\]", block)
         self.assertEqual(page, ns.CATEGORIES)
+        dropdown = re.search(r'<select class="sel nw-cat" id="nw-cat"[^>]*>(.*?)</select>', html, re.S).group(1)
+        self.assertEqual(re.findall(r'<option value="(\w*)">([^<]+)</option>', dropdown), [("", "All categories")] + ns.CATEGORIES)
 
     def test_the_price_updater_starts_the_collector(self):
         with open(os.path.join(ROOT, "scheduler.py"), encoding="utf-8") as f:

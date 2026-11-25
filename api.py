@@ -2414,7 +2414,7 @@ def news_tab(cats: str = "", mine: bool = False, ticker: str = "", days: int = 3
         print(f"News tab error: {e}")
         return {"status": "error", "message": "News isn't available right now. Please try again in a minute.", "items": []}
     return {"status": "success", "items": items, "more": more, "mine_count": len(tickers or []) if mine else None,
-            "categories": [{"key": k, "label": l, "default": d} for k, l, d in news_store.CATEGORIES]}
+            "categories": [{"key": k, "label": l} for k, l in news_store.CATEGORIES]}
 
 
 @app.get("/api/news/world")
