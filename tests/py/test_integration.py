@@ -50,6 +50,7 @@ DELETE /api/alerts/{alert_id}
 GET /api/alerts
 GET /api/alerts/check
 GET /api/economic-calendar
+GET /api/news
 GET /api/news/world
 GET /api/notifications/feed
 GET /api/portfolio/benchmark

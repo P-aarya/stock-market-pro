@@ -43,10 +43,17 @@ const tablet = mediaBlock('max-width:960px'), phone = mediaBlock('max-width:700p
     assert(/<meta name="apple-mobile-web-app-capable" content="yes"/.test(html));
   });
 
-  await t('all eight tabs have an icon and a label, so the bottom bar can stack them', () => {
+  await t('all nine tabs and the phone\'s More button have an icon and a label, so the bottom bar can stack them', () => {
     const tabs = [...html.matchAll(/<button class="ntab[^"]*"[^>]*>(.*?)<\/button>/g)].map(m => m[1]);
-    assert.strictEqual(tabs.length, 8);       // Home, Market, IPOs, Watchlist, Commodities, Learn, Portfolio and Transactions (Profile is in the account menu)
+    assert.strictEqual(tabs.length, 10);      // Home, Market, IPOs, Watchlist, Commodities, Learn, News, Portfolio, Transactions + More (Profile is in the account menu)
     for (const inner of tabs) assert(/<span class="ico">.+<\/span><span class="lbl"/.test(inner), inner);
+  });
+
+  await t('on a narrow phone Learn and News move behind More, which only exists there', () => {
+    assert(/\.ntab-more,\.more-menu\{display:none\}/.test(html), 'no More on a computer');
+    const narrow = html.slice(html.indexOf('@media(max-width:560px){\n  /* Learn and News move behind'));
+    assert(/^@media\(max-width:560px\)\{\s*\/\*[^*]*\*\/\s*#ntab-learn,#ntab-news\{display:none;\}\s*\.ntab\.ntab-more\{display:flex;\}/.test(narrow));
+    assert(html.includes(`onclick="moreGo('learn')"`) && html.includes(`onclick="moreGo('news')"`));
   });
 
   await t('the long tab names have a short form for narrow phones, and the full text is kept', () => {

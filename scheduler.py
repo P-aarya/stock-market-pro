@@ -432,6 +432,12 @@ def main():
         sys.exit(1)                                      # a failed exit makes Render retry and show the failure
 
     threading.Thread(target=_watchdog, name="watchdog", daemon=True).start()
+    try:                                                 # News tab: headlines every 30 min in their own thread, so a
+        import news_store                                # slow news site never holds up prices (and can't stop them)
+        news_store.start(get_db)
+        print("  📰 News collection started (every 30 minutes, kept 30 days)\n")
+    except Exception as e:
+        print(f"  📰 News collection could not start: {e}\n")
 
     cycle = 1
     backoff = 0

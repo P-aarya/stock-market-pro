@@ -10,6 +10,7 @@ import yfinance as yf
 import commodity_groups
 import market_history
 import my_money
+import news_store
 import pandas as pd
 from datetime import datetime, timezone
 from typing import Optional
@@ -2386,6 +2387,34 @@ def _build_stock_news(ticker, count):
     for a in results[2]:  # Google News titles end with " - Publisher"
         a["title"] = _nu_re.sub(r"\s+-\s+[^-]{2,60}$", "", a["title"]).strip() or a["title"]
     return _nu_merge(results, count)
+
+
+@app.get("/api/news")
+def news_tab(cats: str = "", mine: bool = False, ticker: str = "", days: int = 30, q: str = "",
+             offset: int = 0, limit: int = 20, user_id: int = Depends(current_user_id)):
+    """The News tab: headlines from the last `days` days (up to 30), newest first, `limit` at a time.
+    cats: comma-separated categories (empty = all); mine: only news about stocks in your portfolio or watchlist;
+    ticker: only news about that stock (fetched straight away if little is stored for it); q: words in the headline."""
+    categories = [c for c in cats.split(",") if c.strip()] or None
+    tickers = None
+    if ticker.strip():
+        t = ticker.strip().upper()[:10]
+        tickers = [t]
+    elif mine:
+        tickers = sorted(set(portfolio.held_tickers(user_id)) | set(watchlist.get_watchlist(user_id)))
+    try:
+        items, more = news_store.search(get_db, categories, tickers, days, q, offset, limit)
+        if ticker.strip() and offset == 0 and len(items) < 5 and re.match(r"^[A-Z0-9.\-]{1,10}$", tickers[0]):
+            try:
+                if news_store.fetch_stock_now(get_db, tickers[0]):
+                    items, more = news_store.search(get_db, categories, tickers, days, q, offset, limit)
+            except Exception as e:
+                print(f"News fetch for {tickers[0]} failed: {e}")
+    except Exception as e:
+        print(f"News tab error: {e}")
+        return {"status": "error", "message": "News isn't available right now. Please try again in a minute.", "items": []}
+    return {"status": "success", "items": items, "more": more, "mine_count": len(tickers or []) if mine else None,
+            "categories": [{"key": k, "label": l, "default": d} for k, l, d in news_store.CATEGORIES]}
 
 
 @app.get("/api/news/world")

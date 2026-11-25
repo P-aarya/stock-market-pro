@@ -222,6 +222,7 @@ _RULES = [
     ("GET",  r"/api/analyst/(consensus|sectors)", _INITIAL),
     ("GET",  rf"/api/sentiment/{_P}", _INITIAL),
     ("GET",  rf"/api/earnings/{_P}", _INITIAL),                # a ticker, or "calendar"
+    ("GET",  r"/api/news", _INITIAL),                          # the News tab (stored headlines with filters)
     ("GET",  rf"/api/news/{_P}", _INITIAL),                    # "market", "world" or a ticker
     ("GET",  r"/api/economic-calendar", _INITIAL),
     ("*",    r"/api/account/recent(/[^/]+)?", _INITIAL),       # the recently viewed stocks on the Market page

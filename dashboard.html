@@ -88,46 +88,46 @@ body{background:var(--bg0);color:var(--t1);font-family:var(--sans);min-height:10
 .g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
 .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;align-items:start;}
 .g2{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:14px;align-items:start;}
-:is(#page-market,#page-home) .g2{align-items:stretch;} /* Market tab: side-by-side cards always the same height, no gaps */
-:is(#page-market,#page-home) .g2>.card{display:flex;flex-direction:column;}
-:is(#page-market,#page-home) .g2>.card>.gauge{flex:1 1 auto;justify-content:center;} /* sentiment gauge centred in its card */
+:is(#page-market,#page-home,#page-news) .g2{align-items:stretch;} /* Market tab: side-by-side cards always the same height, no gaps */
+:is(#page-market,#page-home,#page-news) .g2>.card{display:flex;flex-direction:column;}
+:is(#page-market,#page-home,#page-news) .g2>.card>.gauge{flex:1 1 auto;justify-content:center;} /* sentiment gauge centred in its card */
 .chbox{position:relative;flex:1 1 auto;min-height:var(--chmin,190px);} /* chart grows to fill its card - no blank space */
 .chbox>canvas{position:absolute;inset:0;}
 /* ═══ MARKET TAB — 3-per-row chart grid ═══ */
-:is(#page-market,#page-home) .g3{align-items:stretch;}
-:is(#page-market,#page-home) .g3>.card{display:flex;flex-direction:column;min-width:0;}
-:is(#page-market,#page-home) .g3>.card.span2{grid-column:span 2;}
-:is(#page-market,#page-home) .g3>.card.span3{grid-column:1/-1;}
-:is(#page-market,#page-home) .g3>.card>.gauge{flex:1 1 auto;justify-content:center;}
-:is(#page-market,#page-home) .gltable td{padding:8px 10px;}
-:is(#page-market,#page-home) .gltable th{padding:8px 10px;}
-@media(max-width:1200px){:is(#page-market,#page-home) .g3{grid-template-columns:repeat(2,1fr);}:is(#page-market,#page-home) .g3>.card.span2{grid-column:1/-1;}}
-@media(max-width:760px){:is(#page-market,#page-home) .g3,:is(#page-market,#page-home) .g2,:is(#page-market,#page-home) .g4{grid-template-columns:1fr;}:is(#page-market,#page-home) .g3>.card.span2{grid-column:auto;}}
+:is(#page-market,#page-home,#page-news) .g3{align-items:stretch;}
+:is(#page-market,#page-home,#page-news) .g3>.card{display:flex;flex-direction:column;min-width:0;}
+:is(#page-market,#page-home,#page-news) .g3>.card.span2{grid-column:span 2;}
+:is(#page-market,#page-home,#page-news) .g3>.card.span3{grid-column:1/-1;}
+:is(#page-market,#page-home,#page-news) .g3>.card>.gauge{flex:1 1 auto;justify-content:center;}
+:is(#page-market,#page-home,#page-news) .gltable td{padding:8px 10px;}
+:is(#page-market,#page-home,#page-news) .gltable th{padding:8px 10px;}
+@media(max-width:1200px){:is(#page-market,#page-home,#page-news) .g3{grid-template-columns:repeat(2,1fr);}:is(#page-market,#page-home,#page-news) .g3>.card.span2{grid-column:1/-1;}}
+@media(max-width:760px){:is(#page-market,#page-home,#page-news) .g3,:is(#page-market,#page-home,#page-news) .g2,:is(#page-market,#page-home,#page-news) .g4{grid-template-columns:1fr;}:is(#page-market,#page-home,#page-news) .g3>.card.span2{grid-column:auto;}}
 
 /* ═══ MARKET TAB — monochrome: white text, green = up/profit, red = down/loss, no glow ═══ */
-:is(#page-market,#page-home){--cyan:#ffffff;--blue:#ffffff;--yellow:#ffffff;--purple:#ffffff;--orange:#ffffff;--pink:#ffffff;--mline:#4a4f63;}
-:is(#page-market,#page-home) *{box-shadow:none!important;text-shadow:none!important;}
-:is(#page-market,#page-home) .ctitle::before,:is(#page-market,#page-home) .stitle::before{background:#00d4ff;} /* heading bars: original cyan */
-:is(#page-market,#page-home) .sc:not([style*="--green"]):not([style*="--red"]){border-top-color:var(--mline)!important;}
-:is(#page-market,#page-home) .ic{border-left-color:var(--mline)!important;}
-:is(#page-market,#page-home) .info-note{border-left-color:var(--mline);}
-:is(#page-market,#page-home) .badge:not(.ai-wrap *){background:transparent!important;color:var(--t2)!important;border:1px solid var(--mline)!important;}
-:is(#page-market,#page-home) .pgbtn:hover,:is(#page-market,#page-home) .pgbtn.on,:is(#page-market,#page-home) .fbtn:hover,:is(#page-market,#page-home) .fbtn.on,:is(#page-market,#page-home) .ai-risk-btn.on{background:#fff;color:#000;border-color:#fff;}
-:is(#page-market,#page-home) .btnp{background:transparent;color:var(--t1);border:1px solid var(--mline);}
-:is(#page-market,#page-home) .btnp:hover{background:#fff;color:#000;}
-:is(#page-market,#page-home) .stab.on{color:var(--t1);}
-:is(#page-market,#page-home) .srch:focus,:is(#page-market,#page-home) .sel:focus,:is(#page-market,#page-home) .ai-input:focus{border-color:var(--mline);}
-:is(#page-market,#page-home) .ai-wrap{--cyan:#00d4ff;--blue:#4f8ef7;--yellow:#ffc800;--purple:#a55eea;--orange:#ff6b35;} /* AI Stock Finder keeps its original colours */
-:is(#page-market,#page-home) .gbar{background:linear-gradient(90deg,#ff4444,#8a8fa0,#00e676);}
-:is(#page-market,#page-home) .news-card:hover{border-color:var(--mline);}
-:is(#page-market,#page-home) .news-card-source{color:var(--t2);}
-:is(#page-market,#page-home) .news-card-cat{background:transparent!important;color:var(--t3)!important;border:1px solid var(--b2);}
-:is(#page-market,#page-home) .news-card-img-placeholder{filter:grayscale(1);}
-:is(#page-market,#page-home) .mlogo{width:20px;height:20px;border-radius:50%;background:#fff;object-fit:contain;padding:2px;vertical-align:middle;margin-right:7px;flex-shrink:0;}
-:is(#page-market,#page-home) .mlogo-l{width:20px;height:20px;border-radius:50%;background:var(--bg4);border:1px solid var(--b2);color:var(--t1);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;vertical-align:middle;margin-right:7px;flex-shrink:0;}
-:is(#page-market,#page-home) td.sym{white-space:nowrap;}
-:is(#page-market,#page-home) .disclaimer{background:var(--bg2)!important;border-color:var(--b1)!important;color:var(--t3)!important;}
-:is(#page-market,#page-home) #heatmap-wrap,:is(#page-market,#page-home) #h-heatmap-wrap{flex:1 1 auto;grid-auto-rows:1fr;} /* tiles stretch to fill the card - no blank space */
+:is(#page-market,#page-home,#page-news){--cyan:#ffffff;--blue:#ffffff;--yellow:#ffffff;--purple:#ffffff;--orange:#ffffff;--pink:#ffffff;--mline:#4a4f63;}
+:is(#page-market,#page-home,#page-news) *{box-shadow:none!important;text-shadow:none!important;}
+:is(#page-market,#page-home,#page-news) .ctitle::before,:is(#page-market,#page-home,#page-news) .stitle::before{background:#00d4ff;} /* heading bars: original cyan */
+:is(#page-market,#page-home,#page-news) .sc:not([style*="--green"]):not([style*="--red"]){border-top-color:var(--mline)!important;}
+:is(#page-market,#page-home,#page-news) .ic{border-left-color:var(--mline)!important;}
+:is(#page-market,#page-home,#page-news) .info-note{border-left-color:var(--mline);}
+:is(#page-market,#page-home,#page-news) .badge:not(.ai-wrap *){background:transparent!important;color:var(--t2)!important;border:1px solid var(--mline)!important;}
+:is(#page-market,#page-home,#page-news) .pgbtn:hover,:is(#page-market,#page-home,#page-news) .pgbtn.on,:is(#page-market,#page-home,#page-news) .fbtn:hover,:is(#page-market,#page-home,#page-news) .fbtn.on,:is(#page-market,#page-home,#page-news) .ai-risk-btn.on{background:#fff;color:#000;border-color:#fff;}
+:is(#page-market,#page-home,#page-news) .btnp{background:transparent;color:var(--t1);border:1px solid var(--mline);}
+:is(#page-market,#page-home,#page-news) .btnp:hover{background:#fff;color:#000;}
+:is(#page-market,#page-home,#page-news) .stab.on{color:var(--t1);}
+:is(#page-market,#page-home,#page-news) .srch:focus,:is(#page-market,#page-home,#page-news) .sel:focus,:is(#page-market,#page-home,#page-news) .ai-input:focus{border-color:var(--mline);}
+:is(#page-market,#page-home,#page-news) .ai-wrap{--cyan:#00d4ff;--blue:#4f8ef7;--yellow:#ffc800;--purple:#a55eea;--orange:#ff6b35;} /* AI Stock Finder keeps its original colours */
+:is(#page-market,#page-home,#page-news) .gbar{background:linear-gradient(90deg,#ff4444,#8a8fa0,#00e676);}
+:is(#page-market,#page-home,#page-news) .news-card:hover{border-color:var(--mline);}
+:is(#page-market,#page-home,#page-news) .news-card-source{color:var(--t2);}
+:is(#page-market,#page-home,#page-news) .news-card-cat{background:transparent!important;color:var(--t3)!important;border:1px solid var(--b2);}
+:is(#page-market,#page-home,#page-news) .news-card-img-placeholder{filter:grayscale(1);}
+:is(#page-market,#page-home,#page-news) .mlogo{width:20px;height:20px;border-radius:50%;background:#fff;object-fit:contain;padding:2px;vertical-align:middle;margin-right:7px;flex-shrink:0;}
+:is(#page-market,#page-home,#page-news) .mlogo-l{width:20px;height:20px;border-radius:50%;background:var(--bg4);border:1px solid var(--b2);color:var(--t1);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;vertical-align:middle;margin-right:7px;flex-shrink:0;}
+:is(#page-market,#page-home,#page-news) td.sym{white-space:nowrap;}
+:is(#page-market,#page-home,#page-news) .disclaimer{background:var(--bg2)!important;border-color:var(--b1)!important;color:var(--t3)!important;}
+:is(#page-market,#page-home,#page-news) #heatmap-wrap,:is(#page-market,#page-home,#page-news) #h-heatmap-wrap{flex:1 1 auto;grid-auto-rows:1fr;} /* tiles stretch to fill the card - no blank space */
 .txrow{align-items:stretch;} /* Transactions: cards in a row share one height, no gaps */
 .g31{display:grid;grid-template-columns:3fr 1fr;gap:12px;margin-bottom:16px;align-items:start;}
 
@@ -237,6 +237,12 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 .pgbtn{background:var(--bg3);border:1px solid var(--b1);border-radius:6px;padding:5px 11px;color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;transition:all 0.12s;}
 .pgbtn:hover,.pgbtn.on{background:var(--blue);color:#fff;border-color:var(--blue);}
 .pginfo{font-size:12px;font-weight:600;color:var(--t3);}
+.pgbtn:disabled{opacity:.4;cursor:default;background:var(--bg3);color:var(--t2);border-color:var(--b1);}
+.tpg{justify-content:space-between;}
+.tpg .pginfo:first-child{margin-right:auto;}
+.tpg-size{display:inline-flex;align-items:center;gap:4px;margin-left:12px;}
+.tpg-size .pgbtn{padding:4px 8px;}
+@media(max-width:600px){.tpg{justify-content:center;}.tpg .pginfo:first-child{width:100%;text-align:center;margin:0 0 4px;}.tpg-size{margin-left:0;}}
 
 .load{display:flex;align-items:center;justify-content:center;padding:32px;color:var(--t3);font-size:13px;font-weight:600;gap:10px;}
 .spin{width:18px;height:18px;border:2px solid var(--b2);border-top-color:var(--blue);border-radius:50%;animation:spin 0.8s linear infinite;}
@@ -614,8 +620,14 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     <button class="ntab" id="ntab-watchlist" onclick="showPage('watchlist',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.1 8.3 22 9.3 17 14.1 18.2 21 12 17.8 5.8 21 7 14.1 2 9.3 8.9 8.3 12 2"/></svg></span><span class="lbl">Watchlist</span></button>
     <button class="ntab" id="ntab-commodities" data-feature="commodities" onclick="showPage('commodities',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg></span><span class="lbl" data-short="Commod.">Commodities</span></button>
     <button class="ntab" id="ntab-learn" data-feature="learn" onclick="showPage('learn',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/></svg></span><span class="lbl">Learn</span></button>
+    <button class="ntab" id="ntab-news" onclick="showPage('news',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h13a1 1 0 0 1 1 1v14a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2z"/><path d="M18 9h2a1 1 0 0 1 1 1v9a2 2 0 0 1-2 2"/><path d="M8 8h6"/><path d="M8 12h6"/><path d="M8 16h4"/></svg></span><span class="lbl">News</span></button>
     <button class="ntab" id="ntab-portfolio" data-feature="portfolio_view" onclick="showPage('portfolio',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg></span><span class="lbl">Portfolio</span></button>
     <button class="ntab" id="ntab-transactions" data-feature="portfolio_view" onclick="showPage('transactions',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span><span class="lbl" data-short="Trades">Transactions</span></button>
+    <button class="ntab ntab-more" id="ntab-more" type="button" onclick="toggleMoreTabs(event)" aria-haspopup="true" aria-expanded="false"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></span><span class="lbl">More</span></button>
+  </div>
+  <div class="more-menu" id="more-menu" hidden role="menu">
+    <button type="button" role="menuitem" id="more-learn" onclick="moreGo('learn')"></button>
+    <button type="button" role="menuitem" id="more-news" onclick="moreGo('news')"></button>
   </div>
   <div class="nav-r">
     <button id="nt-bell" class="nt-bell" onclick="ntToggleBell(event)" title="Notifications"><svg class="lic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span id="nt-badge" class="nt-badge" style="display:none">0</span></button>
@@ -1138,6 +1150,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <thead><tr><th>Ticker</th><th>Company</th><th>Type</th><th>Sector</th><th>Qty</th><th>Avg Buy</th><th>Current</th><th>Invested</th><th>Value</th><th>P&L $</th><th>P&L %</th><th>Day %</th><th>Analyst</th><th title="The prediction model's price for 3 months from now">3M Target</th></tr></thead>
       <tbody id="tb-pf"><tr><td colspan="14"><div class="load"><div class="spin"></div></div></td></tr></tbody>
     </table></div>
+    <div class="pgn tpg" id="pf-pgn"></div>
   </div>
   <div class="info-note pf-from-tx">Your holdings come from your transactions. To buy or sell, add it on the <button class="linkbtn" type="button" onclick="goTab('transactions')">Transactions tab</button> and it shows up here automatically.</div>
 
@@ -1164,7 +1177,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   <div class="card" style="margin-bottom:16px">
     <div class="stitle">Transactions</div>
     <div class="toolbar">
-      <input class="srch" style="width:200px" placeholder="Search..." id="tx-srch" oninput="renderTx()"/>
+      <input class="srch" style="width:200px" placeholder="Search..." id="tx-srch" oninput="txPg=1;renderTx()"/>
       <button class="fbtn on" onclick="setTxF('all',this)">All</button>
       <button class="fbtn" onclick="setTxF('BUY',this)">Buy</button>
       <button class="fbtn" onclick="setTxF('SELL',this)">Sell</button>
@@ -1178,6 +1191,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <thead><tr><th>Date</th><th>Ticker</th><th>Company</th><th>Stock / commodity</th><th>Type</th><th>Qty</th><th>Price</th><th>Total</th><th>Notes</th><th></th></tr></thead>
       <tbody id="tb-tx"><tr><td colspan="10"><div class="load"><div class="spin"></div></div></td></tr></tbody>
     </table></div>
+    <div class="pgn tpg" id="tx-pgn"></div>
   </div>
   <div class="card" id="tx-form-card" data-feature="portfolio_mgt">
     <div class="stitle" id="tx-form-title">Add Transaction</div>
@@ -1204,6 +1218,29 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 </div>
 
 <!-- ═══════════ COMMODITIES PAGE ═══════════ -->
+<!-- ═══ NEWS: headlines from the past 30 days, collected every 30 minutes by the price updater (news_store.py) ═══ -->
+<div class="page" id="page-news">
+  <div class="card">
+    <div class="chdr"><div class="ctitle">News</div><button class="nw-reset" type="button" onclick="nwResetFilters()">Reset filters</button></div>
+    <p class="nw-intro">Headlines from the past 30 days, updated every 30 minutes. Click a story to read it on the publisher's website.</p>
+    <div class="nw-bar">
+      <input class="srch nw-q" id="nw-q" type="search" placeholder="Search headlines" maxlength="80" oninput="nwSoon()" aria-label="Search headlines">
+      <input class="srch nw-tk" id="nw-tk" type="search" placeholder="Stock, e.g. AAPL" maxlength="10" oninput="nwTickerTyped()" aria-label="News about one stock">
+      <select class="sel" id="nw-days" onchange="nwSaveAndLoad()" aria-label="Period">
+        <option value="1">Last 24 hours</option><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option>
+      </select>
+      <div class="nw-scope" role="group" aria-label="Which news">
+        <button class="fbtn on" type="button" id="nw-all" onclick="nwSetMine(false)">All news</button>
+        <button class="fbtn" type="button" id="nw-mine" onclick="nwSetMine(true)">My stocks</button>
+      </div>
+    </div>
+    <div class="nw-cats" id="nw-cats" role="group" aria-label="Categories"></div>
+    <div class="nw-note" id="nw-note" hidden></div>
+    <div id="nw-list"></div>
+    <div class="nw-more"><button class="fbtn" type="button" id="nw-more" hidden onclick="nwLoad(true)">Load more</button></div>
+  </div>
+</div>
+
 <!-- ═══ LEARN: beginner videos, podcasts and tips (Admin Center → Learn changes them) ═══ -->
 <div class="page" id="page-learn">
   <p class="learn-intro">Short videos, podcasts and practical tips to help you learn how the stock market works. Videos open on YouTube and podcasts in a new tab. Each tip links to the official investor-education page it comes from.</p>
@@ -2002,6 +2039,8 @@ function showPage(n,btn){
   if(n==='commodities'){loadCommodities();loadMacro();loadComCo();}
   if(n==='watchlist')loadWatchlist();
   if(n==='learn')loadLearn();
+  if(n==='news')loadNews();
+  if(typeof moreTabsState==='function')moreTabsState(n);
   if(n==='profile')loadProfile();
   if(n==='ipos'&&(!ipoFetchedAt||Date.now()-ipoFetchedAt>IPO_REFRESH_MS))loadIPOs();
 }
@@ -3591,6 +3630,153 @@ function renderWorldNews(){
   }).join('')}</div>`;
 }
 
+// ═══ NEWS TAB: stored headlines (GET /api/news), with categories, period, search, one stock or "My stocks" ═══
+// The category list matches news_store.CATEGORIES (a test checks). Entertainment and Sport start switched off.
+const NW_CATS=[['world','World',1],['global','Global',1],['finance','Finance',1],['business','Business',1],['economic','Economic',1],
+  ['tax','Tax',1],['retail','Retail',1],['tech','Tech',1],['crypto','Crypto',1],['commodities','Commodities',1],['stocks','Stock news',1],
+  ['entertainment','Entertainment',0],['sport','Sport',0]];
+const NW_PAGE=20;
+let nwCats=null,nwMine=false,nwItems=[],nwSeq=0,nwTimer=null,nwLoadedAt=0;
+function nwDefaultCats(){return new Set(NW_CATS.filter(c=>c[2]).map(c=>c[0]));}
+function nwRestore(){
+  if(nwCats)return;
+  nwCats=nwDefaultCats();
+  try{
+    const saved=JSON.parse(localStorage.getItem('nw-filters')||'null');
+    if(saved){
+      if(Array.isArray(saved.cats))nwCats=new Set(saved.cats.filter(k=>NW_CATS.some(c=>c[0]===k)));
+      const d=document.getElementById('nw-days');if(d&&['1','7','30'].includes(String(saved.days)))d.value=String(saved.days);
+      nwMine=!!saved.mine;
+    }
+  }catch(e){}
+}
+function nwSave(){
+  try{localStorage.setItem('nw-filters',JSON.stringify({cats:[...nwCats],days:+document.getElementById('nw-days').value,mine:nwMine}));}catch(e){}
+}
+function nwTicker(){const v=(document.getElementById('nw-tk')?.value||'').trim().toUpperCase();return /^[A-Z0-9.\-]{1,10}$/.test(v)?v:'';}
+/** Categories don't apply while one stock or "My stocks" is chosen: every story about those stocks is shown. */
+function nwCatsApply(){return !nwMine&&!nwTicker();}
+function renderNwFilters(){
+  const box=document.getElementById('nw-cats');if(!box)return;
+  const on=nwCatsApply();
+  box.classList.toggle('nw-off',!on);
+  box.innerHTML=`<button class="fbtn nw-allc" type="button" onclick="nwAllCats()">${nwCats.size===NW_CATS.length?'Clear all':'Select all'}</button>`+
+    NW_CATS.map(([k,l])=>`<button class="fbtn${nwCats.has(k)?' on':''}" type="button" aria-pressed="${nwCats.has(k)}" onclick="nwToggleCat('${k}')">${l}</button>`).join('');
+  document.getElementById('nw-all').classList.toggle('on',!nwMine);
+  document.getElementById('nw-mine').classList.toggle('on',nwMine);
+  const note=document.getElementById('nw-note'),t=nwTicker();
+  note.hidden=on;
+  if(!on)note.innerHTML=t?`Showing every story about <b>${escapeHtml(t)}</b>. <button type="button" class="nw-link" onclick="nwClearTicker()">Show all news</button>`
+                         :'Showing every story about the stocks in your portfolio and watchlist.';
+}
+function nwToggleCat(k){if(nwCats.has(k))nwCats.delete(k);else nwCats.add(k);nwSaveAndLoad();}
+function nwAllCats(){nwCats=nwCats.size===NW_CATS.length?new Set():new Set(NW_CATS.map(c=>c[0]));nwSaveAndLoad();}
+function nwSetMine(v){nwMine=!!v;if(v)document.getElementById('nw-tk').value='';nwSaveAndLoad();}
+function nwClearTicker(){document.getElementById('nw-tk').value='';nwSaveAndLoad();}
+function nwPickTicker(ev,t){if(ev)ev.stopPropagation();document.getElementById('nw-tk').value=t;nwMine=false;nwSaveAndLoad();
+  if(typeof window!=='undefined'&&window.scrollTo)window.scrollTo(0,0);}
+function nwResetFilters(){
+  nwCats=nwDefaultCats();nwMine=false;
+  document.getElementById('nw-q').value='';document.getElementById('nw-tk').value='';document.getElementById('nw-days').value='30';
+  nwSaveAndLoad();
+}
+function nwSaveAndLoad(){nwSave();renderNwFilters();nwLoad(false);}
+function nwSoon(){clearTimeout(nwTimer);nwTimer=setTimeout(()=>nwLoad(false),350);}      // search as you type, without a request per key
+function nwTickerTyped(){
+  const raw=(document.getElementById('nw-tk').value||'').trim();
+  if(raw&&nwMine){nwMine=false;nwSave();}
+  renderNwFilters();
+  if(!raw||nwTicker())nwSoon();
+}
+function nwWhen(ts){
+  if(!ts)return '';
+  const age=Date.now()/1000-ts;
+  if(age<7*86400)return timeAgo(ts);
+  return new Date(ts*1000).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+}
+function nwCard(n){
+  const img=safeHttpUrl(n.image);
+  const label=k=>(NW_CATS.find(c=>c[0]===k)||[k,k])[1];
+  const tags=(n.tickers||[]).slice(0,4).map(t=>`<button type="button" class="nw-tk-tag" title="News about ${escapeHtml(t)}" onclick="nwPickTicker(event,'${escapeHtml(t)}')">${escapeHtml(t)}</button>`).join('')+
+             (n.categories||[]).filter(k=>k!=='stocks'||!(n.tickers||[]).length).slice(0,2).map(k=>`<span class="news-card-cat">${escapeHtml(label(k))}</span>`).join('');
+  return `<div class="nw-card" role="link" tabindex="0" data-url="${escapeHtml(safeHttpUrl(n.url))}" onclick="openNewsLink(this)" onkeydown="if(event.key==='Enter')openNewsLink(this)">
+    ${img?`<img class="nw-img" src="${escapeHtml(img)}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'nw-img nw-ph',innerHTML:LI.news}))"/>`:`<div class="nw-img nw-ph">${LI.news}</div>`}
+    <div class="nw-body">
+      <div class="nw-title">${escapeHtml(n.title||'')}</div>
+      ${n.summary?`<div class="nw-sum">${escapeHtml(n.summary)}</div>`:''}
+      <div class="nw-meta"><span class="nw-src">${escapeHtml(n.source||'News')}</span><span class="nw-time">${nwWhen(n.published)}</span>${tags?`<span class="nw-tags">${tags}</span>`:''}</div>
+    </div>
+  </div>`;
+}
+function renderNwList(){
+  const list=document.getElementById('nw-list');
+  list.innerHTML=nwItems.length?`<div class="nw-grid">${nwItems.map(nwCard).join('')}</div>`:'';
+}
+async function nwLoad(more){
+  nwRestore();
+  const seq=++nwSeq,list=document.getElementById('nw-list'),btn=document.getElementById('nw-more');
+  if(!more){nwItems=[];list.innerHTML='<div class="load"><div class="spin"></div>Loading news...</div>';btn.hidden=true;}
+  else{btn.disabled=true;btn.textContent='Loading...';}
+  const p=new URLSearchParams({days:document.getElementById('nw-days').value,offset:more?nwItems.length:0,limit:NW_PAGE});
+  const t=nwTicker(),q=(document.getElementById('nw-q').value||'').trim();
+  if(t)p.set('ticker',t);else if(nwMine)p.set('mine','true');else p.set('cats',[...nwCats].join(','));
+  if(q)p.set('q',q);
+  if(!t&&!nwMine&&!nwCats.size){                                     // nothing chosen: say so instead of asking the server
+    list.innerHTML='<div class="empty">Choose at least one category above to see news.</div>';btn.hidden=true;return;
+  }
+  const d=await api('/api/news?'+p.toString());
+  if(seq!==nwSeq)return;                                             // a newer filter change has already asked again
+  btn.disabled=false;btn.textContent='Load more';
+  if(!d||d.status!=='success'){
+    if(more){btn.hidden=false;return;}
+    list.innerHTML=`<div class="empty">${escapeHtml((d&&d.message)||'Could not load the news.')} <button type="button" class="nw-link" onclick="nwLoad(false)">Try again</button></div>`;
+    return;
+  }
+  nwItems=more?nwItems.concat(d.items):d.items;nwLoadedAt=Date.now();
+  renderNwList();
+  btn.hidden=!d.more;
+  if(!nwItems.length){
+    let msg='No headlines match these filters. Try more categories, a longer period or different words.';
+    if(nwMine&&d.mine_count===0)msg='Your portfolio and watchlist are empty. Add a stock to either one to see its news here.';
+    else if(t)msg=`No recent news found for ${escapeHtml(t)}. Check the symbol, or try a longer period.`;
+    list.innerHTML=`<div class="empty">${msg}</div>`;
+  }
+}
+/** Opening the tab: draw the filters, and fetch again only if it's been more than 5 minutes. */
+function loadNews(){
+  nwRestore();renderNwFilters();
+  if(!nwLoadedAt||Date.now()-nwLoadedAt>5*60*1000)nwLoad(false);
+}
+
+// ═══ Phone tab bar: Learn and News sit behind "More" so the other tabs keep room for their labels ═══
+function moreTabsState(n){
+  const b=document.getElementById('ntab-more');
+  if(b&&b.classList){if(n==='learn'||n==='news')b.classList.add('on');else b.classList.remove('on');}
+  closeMoreTabs();
+}
+function toggleMoreTabs(ev){
+  if(ev)ev.stopPropagation();
+  const m=document.getElementById('more-menu');if(!m)return;
+  if(!m.hidden){closeMoreTabs();return;}
+  const cur=document.querySelector('.page.on')?.id;
+  const item=(n,label,feat)=>{const el=document.getElementById('more-'+n);
+    el.className=cur==='page-'+n?'on':'';
+    el.innerHTML=document.querySelector('#ntab-'+n+' .ico').innerHTML+`<span>${label}</span>`+(feat&&!can(feat)?`<span class="more-lock">${LOCK_ICON}</span>`:'');};
+  item('learn','Learn','learn');item('news','News',null);
+  m.hidden=false;document.body.classList.add('more-open');                  // the chat bubble would sit on top of the menu
+  document.getElementById('ntab-more').setAttribute('aria-expanded','true');
+}
+function closeMoreTabs(){
+  const m=document.getElementById('more-menu');if(m)m.hidden=true;
+  if(document.body&&document.body.classList)document.body.classList.remove('more-open');
+  const b=document.getElementById('ntab-more');if(b&&b.setAttribute)b.setAttribute('aria-expanded','false');
+}
+function moreGo(n){closeMoreTabs();showPage(n,document.getElementById('ntab-'+n));}
+if(typeof document!=='undefined'&&document.addEventListener){
+  document.addEventListener('click',e=>{const m=document.getElementById('more-menu');if(m&&!m.hidden&&!m.contains(e.target))closeMoreTabs();});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMoreTabs();});
+}
+
 function showNewsNotification(article, count){
   if(!article) return;
   if(Notification.permission === 'granted'){
@@ -4896,8 +5082,38 @@ function closeFS(){document.getElementById('fsm').classList.remove('open');docum
 
 // Portfolio
 let pfRows=[],pfEditId=null,pfKind='all',allocBy='sector';
+// ── Pages for the Holdings and Transactions tables: 5 rows to begin with (5 / 10 / 25 to choose, remembered in this browser) ──
+const TPG_SIZES=[5,10,25];
+function tpgSize(key){try{const v=+localStorage.getItem('tpg-'+key);return TPG_SIZES.includes(v)?v:5;}catch(e){return 5;}}
+function tpgSetSize(key,v){try{localStorage.setItem('tpg-'+key,String(v));}catch(e){}}
+let pfPg=1,txPg=1,pfSize=tpgSize('pf'),txSize=tpgSize('tx');
+/** One page of `rows`, and the bar under the table: "Showing 6–10 of 23  ‹ Prev 1 2 3 Next ›  Rows 5 10 25". */
+function tablePage(rows,page,size,barId,goFn,sizeFn){
+  const pages=Math.max(1,Math.ceil(rows.length/size)),p=Math.min(Math.max(1,page),pages);
+  const bar=document.getElementById(barId);
+  if(bar){
+    if(rows.length<=TPG_SIZES[0]){bar.innerHTML='';}
+    else{
+      const a=(p-1)*size+1,b=Math.min(p*size,rows.length);
+      let h=`<span class="pginfo">Showing ${a}–${b} of ${rows.length}</span>`;
+      if(pages>1){
+        h+=`<button class="pgbtn" type="button" ${p<=1?'disabled':''} onclick="${goFn}(${p-1})">‹ Prev</button>`;
+        const lo=Math.max(1,Math.min(p-2,pages-4)),hi=Math.min(pages,lo+4);
+        for(let i=lo;i<=hi;i++)h+=`<button class="pgbtn${i===p?' on':''}" type="button" onclick="${goFn}(${i})">${i}</button>`;
+        h+=`<button class="pgbtn" type="button" ${p>=pages?'disabled':''} onclick="${goFn}(${p+1})">Next ›</button>`;
+      }
+      h+=`<span class="tpg-size"><span class="pginfo">Rows</span>${TPG_SIZES.map(n=>`<button class="pgbtn${n===size?' on':''}" type="button" onclick="${sizeFn}(${n})">${n}</button>`).join('')}</span>`;
+      bar.innerHTML=h;
+    }
+  }
+  return {page:p,rows:rows.slice((p-1)*size,p*size)};
+}
+function goPfPg(p){pfPg=p;renderHoldings();}
+function setPfSize(n){pfSize=n;tpgSetSize('pf',n);pfPg=1;renderHoldings();}
+function goTxPg(p){txPg=p;renderTx();}
+function setTxSize(n){txSize=n;tpgSetSize('tx',n);txPg=1;renderTx();}
 function setPfKind(k){
-  pfKind=k;
+  pfKind=k;pfPg=1;
   document.querySelectorAll('#pf-kinds .fbtn').forEach(b=>b.classList.toggle('on',b.dataset.kind===k));
   renderHoldings();
 }
@@ -4913,9 +5129,11 @@ function renderHoldings(){
   const n={all:h.length,stock:h.filter(x=>!isCommodity(x)).length,commodity:h.filter(isCommodity).length};
   Object.entries(n).forEach(([k,v])=>{const el=document.getElementById('pf-kn-'+k);if(el)el.textContent=v;});
   const rows=pfKind==='all'?h:h.filter(x=>(isCommodity(x)?'commodity':'stock')===pfKind);
+  if(!h.length||!rows.length){const b=document.getElementById('pf-pgn');if(b)b.innerHTML='';}
   if(!h.length){document.getElementById('tb-pf').innerHTML='<tr><td colspan="14" class="empty">No holdings yet. Add a BUY on the <button class="linkbtn" type="button" onclick="goTab(\'transactions\')">Transactions tab</button>.</td></tr>';return;}
   if(!rows.length){document.getElementById('tb-pf').innerHTML=`<tr><td colspan="14" class="empty">No ${pfKind==='commodity'?'commodities':'stocks'} in your holdings.</td></tr>`;return;}
-  document.getElementById('tb-pf').innerHTML=rows.map(x=>`<tr data-t="${escapeHtml(x.ticker)}"${isCommodity(x)?' style="cursor:default"':' onclick="openStock(this.dataset.t)"'}>
+  const pg=tablePage(rows,pfPg,pfSize,'pf-pgn','goPfPg','setPfSize');pfPg=pg.page;
+  document.getElementById('tb-pf').innerHTML=pg.rows.map(x=>`<tr data-t="${escapeHtml(x.ticker)}"${isCommodity(x)?' style="cursor:default"':' onclick="openStock(this.dataset.t)"'}>
     <td class="sym">${escapeHtml(holdingName(x))}</td><td style="color:var(--t2);font-weight:600">${isCommodity(x)?escapeHtml('per '+(x.unit||'unit')):escapeHtml(x.company_name||'--')}</td>
     <td>${kindCell(x)}</td>
     <td style="font-size:10px;color:var(--t3);font-weight:700">${escapeHtml(x.sector||'--')}</td>
@@ -5251,13 +5469,14 @@ async function loadTx(){
   }
   aTx=Array.isArray(t)?t:[];renderTx();buildTxCharts();
 }
-function setTxF(f,btn){txF=f;document.querySelectorAll('#page-transactions .toolbar .fbtn:not([data-kind])').forEach(b=>b.classList.remove('on'));btn.classList.add('on');renderTx();}
-function setTxKind(k){txKind=k;document.querySelectorAll('#page-transactions .toolbar .fbtn[data-kind]').forEach(b=>b.classList.toggle('on',b.dataset.kind===k));renderTx();}
+function setTxF(f,btn){txF=f;txPg=1;document.querySelectorAll('#page-transactions .toolbar .fbtn:not([data-kind])').forEach(b=>b.classList.remove('on'));btn.classList.add('on');renderTx();}
+function setTxKind(k){txKind=k;txPg=1;document.querySelectorAll('#page-transactions .toolbar .fbtn[data-kind]').forEach(b=>b.classList.toggle('on',b.dataset.kind===k));renderTx();}
 function renderTx(){
   const q=document.getElementById('tx-srch').value.toLowerCase();
   const f=aTx.filter(t=>{const mf=txF==='all'||t.transaction_type===txF;const mk=txKind==='all'||(isCommodity(t)?'commodity':'stock')===txKind;const mq=!q||t.ticker?.toLowerCase().includes(q)||t.company_name?.toLowerCase().includes(q);return mf&&mk&&mq;});
   const badge={BUY:'bg',SELL:'br',DIVIDEND:'bc'};
-  document.getElementById('tb-tx').innerHTML=f.length?f.map(t=>`<tr><td style="color:var(--t2);font-weight:600">${escapeHtml(String(t.transaction_date||'--').slice(0,10))}</td><td class="sym">${escapeHtml(holdingName(t))}</td><td style="color:var(--t2);font-weight:600">${isCommodity(t)?escapeHtml('per '+(t.unit||'unit')):escapeHtml(t.company_name||'--')}</td><td>${kindCell(t)}</td><td><span class="badge ${badge[t.transaction_type]||'bb'}">${escapeHtml(t.transaction_type)}</span></td><td class="num">${escapeHtml(qtyText(t))}</td><td class="num">${fp(t.price)}</td><td class="num c">${fb(t.total_value)}</td><td style="color:var(--t3);font-size:12px">${escapeHtml(t.notes||'--')}</td>
+  const pg=tablePage(f,txPg,txSize,'tx-pgn','goTxPg','setTxSize');txPg=pg.page;
+  document.getElementById('tb-tx').innerHTML=f.length?pg.rows.map(t=>`<tr><td style="color:var(--t2);font-weight:600">${escapeHtml(String(t.transaction_date||'--').slice(0,10))}</td><td class="sym">${escapeHtml(holdingName(t))}</td><td style="color:var(--t2);font-weight:600">${isCommodity(t)?escapeHtml('per '+(t.unit||'unit')):escapeHtml(t.company_name||'--')}</td><td>${kindCell(t)}</td><td><span class="badge ${badge[t.transaction_type]||'bb'}">${escapeHtml(t.transaction_type)}</span></td><td class="num">${escapeHtml(qtyText(t))}</td><td class="num">${fp(t.price)}</td><td class="num c">${fb(t.total_value)}</td><td style="color:var(--t3);font-size:12px">${escapeHtml(t.notes||'--')}</td>
     <td style="white-space:nowrap"><button class="bm-act" data-id="${t.id}" onclick="editTx(this.dataset.id)">Edit</button> <button class="bm-act" data-id="${t.id}" onclick="deleteTx(this.dataset.id)">Remove</button></td></tr>`).join(''):`<tr><td colspan="10" class="empty">${aTx.length?'No transactions match these filters.':'No transactions yet.'}</td></tr>`;
 }
 function buildTxCharts(){
@@ -5309,6 +5528,7 @@ async function saveTx(){
       body:JSON.stringify(editing?{quantity:q,price:p,transaction_date:d,notes}:{ticker:t,transaction_type:type,quantity:q,price:p,transaction_date:d,notes})});
     let data=null;try{data=await res.json();}catch(e){}
     if(!res.ok||!data||data.status==='error'){txSay(apiMessage(data,res),false);return;}
+    if(!editing)txPg=1;                             // a new trade is the newest: show the first page
     resetTxForm();txSay(data.message,true);
     await loadTx();loadPortfolio();                 // buys and sales always change the Portfolio
   }catch(e){txSay("Couldn't reach the server. Please try again.",false);}
@@ -6661,6 +6881,56 @@ function loadPortfolioTickers() {
 <!-- ═══════════ BOUNTY — AI CHATBOT ═══════════ -->
 <style>
 /* World News Cards — Compact */
+/* ═══ News tab ═══ */
+.nw-intro{font-size:12.5px;color:var(--t3);margin:4px 0 12px;line-height:1.5}
+.nw-reset{background:none;border:1px solid var(--b2);border-radius:6px;padding:4px 10px;color:var(--t2);font-size:11px;font-weight:700;cursor:pointer}
+.nw-reset:hover{color:var(--t1);border-color:var(--t3)}
+.nw-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.nw-bar .srch{margin:0}
+.nw-q{flex:2 1 220px;min-width:0}
+.nw-tk{flex:1 1 150px;min-width:0;text-transform:uppercase}
+.nw-tk::placeholder{text-transform:none}
+.nw-bar .sel{flex:0 0 auto}
+.nw-scope{display:flex;gap:4px;flex:0 0 auto}
+.nw-cats{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.nw-cats .fbtn{padding:6px 11px}
+.nw-cats .nw-allc{background:none;border-style:dashed}
+.nw-cats.nw-off .fbtn{opacity:.4;pointer-events:none}
+.nw-note{font-size:12px;color:var(--t2);margin:-4px 0 12px}
+.nw-link{background:none;border:0;padding:0;color:var(--t1);text-decoration:underline;font:inherit;cursor:pointer}
+.nw-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.nw-card{display:flex;gap:12px;background:var(--bg3);border:1px solid var(--b2);border-radius:10px;padding:10px;cursor:pointer;min-width:0;transition:border-color .15s}
+.nw-card:hover,.nw-card:focus-visible{border-color:var(--mline,var(--b2));outline:none}
+.nw-img{width:96px;height:96px;border-radius:7px;object-fit:cover;flex-shrink:0;background:var(--bg2)}
+.nw-ph{display:flex;align-items:center;justify-content:center;color:var(--t3)}
+.nw-ph .lic{width:26px;height:26px}
+.nw-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.nw-title{font-size:13.5px;font-weight:700;color:var(--t1);line-height:1.4;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.nw-sum{font-size:12px;color:var(--t3);line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.nw-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin-top:auto;font-size:11px}
+.nw-src{font-weight:700;color:var(--t2)}
+.nw-time{color:var(--t3)}
+.nw-tags{display:inline-flex;flex-wrap:wrap;gap:4px}
+.nw-tk-tag{background:none;border:1px solid var(--b2);border-radius:4px;padding:1px 6px;font-size:10px;font-weight:800;color:var(--t1);cursor:pointer}
+.nw-tk-tag:hover{background:#fff;color:#000;border-color:#fff}
+.nw-more{display:flex;justify-content:center;margin-top:14px}
+.nw-more .fbtn{padding:8px 22px}
+.nw-more .fbtn:disabled{opacity:.6;cursor:default}
+@media(max-width:900px){.nw-grid{grid-template-columns:1fr}}
+@media(max-width:560px){
+  .nw-q{flex-basis:100%}
+  .nw-tk{flex:1 1 120px}
+  .nw-cats{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;margin-right:-4px;padding-bottom:2px}
+  .nw-cats::-webkit-scrollbar{display:none}
+  .nw-cats .fbtn{flex:0 0 auto;min-height:38px}
+  .nw-scope{flex:1 1 100%}.nw-scope .fbtn{flex:1;min-height:40px}
+  .nw-img{width:72px;height:72px}
+  .nw-title{font-size:13px}
+  .nw-sum{display:none}
+}
+/* the "More" button and its menu exist only on narrow phones (see the 560px rule below) */
+.ntab-more,.more-menu{display:none}
+body.more-open #bounty-btn{display:none!important}
 .news-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
 @media(max-width:768px){.news-grid{grid-template-columns:1fr;}}
 .news-card{background:var(--bg3);border:1px solid var(--b2);border-radius:10px;overflow:hidden;cursor:pointer;transition:border-color 0.2s;display:flex;flex-direction:row;height:90px;}
@@ -6974,15 +7244,18 @@ button,select,.ntab,.fstab,.stab,.fbtn,.pgbtn{touch-action:manipulation;-webkit-
 .brand,.nav-r{flex-shrink:0;}
 @media(max-width:1500px){.nav-r #nconn{display:none;}}
 @media(max-width:1260px){.nav-r .ntime{display:none;}}
-@media(max-width:1160px){.nav{padding:0 16px;}.ntab{padding:7px 12px;}}
+@media(max-width:1400px){.nav{padding:0 16px;}.ntab{padding:7px 12px;}}   /* nine tabs: they tighten in steps as the window narrows */
+@media(max-width:1160px){.ntab{padding:7px 8px;}}
 @media(max-width:1060px){.nav-r .lpill{display:none;}.ntab{padding:7px 8px;}.nav{padding:0 12px;}.nav-r{gap:8px;}}
 /* An administrator's bar also holds the Admin link, so it sheds items sooner: the clock, then the word "Admin", then Live. */
 .na-icon{display:inline-flex;line-height:1;}
 @media(max-width:1450px){.nav.has-admin .ntime{display:none;}}
 @media(max-width:1300px){.nav.has-admin .na-text{display:none;}}
-@media(max-width:1200px){.nav.has-admin{padding:0 16px;}.nav.has-admin .ntab{padding:7px 12px;}}
+@media(max-width:1540px){.nav.has-admin{padding:0 16px;}.nav.has-admin .ntab{padding:7px 12px;}}
+@media(max-width:1220px){.nav.has-admin .ntab{padding:7px 8px;}}
 @media(max-width:1120px){.nav.has-admin .lpill{display:none;}}
 @media(max-width:1060px){.nav.has-admin .ntab{padding:7px 8px;}.nav.has-admin{padding:0 12px;}}
+@media(max-width:1010px){.nav.has-admin .ntab{padding:7px 5px;}.nav.has-admin{padding:0 10px;}}
 @media(max-width:960px){
   body{min-height:100dvh;}
   .nav{height:auto;min-height:calc(54px + env(safe-area-inset-top));padding:env(safe-area-inset-top) calc(14px + env(safe-area-inset-right)) 0 calc(14px + env(safe-area-inset-left));gap:8px;}
@@ -7103,6 +7376,14 @@ button,select,.ntab,.fstab,.stab,.fbtn,.pgbtn{touch-action:manipulation;-webkit-
   #bounty-send{min-height:44px;padding:11px 26px;}
 }
 @media(max-width:560px){
+  /* Learn and News move behind "More" so the other tabs keep room for their names */
+  #ntab-learn,#ntab-news{display:none;}
+  .ntab.ntab-more{display:flex;}
+  .more-menu:not([hidden]){display:flex;flex-direction:column;position:fixed;z-index:10000;right:calc(8px + env(safe-area-inset-right));bottom:calc(66px + env(safe-area-inset-bottom));
+    min-width:170px;padding:6px;background:var(--bg2);border:1px solid var(--b2);border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.6);}
+  .more-menu button{display:flex;align-items:center;gap:10px;min-height:46px;padding:0 12px;background:none;border:0;border-radius:8px;color:var(--t1);font-size:14px;font-weight:700;text-align:left;cursor:pointer;}
+  .more-menu button.on{background:rgba(79,142,247,0.16);color:var(--blue);}
+  .more-menu .more-lock{margin-left:auto;display:flex;color:var(--t3)}.more-menu .more-lock svg{width:15px;height:15px}
   /* six labels do not fit side by side on a phone, so the two long ones show a short form (the full text stays for screen readers) */
   .ntab .lbl[data-short]{font-size:0;}
   .ntab .lbl[data-short]::after{content:attr(data-short);font-size:10px;letter-spacing:-0.1px;}

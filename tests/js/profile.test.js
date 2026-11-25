@@ -359,7 +359,7 @@ function profile({ fetchImpl, signedOut = () => false } = {}) {
   await t('the page, the menu entry and the message are wired up: page and loader exist, Profile is not a tab, and showPage loads it', () => {
     const tabs = between('<div class="ntabs">', '<div class="nav-r">');
     assert(!/profile/i.test(tabs), 'Profile is not one of the tabs');
-    assert.strictEqual((tabs.match(/<button class="ntab/g) || []).length, 8, 'the eight tabs of the app');
+    assert.strictEqual((tabs.match(/<button class="ntab/g) || []).length, 10, 'the nine tabs of the app and the phone\'s More button');
     assert(!/showPage\('profile',this\)/.test(html), 'nothing opens the Profile page as if it were a tab');
     assert(html.includes('<div class="page" id="page-profile">') && html.includes('<div id="prof-body">'));
     assert(/if\(n==='profile'\)loadProfile\(\);/.test(between('function showPage(n,btn){', 'function showSub')));

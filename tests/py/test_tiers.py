@@ -154,7 +154,7 @@ class EveryRouteIsClassified(unittest.TestCase):
             ("GET", "/api/market/summary"): I, ("GET", "/api/market/indices"): I, ("GET", "/api/market/sectors"): I, ("GET", "/api/stocks"): I,
             ("GET", "/api/market/gainers"): I, ("GET", "/api/market/losers"): I, ("GET", "/api/market/most-active"): I, ("GET", "/api/market/sentiment"): I,
             ("GET", "/api/market/rsi-distribution"): I, ("GET", "/api/market/pe-vs-growth"): I, ("GET", "/api/analyst/consensus"): I, ("GET", "/api/analyst/sectors"): I,
-            ("GET", "/api/earnings/calendar"): I, ("GET", "/api/economic-calendar"): I, ("GET", "/api/news/world"): I, ("PUT", "/api/watchlist"): I,
+            ("GET", "/api/earnings/calendar"): I, ("GET", "/api/economic-calendar"): I, ("GET", "/api/news/world"): I, ("GET", "/api/news"): I, ("PUT", "/api/watchlist"): I,
             ("DELETE", "/api/alerts/3"): I, ("GET", "/api/notifications/feed"): I, ("GET", "/api/public/stocks"): I, ("GET", "/api/account/recent"): I,
             # the Market tab: only its own currency-rates card is refused by the server (the rest of its data is what Home is drawn from)
             ("GET", "/api/market/currencies"): "market",
