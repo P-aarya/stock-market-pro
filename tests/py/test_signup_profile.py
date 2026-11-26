@@ -143,6 +143,44 @@ class TheSignUpPage(unittest.TestCase):
         self.assertIn("Total: ", self.page)
 
 
+class OnePageAtATime(unittest.TestCase):
+    """The sign-up form is six pages, shown one at a time with Next and Back. It stays one form that is sent once, at the end."""
+    page = auth_pages.register_page()
+
+    def pages(self, text=None):
+        form = (text or self.page).split('<form method="post" action="/register">')[1].split("</form>")[0]
+        parts = re.split(r'data-step="(\d)"', form)
+        return {int(number): body for number, body in zip(parts[1::2], parts[2::2])}
+
+    def test_the_account_details_come_first_then_one_question_on_each_page(self):
+        names = {number: sorted(set(re.findall(r'name="(\w+)"', body))) for number, body in self.pages().items()}
+        self.assertEqual(names, {1: ["confirm", "email", "password"], 2: ["expected_return"], 3: ["risk"], 4: ["markets"], 5: ["salary"],
+                                 6: ["plan_commodities", "plan_ipos", "plan_stocks"]})
+        self.assertEqual(re.findall(r"<h2 id=\"q-\w+\">([^<]+)</h2>", self.page), ["Expected returns", "Risk appetite", "Markets you are interested in", "Salary range", "Investment plan"])
+
+    def test_next_goes_on_back_goes_back_and_only_the_last_page_sends_the_form(self):
+        for number, body in self.pages().items():
+            self.assertEqual(body.count('class="stepbtn next"'), 0 if number == 6 else 1, number)
+            self.assertEqual(body.count('class="stepbtn back"'), 0 if number == 1 else 1, number)
+            self.assertEqual(body.count('type="submit"'), 1 if number == 6 else 0, number)
+        self.assertEqual(self.page.count("<form"), 1)                                   # one form, so a password is never passed from page to page
+        for button in re.findall(r'<button [^>]*class="stepbtn[^"]*"', self.page):
+            self.assertIn('type="button"', button)                                      # Next and Back never send anything themselves
+
+    def test_an_invite_code_is_asked_on_the_first_page(self):
+        self.assertIn('name="code"', self.pages(auth_pages.register_page(needs_code=True))[1])
+
+    def test_without_javascript_every_page_shows_because_only_the_script_hides_any(self):
+        css = self.page.split("<style>")[1].split("</style>")[0]
+        self.assertEqual(css.count(".step{display:none"), 1)
+        self.assertIn(".wizard .step{display:none}", css)                               # .wizard is added by the script, never in the HTML
+        self.assertIn(".stepbtn{display:none}", css)                                    # and the Next and Back buttons are for the script too
+        form = self.page.split('<form method="post" action="/register">')[1].split("</form>")[0]
+        self.assertNotIn(" hidden", form)
+        self.assertNotIn('class="wizard"', self.page)
+        self.assertIn("form.noValidate=true", self.page)                                # else the browser would block sending: fields on unseen pages
+
+
 class SigningUp(AccountsTestCase, unittest.TestCase):
     def setUp(self):
         super().setUp()
