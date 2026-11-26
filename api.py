@@ -2666,7 +2666,7 @@ def my_money_delete(item_id: int, user_id: int = Depends(current_user_id)):
     return _money_call(my_money.delete_item, user_id, item_id)
 
 
-# ── Your finances (profile menu): monthly money, optional giving and goals (my_finance.py) ──
+# ── Your personal finance (profile menu): monthly money, optional giving, goals and the wishlist (my_finance.py) ──
 class MonthlyIn(BaseModel):
     income: Optional[float] = None
     housing: Optional[float] = None
@@ -2697,7 +2697,7 @@ def _finance_call(fn, *args):
     except my_finance.FinanceError as e:
         return agent_error(e.status, e.message)
     except Exception:
-        log.exception("Your finances failed")
+        log.exception("Your personal finance failed")
         return agent_error(500, "Something went wrong. Please try again.")
 
 
@@ -2739,6 +2739,47 @@ def finance_goal_update(goal_id: int, body: GoalIn, user_id: int = Depends(curre
 @app.delete("/api/finance/goals/{goal_id}")
 def finance_goal_delete(goal_id: int, user_id: int = Depends(current_user_id)):
     return _finance_call(my_finance.delete_goal, user_id, goal_id)
+
+
+class WishIn(BaseModel):
+    kind: str = Field(max_length=10)                       # "stock" or "item"
+    name: str = Field(max_length=200)                      # the stock's symbol, or what the thing is
+    category: Optional[str] = Field(default=None, max_length=20)
+    amount: Optional[float] = None                         # a stock's budget (optional) or the thing's cost
+    want_by: Optional[str] = Field(default=None, max_length=10)
+    loan: bool = False
+    loan_years: Optional[int] = None
+
+
+def _wish_args(b):
+    return (b.kind, b.name, b.category, b.amount, b.want_by, b.loan, b.loan_years)
+
+
+@app.post("/api/finance/wishlist")
+def finance_wish_add(body: WishIn, user_id: int = Depends(current_user_id)):
+    return _finance_call(my_finance.add_wish, user_id, *_wish_args(body))
+
+
+@app.put("/api/finance/wishlist/{wish_id}")
+def finance_wish_update(wish_id: int, body: WishIn, user_id: int = Depends(current_user_id)):
+    return _finance_call(my_finance.update_wish, user_id, wish_id, *_wish_args(body))
+
+
+@app.delete("/api/finance/wishlist/{wish_id}")
+def finance_wish_delete(wish_id: int, user_id: int = Depends(current_user_id)):
+    return _finance_call(my_finance.delete_wish, user_id, wish_id)
+
+
+@app.get("/api/finance/wishlist-stocks")
+def finance_wish_stocks(request: Request, user_id: int = Depends(current_user_id)):
+    """What our data says about each stock on the wishlist; the model's signal only on plans with stock prediction."""
+    def read(uid):
+        try:
+            holdings = portfolio.list_holdings(uid)
+        except Exception:
+            holdings = []
+        return my_finance.wishlist_stocks(uid, "stock_prediction" in _plan_features(request), holdings)
+    return _finance_call(read, user_id)
 
 
 @app.get("/api/portfolio/history")
@@ -3069,7 +3110,7 @@ def _xlsx(data: bytes, filename: str):
 
 @app.get("/api/account/export")
 def export_my_data(user_id: int = Depends(current_user_id)):
-    """Your Portfolio, Transactions, Other money and Your finances as one Excel file."""
+    """Your Portfolio, Transactions, Other money and Your personal finance as one Excel file."""
     try:
         import exports
         user = auth.get_user(user_id)
@@ -3082,7 +3123,7 @@ def export_my_data(user_id: int = Depends(current_user_id)):
         try:
             finance = my_finance.get_all(user_id)
         except Exception:
-            log.exception("Your finances for the Excel download failed")
+            log.exception("Your personal finance for the Excel download failed")
             finance = None
         data = exports.my_data_workbook((user or {}).get("email", ""), holdings, portfolio.summarize(holdings),
                                         portfolio.list_transactions(user_id), portfolio.transaction_summary(user_id),

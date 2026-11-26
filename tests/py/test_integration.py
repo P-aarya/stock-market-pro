@@ -91,6 +91,10 @@ DELETE /api/finance/giving
 POST /api/finance/goals
 PUT /api/finance/goals/{goal_id}
 DELETE /api/finance/goals/{goal_id}
+POST /api/finance/wishlist
+PUT /api/finance/wishlist/{wish_id}
+DELETE /api/finance/wishlist/{wish_id}
+GET /api/finance/wishlist-stocks
 GET /api/watchlist/extras
 GET /api/stocks/quotes
 GET /api/stocks/{ticker}/buy-sell

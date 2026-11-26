@@ -114,6 +114,7 @@ TX_TYPES = {"BUY": "Buy", "SELL": "Sell", "DIVIDEND": "Dividend"}
 
 MONEY_COLUMNS = [("Kind", 20, None), ("Name", 30, None), ("Amount (US$)", 16, MONEY), ("Last updated", 13, DATE)]
 FINANCE_COLUMNS = [("Question", 36, None), ("Your answer", 22, None), ("Amount (US$)", 16, MONEY)]
+WISH_COLUMNS = [("Wishlist", 30, None), ("Kind", 16, None), ("Budget / cost (US$)", 18, MONEY), ("By", 13, DATE), ("Loan", 16, None)]
 GOAL_COLUMNS = [("Goal", 30, None), ("Cost (US$)", 16, MONEY), ("By", 13, DATE), ("Already saved (US$)", 18, MONEY)]
 MONTHLY_QUESTIONS = [("income", "Comes in each month"), ("housing", "Rent or home loan"), ("bills", "Bills"), ("food", "Food and shopping"),
                      ("transport", "Transport"), ("repayments", "Loan or card repayments"), ("other_spend", "Everything else")]
@@ -197,8 +198,8 @@ def my_data_workbook(email, holdings, summary, transactions, tx_summary, now=Non
             cell = ws.cell(row=row + 1, column=3, value=round(sum(m.get("amount") or 0 for m in other_money), 2))
             cell.number_format, cell.font = MONEY, TOTAL_FONT
     if finance is not None:
-        ws = wb.create_sheet("Your finances")
-        row = _sheet_header(ws, "Aymetrix · Your finances", f"{email} · your answers on the Your finances page", FINANCE_COLUMNS)
+        ws = wb.create_sheet("Your personal finance")
+        row = _sheet_header(ws, "Aymetrix · Your personal finance", f"{email} · your answers on the Your personal finance page", FINANCE_COLUMNS)
         monthly = finance.get("monthly") or {}
         for key, label in MONTHLY_QUESTIONS:
             row = _write_row(ws, row, FINANCE_COLUMNS, [label, "" if monthly.get(key) is not None else "not answered", monthly.get(key)])
@@ -219,6 +220,18 @@ def my_data_workbook(email, holdings, summary, transactions, tx_summary, now=Non
             ws.cell(row=row, column=1, value="No goals yet.").font = NOTE_FONT
         for goal in goals:
             row = _write_row(ws, row, GOAL_COLUMNS, [goal.get("name"), goal.get("target"), _date(goal.get("target_date")), goal.get("saved")])
+        wishes = finance.get("wishlist") or []
+        row += 1
+        for col, (title, _w, _f) in enumerate(WISH_COLUMNS, start=1):
+            ws.cell(row=row, column=col, value=title).font = TOTAL_FONT
+        row += 1
+        if not wishes:
+            ws.cell(row=row, column=1, value="Nothing on your wishlist yet.").font = NOTE_FONT
+        for w in wishes:
+            stock = w.get("kind") == "stock"
+            loan = "" if stock else (f"Yes, {w['loan_years']} years" if w.get("loan") and w.get("loan_years") else "Yes" if w.get("loan") else "No")
+            row = _write_row(ws, row, WISH_COLUMNS, [w.get("name"), "Stock" if stock else (w.get("category") or "other").replace("_", " ").title(),
+                                                     w.get("amount"), _date(w.get("want_by")) if w.get("want_by") else None, loan])
     return _bytes(wb)
 
 

@@ -194,7 +194,7 @@ function profile({ fetchImpl, signedOut = () => false } = {}) {
     return { nav, parts, calls, docListeners, press: (ev, e) => (docListeners[ev] || []).forEach(fn => fn(e)) };
   }
 
-  await t('the account menu lists the name, the email, then Profile and plan, Your finances, then Sign out', () => {
+  await t('the account menu lists the name, the email, then Profile and plan, Your personal finance, then Sign out', () => {
     const { parts } = accountMenu({ name: 'Abheek Das' });
     assert.deepStrictEqual(parts.menu.children.map(c => c.className), ['nprof-name', 'nprof-email', 'nprof-hr', 'nmenu-item', 'nmenu-item', 'nsignout']);
     assert.strictEqual(parts.btn.id, 'nprof-btn', 'the account icon can be found, so it can be lit while Profile is open');
@@ -203,7 +203,7 @@ function profile({ fetchImpl, signedOut = () => false } = {}) {
     assert.deepStrictEqual([prof.tag, prof.type, prof.id, prof.attrs.role], ['button', 'button', 'nprof-profile', 'menuitem']);
     assert(prof.innerHTML.includes('<span>Profile and plan</span>'));
     assert.deepStrictEqual([fin.tag, fin.id, fin.attrs.role], ['button', 'nprof-finance', 'menuitem']);
-    assert(fin.innerHTML.includes('<span>Your finances</span>'));
+    assert(fin.innerHTML.includes('<span>Your personal finance</span>'));
     assert.deepStrictEqual([out.tag, out.href, out.attrs.role], ['a', '/logout', 'menuitem']);
     assert.strictEqual(accountMenu().parts.menu.children[0].textContent, 'Your account', 'with no name the menu says Your account');
   });
@@ -216,7 +216,7 @@ function profile({ fetchImpl, signedOut = () => false } = {}) {
     assert.deepStrictEqual(calls, ['openProfile']);
   });
 
-  await t('choosing Your finances closes the menu and opens that page', () => {
+  await t('choosing Your personal finance closes the menu and opens that page', () => {
     const { parts, calls } = accountMenu();
     parts.btn.fire('click'); parts.menu.children[4].fire('click');
     assert(!parts.menu.classList.contains('open'));

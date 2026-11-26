@@ -1,8 +1,9 @@
 """
-"Your finances" (profile menu): monthly money, optional giving and goals. Each answer is only ever read or changed for
+"Your personal finance" (profile menu): monthly money, optional giving, goals and the wishlist. Each answer is only ever read or changed for
 its own account, answers are checked before the database, the routes sit on a plan, the SQL works on the live
 database's ANSI mode, and the answers go with the account (download and deletion). The page itself is checked for its
-place in the profile menu, its five sections, and the Suggestions / Clear and Edit / Remove buttons.
+place in the profile menu, its six sections, and the Analysis / Clear and Edit / Remove buttons. A wishlist stock gets
+"Looks good" / "Wait for now" / "Be careful" from the data, with the model's part only on plans with prediction.
 """
 import datetime as dt
 import io
@@ -59,7 +60,7 @@ class Scoping(unittest.TestCase):
         mf._ready[0] = False
         with mock.patch.object(mf, "get_db_connection", return_value=conn):
             mf.list_goals(ME); mf.list_goals(ME)
-        self.assertEqual(sum(1 for s, _ in conn.log if s.startswith("CREATE TABLE")), 2)
+        self.assertEqual(sum(1 for s, _ in conn.log if s.startswith("CREATE TABLE")), len(mf.TABLES))
 
     def test_sql_works_in_ansi_mode(self):
         import inspect
@@ -132,7 +133,7 @@ class GoesWithTheAccount(unittest.TestCase):
         finance = {"monthly": {"income": 5000.0, "housing": 1600.0}, "giving": {"on": True, "mode": "pct", "value": 1.5, "causes": "Education"},
                    "goals": [{"name": "Car", "target": 25000.0, "target_date": "2028-06-30", "saved": 6000.0}]}
         wb = openpyxl.load_workbook(io.BytesIO(exports.my_data_workbook("a@b.c", [], {}, [], {}, finance=finance)))
-        values = [c.value for row in wb["Your finances"].iter_rows() for c in row if c.value is not None]
+        values = [c.value for row in wb["Your personal finance"].iter_rows() for c in row if c.value is not None]
         for v in ("Comes in each month", 5000, "1.5% of income", "Education", "Car", 25000):
             self.assertIn(v, values)
 
@@ -144,19 +145,20 @@ class Page(unittest.TestCase):
             cls.html = f.read()
 
     def test_in_the_profile_menu_after_profile_and_plan(self):
-        self.assertIn("<span>Your finances</span>", self.html)
+        self.assertIn("<span>Your personal finance</span>", self.html)
         self.assertIn("menu.appendChild(prof);menu.appendChild(fin);menu.appendChild(out);", self.html)
         self.assertIn("if(n==='finance')loadFinance();", self.html)
 
-    def test_five_sections(self):
+    def test_six_sections(self):
         tabs = re.findall(r'class="fin-tab[^"]*"[^>]*data-t="(\w+)"[^>]*>([^<]+)<', self.html)
-        self.assertEqual(tabs, [("monthly", "Monthly money"), ("invest", "Investments"), ("goals", "Goals"), ("give", "Donations"), ("calc", "Calculators")])
+        self.assertEqual(tabs, [("monthly", "Monthly money"), ("invest", "Investments"), ("goals", "Goals"), ("wish", "Wishlist"),
+                                ("give", "Donations"), ("calc", "Calculators")])
         for t, _ in tabs:
             self.assertIn(f'id="fin-p-{t}"', self.html)
 
-    def test_suggestions_only_when_asked_and_clear_closes_them(self):
-        for sec in ("monthly", "invest", "goals", "give"):
-            self.assertIn(f'data-s="{sec}" onclick="finSuggest(\'{sec}\')">Suggestions</button>', self.html)
+    def test_analysis_only_when_asked_and_clear_closes_it(self):
+        for sec in ("monthly", "invest", "goals", "wstock", "witem", "give"):
+            self.assertIn(f'data-s="{sec}" onclick="finSuggest(\'{sec}\')">Analysis</button>', self.html)
             self.assertIn(f'<div class="fin-tips" id="fin-tips-{sec}" hidden></div>', self.html)
         self.assertIn("onclick=\"finClearTips('${sec}')\">Clear</button>", self.html)
 
@@ -164,6 +166,112 @@ class Page(unittest.TestCase):
         block = re.search(r"const FIN_CALCS=\{(.*?)\n\};", self.html, re.S).group(1)
         self.assertEqual(re.findall(r"^  (\w+):\{name:'([^']+)'", block, re.M),
                          [("loan", "Loan"), ("stock", "Stock return"), ("grow", "Savings growth"), ("sip", "Monthly investing"), ("goal", "Saving for a goal")])
+
+
+
+class Wishlist(unittest.TestCase):
+    def tearDown(self):
+        mock.patch.stopall()
+
+    def test_only_my_rows(self):
+        found = lambda sql, p: [] if "AND kind = 'stock'" in sql else [{"id": 3}] if sql.startswith("SELECT id FROM") \
+            else [{"ticker": "AAPL"}] if "stocks_live" in sql \
+            else [{"n": 0}] if "COUNT" in sql else [] if sql.startswith("SELECT") else 1
+        for call in (lambda: mf.list_wishlist(ME), lambda: mf.add_wish(ME, "stock", "AAPL"), lambda: mf.add_wish(ME, "item", "Car", "car", 100),
+                     lambda: mf.update_wish(ME, 3, "item", "Car", "car", 100), lambda: mf.delete_wish(ME, 3)):
+            _, conn = run(call, respond=found)
+            for sql, params in conn.log:
+                if sql.startswith("CREATE TABLE") or "stocks_live" in sql:
+                    continue
+                self.assertIn("user_id", sql, sql)
+                self.assertIn(ME, params, sql)
+
+    def test_checks(self):
+        with self.assertRaises(mf.FinanceError):
+            run(mf.add_wish, ME, "stock", "ZZZZ", respond=lambda sql, p: [])          # not a stock we have
+        for args in (("stock", "not a ticker!"), ("item", ""), ("item", "Car", "car", 0), ("item", "Car", "car", 10, "2020-01-01"),
+                     ("item", "Car", "car", 10, None, True, 0), ("item", "Car", "car", 10, None, True, 41), ("other", "x")):
+            with self.assertRaises(mf.FinanceError, msg=str(args)):
+                mf._wish_check(*(list(args) + [None] * (7 - len(args))))
+        self.assertEqual(mf._wish_check("item", " my  car ", "spaceship", "25000", None, False, 5),
+                         ("item", "my car", "other", 25000.0, None, 0, None))          # unknown kind -> other; no loan -> no length
+
+    def test_routes_and_plan(self):
+        for m, p in (("POST", "/api/finance/wishlist"), ("PUT", "/api/finance/wishlist/3"), ("DELETE", "/api/finance/wishlist/3"),
+                     ("GET", "/api/finance/wishlist-stocks")):
+            self.assertEqual(tiers.feature_for(m, p), "portfolio_view", p)
+        seen = []
+        mock.patch.object(api.portfolio, "list_holdings", return_value=[]).start()
+        mock.patch.object(api.my_finance, "wishlist_stocks", side_effect=lambda uid, pred, h: seen.append((uid, pred)) or {"stocks": []}).start()
+        signed_in_client(5).get("/api/finance/wishlist-stocks")
+        signed_in_client(6, tier=2).get("/api/finance/wishlist-stocks")
+        self.assertEqual(seen, [(5, True), (6, False)])             # the model's part only on plans with stock prediction
+
+
+TODAY = dt.date(2026, 11, 26)
+GOOD = {"ticker": "AAPL", "sector": "Technology", "current_price": 200, "week_52_high": 260, "week_52_low": 160, "ma_50": 195, "ma_200": 180,
+        "rsi_14": 55, "pe_ratio": 30, "recommendation": "buy", "upside_pct": 12, "num_analysts": 40,
+        "buy_signal": "Strong Buy", "prob_up_3m": 64, "target_3m": 215}
+
+
+class StockRead(unittest.TestCase):
+    def read(self, **change):
+        return mf.stock_read(dict(GOOD, **change), sector_pe=40, predictions=True, today=TODAY)
+
+    def test_looks_good(self):
+        r = self.read()
+        self.assertEqual((r["verdict"], r["label"]), ("good", "Looks good"))
+        self.assertTrue(any("BUY" in p[1] for p in r["points"]))
+
+    def test_results_soon_means_wait(self):
+        r = self.read(next_earnings_date=TODAY + dt.timedelta(days=5))
+        self.assertEqual((r["verdict"], r["label"]), ("wait", "Looks good, but wait"))
+        self.assertTrue(any(p[1] == "Results in 5 days." for p in r["points"]))
+
+    def test_near_the_high_and_overbought(self):
+        r = self.read(current_price=258, rsi_14=78, buy_signal="Hold", prob_up_3m=50, recommendation="hold", upside_pct=2)
+        self.assertEqual(r["label"], "Wait for now")
+
+    def test_be_careful(self):
+        r = self.read(current_price=165, ma_200=190, pe_ratio=-4, recommendation="sell", upside_pct=-8, buy_signal="Sell", prob_up_3m=30)
+        self.assertEqual((r["verdict"], r["label"]), ("careful", "Be careful"))
+        self.assertTrue(any(p[1] == "Not making a profit." for p in r["points"]))
+
+    def test_no_model_without_prediction(self):
+        r = mf.stock_read(dict(GOOD), sector_pe=40, predictions=False, today=TODAY)
+        self.assertFalse(any("model" in p[1].lower() for p in r["points"]))
+
+    def test_missing_data_is_left_out(self):
+        r = mf.stock_read({"ticker": "NEW", "current_price": 10}, predictions=True, today=TODAY)
+        self.assertEqual((r["points"], r["label"]), ([], "Wait for now"))
+
+    def test_budget_and_sector(self):
+        r = mf.stock_read(dict(GOOD), sector_pe=40, today=TODAY, sector_share=80, budget=1000)
+        texts = " ".join(p[1] + p[2] for p in r["points"])
+        self.assertIn("80% in Technology", texts)
+        self.assertIn("buys 5 shares", texts)
+
+
+class Calculators(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        with open(os.path.join(ROOT, "dashboard.html"), encoding="utf-8") as f:
+            cls.html = f.read()
+
+    def test_stock_return_has_years_roi_and_return_per_year(self):
+        block = re.search(r"  stock:\{name:'Stock return',fields:\[(.*?)\]\],", self.html, re.S).group(1)
+        self.assertIn("'yrs','Years held'", block)
+        self.assertIn("ROI (total return)", self.html)
+        self.assertIn("Return per year (average)", self.html)
+
+    def test_compounded_note_and_growth_explained(self):
+        self.assertIn("This is the compounded amount", self.html)
+        self.assertNotIn("0 for a bank account", self.html)
+        self.assertIn("How much your saved money earns each year while you save", self.html)
+
+    def test_loan_types_for_each_kind(self):
+        block = re.search(r"const FIN_LOANS=\{(.*?)\n\};", self.html, re.S).group(1)
+        self.assertEqual(re.findall(r"^  (\w+):", block, re.M), list(mf.ITEM_KINDS))
 
 
 if __name__ == "__main__":
