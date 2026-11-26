@@ -1295,6 +1295,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     <div class="fin-wgrid" id="fw-item" hidden>
       <div class="card fin-q"><div class="chdr"><div class="ctitle" id="fwi-title">Add something to buy</div></div>
         <div class="fin-form fin-form-open">
+          <label class="fin-fl">What is your monthly income? ($) <small>(after tax; the same answer as in Monthly money)</small><input class="srch" id="fwi-inc" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 5000"></label>
           <label class="fin-fl">What is it?<input class="srch" id="fwi-n" maxlength="80" placeholder="e.g. Car, Laptop, Flat deposit"></label>
           <label class="fin-fl">What kind?<select class="sel" id="fwi-c" onchange="finWishItemPreview()"><option value="car">Car or vehicle</option><option value="home">Home</option><option value="education">Education</option><option value="other">Something else</option></select></label>
           <label class="fin-fl">How much does it cost? ($)<input class="srch" id="fwi-a" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 25000" oninput="finWishItemPreview()"></label>
@@ -3753,7 +3754,7 @@ const FIN_Q=[['income','How much comes in each month?','Pay after tax, plus any 
   ['repayments','Loan or card repayments',''],['other_spend','Everything else','Fun, subscriptions, gifts…']];
 const FIN_SPEND=[['housing','Home','#4f8ef7'],['bills','Bills','#06b6d4'],['food','Food','#f5a623'],['transport','Transport','#a855f7'],
   ['repayments','Repayments','#ff4444'],['other_spend','Other','#7a8ba0']];
-let finData=null,finHold=null,finTabNow='monthly',finEditM=false,finEditG=false,finGoalId=null,finCalc='loan',finOpen={},finLoading=false,finWishNow='stock',finWishStocks=null,finWishSeq=0;
+let finData=null,finHold=null,finTabNow='monthly',finEditM=false,finEditG=false,finGoalId=null,finCalc='loan',finOpen={},finLoading=false,finWishNow='stock',finWishStocks=null,finWishSeq=0,finWsOpen=new Set();
 const finN=v=>{const x=parseFloat(v);return isFinite(x)?x:null;};
 const finUsd=v=>v==null||!isFinite(v)?'—':(v<0?'-':'')+'$'+Math.abs(v).toLocaleString('en-US',{maximumFractionDigits:0});
 const finUsd2=v=>v==null||!isFinite(v)?'—':(v<0?'-':'')+'$'+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -3810,7 +3811,7 @@ function finMonthlyNow(){                       // the answers being typed (whil
   if(finEditM&&document.getElementById('fm-income'))FIN_Q.forEach(([k])=>{m[k]=finN(document.getElementById('fm-'+k).value);});
   else FIN_Q.forEach(([k])=>{m[k]=finData&&finData.monthly?finData.monthly[k]:null;});
   const spend=FIN_SPEND.reduce((a,[k])=>a+(m[k]||0),0);
-  const ok=m.income!=null;
+  const ok=m.income!=null&&FIN_SPEND.some(([k])=>m[k]!=null);   // what's saved needs income and at least one spending answer
   return {m,spend,ok,save:ok?m.income-spend:null,rate:ok&&m.income>0?(m.income-spend)/m.income*100:null};
 }
 function finGiveNow(){                          // the giving plan being typed or the saved one: {on, monthly}
@@ -4135,16 +4136,22 @@ function finRenderWishStocks(){
   if(finWishStocks===null){el.innerHTML='<div class="load"><div class="spin"></div>Looking at the data…</div>';return;}
   const reads={};(finWishStocks.stocks||[]).forEach(r=>{reads[r.id]=r;});
   const dot={good:'var(--green)',warn:'#f5a623',bad:'var(--red)',info:'var(--t3)'};
-  el.innerHTML=(finWishStocks.failed?'<div class="fin-empty">Couldn’t load the data. <button type="button" class="nw-link" onclick="finLoadWishStocks()">Try again</button></div>':'')+ws.map(w=>{
-    const r=reads[w.id]||{};
-    return `<div class="fin-ws"><div class="fin-wsh"><div><b>${escapeHtml(w.name)}</b> <span class="fin-mini">${escapeHtml(r.name&&r.name!==w.name?r.name:'')}</span>
+  const anyOpen=ws.some(w=>finWsOpen.has(w.id));
+  el.innerHTML=(anyOpen?'<div class="fin-wstop"><button class="fin-clear" type="button" onclick="finWsCloseAll()">Close all</button></div>':'')+(finWishStocks.failed?'<div class="fin-empty">Couldn’t load the data. <button type="button" class="nw-link" onclick="finLoadWishStocks()">Try again</button></div>':'')+ws.map(w=>{
+    const r=reads[w.id]||{},open=finWsOpen.has(w.id),pts=r.points||[];
+    return `<div class="fin-ws${open?' open':''}"><div class="fin-wsh"><div><b>${escapeHtml(w.name)}</b> <span class="fin-mini">${escapeHtml(r.name&&r.name!==w.name?r.name:'')}</span>
         <div class="fin-mini">${r.price?finUsd2(r.price):''}${r.sector?' · '+escapeHtml(r.sector):''}${w.amount?' · budget '+finUsd(w.amount):''}</div></div>
         ${r.label?`<span class="fin-verdict v-${r.verdict||'none'}">${escapeHtml(r.label)}</span>`:''}</div>
-      ${(r.points||[]).length?`<ul class="fin-pts">${r.points.map(([t,h,x])=>`<li><span class="fin-dot" style="background:${dot[t]||dot.info}"></span><span><b>${escapeHtml(h)}</b> ${escapeHtml(x)}</span></li>`).join('')}</ul>`:''}
-      <div class="fin-rowacts fin-wsa"><button class="fin-ic" type="button" onclick="finWishStockEdit(${w.id})">Edit</button><button class="fin-ic fin-rm" type="button" onclick="finWishDelete(${w.id})">Remove</button></div></div>`;
+      <div class="fin-wsbar"><label class="fin-chk"><input type="checkbox" ${open?'checked':''} ${pts.length?'':'disabled'} onchange="finWsToggle(${w.id},this.checked)"><span>${open?'Hide analysis':'Show analysis'}</span></label>
+        <span class="fin-rowacts"><button class="fin-ic" type="button" onclick="finWishStockEdit(${w.id})">Edit</button><button class="fin-ic fin-rm" type="button" onclick="finWishDelete(${w.id})">Remove</button></span></div>
+      ${open&&pts.length?`<div class="fin-wsbody"><ul class="fin-pts">${pts.map(([t,h,x])=>`<li><span class="fin-dot" style="background:${dot[t]||dot.info}"></span><span><b>${escapeHtml(h)}</b> ${escapeHtml(x)}</span></li>`).join('')}</ul>
+        <div class="fin-wsclose"><button class="fin-clear" type="button" onclick="finWsToggle(${w.id},false)">Close</button></div></div>`:''}</div>`;
   }).join('')+(finWishStocks&&finWishStocks.predictions===false?'<p class="fin-note">Our model’s signal is included on plans with stock predictions.</p>':'');
   finTips('wstock');
 }
+/** Each stock's analysis opens with its tick box (or Show analysis) and closes with the box, its Close button or Close all. */
+function finWsToggle(id,on){if(on)finWsOpen.add(id);else finWsOpen.delete(id);finRenderWishStocks();}
+function finWsCloseAll(){finWsOpen.clear();finRenderWishStocks();}
 function finWishStockEdit(id){
   const w=finWishes('stock').find(x=>x.id===id);if(!w)return;
   finWsId=id;document.getElementById('fws-title').textContent='Edit stock';
@@ -4168,7 +4175,7 @@ async function finWishDelete(id){
   const w=((finData&&finData.wishlist)||[]).find(x=>x.id===id);if(!w||!confirm(`Remove ${w.name} from your wishlist?`))return;
   const d=await finSend('DELETE',`/api/finance/wishlist/${encodeURIComponent(id)}`);
   if(d){finData.wishlist=finData.wishlist.filter(x=>x.id!==id);
-    if(w.kind==='stock'){if(finWsId===id)finWishStockReset();if(finWishStocks&&finWishStocks.stocks)finWishStocks.stocks=finWishStocks.stocks.filter(x=>x.id!==id);finRenderWishStocks();}
+    if(w.kind==='stock'){finWsOpen.delete(id);if(finWsId===id)finWishStockReset();if(finWishStocks&&finWishStocks.stocks)finWishStocks.stocks=finWishStocks.stocks.filter(x=>x.id!==id);finRenderWishStocks();}
     else{if(finWiId===id)finWishItemReset();finRenderWishItems();}}
 }
 function finTipsWishStocks(){
@@ -4208,10 +4215,26 @@ function finWishItemReset(){
   ['fwi-n','fwi-a','fwi-d','fwi-y'].forEach(i=>{document.getElementById(i).value='';});document.getElementById('fwi-c').value='car';document.getElementById('fwi-l').checked=false;
   finWishItemPreview();document.getElementById('fwi-save').textContent='Add to wishlist';document.getElementById('fwi-cancel').hidden=true;
 }
+/** The income box shows the shared Monthly money answer (or what is being typed there). */
+function finFillIncome(){const el=document.getElementById('fwi-inc');if(!el||document.activeElement===el)return;const v=finMonthlyNow().m.income;el.value=v!=null?v:'';}
+/** A changed income is saved as the Monthly money answer, keeping the other Monthly money answers as they are. */
+async function finSaveIncome(inc){
+  const saved=finData.monthly&&finData.monthly.income;
+  if(inc==null||inc===saved)return true;
+  if(inc<0){finSay('Monthly income can’t be below $0.',false);return false;}
+  const body={...(finData.monthly||{}),income:inc};
+  const d=await finSend('PUT','/api/finance/monthly',body);if(!d)return false;
+  finData.monthly=d.monthly;finData.has_monthly=true;
+  const typing=finEditM&&document.getElementById('fm-income');
+  if(typing)document.getElementById('fm-income').value=inc;else{finEditM=false;finRenderMonthly();}
+  finLive();return true;
+}
 async function finWishItemSave(){
   const name=document.getElementById('fwi-n').value.trim(),amount=finN(document.getElementById('fwi-a').value),month=document.getElementById('fwi-d').value;
+  const inc=finN(document.getElementById('fwi-inc').value);
   if(!name){finSay('Say what you would like to buy, e.g. Car.',false);return;}
   if(!(amount>0)){finSay('Enter how much it costs.',false);return;}
+  if(!(await finSaveIncome(inc)))return;
   let want=null;if(month){const [y,mo]=month.split('-').map(Number);want=`${month}-${String(new Date(y,mo,0).getDate()).padStart(2,'0')}`;}
   const loan=document.getElementById('fwi-l').checked,yrs=finN(document.getElementById('fwi-y').value);
   const body={kind:'item',name,category:document.getElementById('fwi-c').value,amount,want_by:want,loan,loan_years:loan&&yrs?Math.round(yrs):null};
@@ -4229,12 +4252,13 @@ function finLoanRows(w){                       // each loan type for this thing:
 }
 function finRenderWishItems(){
   const el=document.getElementById('fwi-list');if(!el||!finData)return;
+  finFillIncome();
   const items=finWishes('item'),save=finSaveRate(),inc=finMonthlyNow().m.income;
   if(!items.length){el.innerHTML='<div class="fin-empty">Nothing yet. Add something you would like to buy, like a car or a laptop. We will show how long saving takes and, if you want a loan, what each kind would cost.</div>';finTips('witem');return;}
   el.innerHTML=items.map(w=>{
     const when=w.want_by?new Date(w.want_by+'T00:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}):'';
     let saving;
-    if(save==null)saving='Answer Monthly money to see how long saving for it would take.';
+    if(save==null)saving='Answer Monthly money (what you spend) to see how long saving for it would take.';
     else if(save<=0)saving='<span class="r">You don’t save anything each month at the moment, so saving for it isn’t possible yet.</span>';
     else{const n=Math.ceil(w.amount/save),by=new Date();by.setMonth(by.getMonth()+n);
       const late=w.want_by?n-finMonthsTo(w.want_by):null;
@@ -4244,8 +4268,9 @@ function finRenderWishItems(){
     if(w.loan){const rows=finLoanRows(w),best=rows.reduce((a,r)=>r.interest<a.interest?r:a,rows[0]),low=rows.reduce((a,r)=>r.pay<a.pay?r:a,rows[0]);
       loan=`<table class="fin-tbl fin-loans"><thead><tr><th>Loan type</th><th class="n">Each month</th><th class="n">Total interest</th></tr></thead><tbody>${rows.map(r=>`<tr class="${r===best?'best':''}"><td>${escapeHtml(r.n)}${r===best?' <span class="fin-best">lowest total cost</span>':''}<div class="fin-mini">${r.m>=24?Math.round(r.m/12)+' years':r.m+' months'} · typical ${escapeHtml(r.range)}</div></td><td class="n">${finUsd(r.pay)}</td><td class="n">${finUsd(r.interest)}</td></tr>`).join('')}</tbody></table>`+
         (inc>0?`<div class="fin-mini fin-afford">The smallest monthly payment (${escapeHtml(low.n)}, ${finUsd(low.pay)}) is ${finPct(low.pay/inc*100)} of what comes in each month${low.pay/inc>0.2?' <span class="r">(heavy: over 20%)</span>':low.pay/inc>0.1?' (manageable)':' <span class="g">(fits well)</span>'}.</div>`:'');}
+    const ofInc=inc>0?`<div class="fin-mini fin-saving">That is <b>${(w.amount/inc).toFixed(w.amount/inc<10?1:0).replace(/\.0$/,'')} month${w.amount/inc===1?'':'s'} of your income</b>.</div>`:'';
     return `<div class="fin-ws"><div class="fin-wsh"><div><b>${escapeHtml(w.name)}</b> <span class="fin-mini">${FIN_ITEM_KINDS[w.category]||''}${when?' · by '+when:''}</span></div><b>${finUsd(w.amount)}</b></div>
-      <div class="fin-mini fin-saving">${saving}</div>${loan}
+      ${ofInc}<div class="fin-mini fin-saving">${saving}</div>${loan}
       <div class="fin-rowacts fin-wsa"><button class="fin-ic" type="button" onclick="finWishItemEdit(${w.id})">Edit</button><button class="fin-ic fin-rm" type="button" onclick="finWishDelete(${w.id})">Remove</button></div></div>`;
   }).join('')+(items.some(w=>w.loan)?'<p class="fin-note">Typical US rates, November 2026. Your rate depends on your credit score and the lender, so compare offers before you borrow.</p>':'');
   finTips('witem');
@@ -7656,6 +7681,12 @@ function loadPortfolioTickers() {
 .fin-pts{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:7px}
 .fin-pts li{display:flex;gap:9px;font-size:12.5px;color:var(--t2);line-height:1.45}.fin-pts b{color:var(--t1)}.fin-pts .fin-dot{margin-top:5px}
 .fin-wsa{justify-content:flex-end;margin-top:10px}
+.fin-wsbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+.fin-chk{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:var(--blue);cursor:pointer;min-height:32px}
+.fin-chk input{width:16px;height:16px;accent-color:var(--blue);margin:0;cursor:pointer}.fin-chk input:disabled+span{color:var(--t3)}
+.fin-wsbody{margin-top:6px;padding:10px 12px;border-radius:9px;background:var(--bg3);border:1px solid var(--b2)}
+.fin-wsbody .fin-pts{margin:0}.fin-wsclose{display:flex;justify-content:flex-end;margin-top:8px}
+.fin-wstop{display:flex;justify-content:flex-end;margin-bottom:4px}
 .fin-saving{margin-top:6px;line-height:1.5}.fin-saving b{color:var(--t1)}
 .fin-loans{margin-top:10px;font-size:12.5px}.fin-loans td{white-space:normal}.fin-loans td.n{white-space:nowrap}.fin-loans tr.best td{background:rgba(0,200,83,.06)}
 .fin-best{display:inline-block;font-size:10px;font-weight:800;color:var(--green);border:1px solid rgba(0,200,83,.5);border-radius:10px;padding:1px 6px;margin-left:4px;vertical-align:1px}
@@ -7680,6 +7711,7 @@ function loadPortfolioTickers() {
 .fin-sbtn{padding:6px 12px;font-size:12px}
 .fin-form{display:grid;gap:10px;margin:12px 0 4px;padding:12px;border:1px solid var(--b2);border-radius:10px;background:var(--bg3)}
 .fin-form[hidden]{display:none}.fin-form-open{background:none;border:0;padding:0;margin:0}
+.fin-fl[hidden]{display:none}
 .fin-fl{display:grid;gap:5px;font-size:12px;font-weight:700;color:var(--t2)}.fin-fl small{font-weight:400;color:var(--t3)}
 .fin-fl .srch,.fin-fl .sel{width:100%;margin:0}
 .fin-preview{font-size:12.5px;color:var(--t2);min-height:18px}
