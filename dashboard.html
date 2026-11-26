@@ -7090,9 +7090,9 @@ async function fetchQuotes(tickers){
 // The Watchlist table appears at once from the stock list the dashboard already has, then the fresh prices
 // (one request for all of them) replace it. Every saved stock gets a row, so even one we have no data for can be removed.
 let wlSeq = 0;
-let wlSector = 'All';                          // the sector button that's on ('All' = every stock)
+let wlSector = 'All';                          // the sector chosen in the dropdown ('All' = every stock)
 function wlSectorOf(s){ return (s.sector || '').trim() || 'Other'; }
-/** One button per sector in the watchlist, with how many stocks it has; clicking one shows only those. */
+/** A dropdown of the sectors in the watchlist, with how many stocks each has; choosing one shows only those. */
 function renderWlSectors(rows){
   const el = document.getElementById('wl-sec'); if(!el) return;
   const counts = {};
@@ -7101,8 +7101,9 @@ function renderWlSectors(rows){
   if(wlSector !== 'All' && !counts[wlSector]) wlSector = 'All';          // its last stock was removed
   el.style.display = names.length > 1 ? 'flex' : 'none';
   if(names.length <= 1) { wlSector = 'All'; return; }
-  const btn = (k, n) => `<button type="button" class="fbtn${wlSector === k ? ' on' : ''}" data-k="${escapeHtml(k)}" onclick="setWlSector(this.dataset.k)">${escapeHtml(k)} <span class="wl-sec-n">${n}</span></button>`;
-  el.innerHTML = btn('All', rows.length) + names.map(k => btn(k, counts[k])).join('');
+  const opt = (k, label, n) => `<option value="${escapeHtml(k)}"${wlSector === k ? ' selected' : ''}>${escapeHtml(label)} (${n})</option>`;
+  el.innerHTML = `<label class="wl-sec-l" for="wl-sec-sel">Sector</label><select class="sel" id="wl-sec-sel" onchange="setWlSector(this.value)">` +
+    opt('All', 'All sectors', rows.length) + names.map(k => opt(k, k, counts[k])).join('') + '</select>';
 }
 function setWlSector(k){ wlSector = k; renderWatchlistTable(wlKnown); }
 let wlKnown = {};
@@ -8060,8 +8061,9 @@ body.pg-home #bounty-btn,body.pg-home #bounty-win{display:none!important;}   /* 
 .mi-k{font-size:10px;font-weight:600;color:var(--t3);margin-left:6px;}
 .mi-a{display:flex;gap:4px;}
 @media(max-width:700px){.money-wrap{flex-direction:column;align-items:stretch;}.money-donut{margin:0 auto;}.money-form{grid-template-columns:1fr;}}
-.wl-sec{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;}
-.wl-sec-n{font-family:var(--mono);font-size:10px;font-weight:800;opacity:.7;margin-left:4px;}
+.wl-sec{display:flex;align-items:center;gap:8px;margin:0 0 12px;}
+.wl-sec-l{font-size:12px;font-weight:700;color:var(--t2);}
+.wl-sec .sel{margin:0;min-width:200px;max-width:100%;}
 .pft-sub{font-size:11px;font-weight:600;color:var(--t3);}
 .pft-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:12px;}
 .pft-pick{display:flex;flex-wrap:wrap;gap:6px;}
