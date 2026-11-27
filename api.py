@@ -288,6 +288,22 @@ async def restore(request: Request):
     return _start_session(request, user["id"])
 
 
+def _signup_details(form: dict, lists: dict) -> dict:
+    """The optional questions on the sign-up form (the same details as the Profile card in Settings), checked. What was typed in an
+    "Other" box only counts when "Other" was chosen, and, as in Settings, the list that doesn't fit what the person follows is left out."""
+    follows = form.get("follows", "")
+    picked, others = {}, {}
+    for key, left_out_for in (("purposes", None), ("sectors", "commodities"), ("commodities", "stocks")):
+        chosen = [] if follows == left_out_for else lists.get(key, [])
+        picked[key] = [c for c in chosen if c not in ("", "__other")]
+        others[key + "_other"] = form.get(key + "_other", "") if "__other" in chosen else ""
+    profession = form.get("profession", "")
+    if profession == "__other":
+        profession = form.get("profession_other", "")
+    return auth.clean_profile(form.get("name"), form.get("city"), form.get("birth_date"), form.get("gender"), profession,
+                              form.get("invest_range"), picked["purposes"], follows, picked["sectors"], picked["commodities"], others)
+
+
 @app.get("/register", response_class=HTMLResponse)
 def register_page(request: Request):
     if not ALLOW_SIGNUP:
@@ -303,7 +319,7 @@ async def register(request: Request):
     form = {k: v[0] for k, v in lists.items()}
     email, password = auth.normalize_email(form.get("email")), form.get("password", "")
     client = _client_id(request)
-    answers = {**form, "markets": lists.get("markets", [])}               # shown again, selected, if the page has to be redone
+    answers = {**form, **{k: lists.get(k, []) for k in ("markets", "purposes", "sectors", "commodities")}}     # shown again if the page has to be redone
 
     def again(message, status):
         return HTMLResponse(auth_pages.register_page(message, email, bool(SIGNUP_CODE), answers=answers), status_code=status)
@@ -315,7 +331,8 @@ async def register(request: Request):
         return again("That invite code isn't right.", 403)
     if password != form.get("confirm", ""):
         return again("The two passwords don't match.", 400)
-    try:                                                                   # the investor questions are checked before any account is made
+    try:                                                                   # every answer is checked before any account is made
+        details = _signup_details(form, lists)
         investor = auth.clean_investor_profile(form.get("expected_return"), form.get("risk"), lists.get("markets", []), form.get("salary"),
                                                {k: form.get("plan_" + k) for k in auth.PLAN_BUCKETS}, required=True)
     except auth.AuthError as e:
@@ -328,9 +345,9 @@ async def register(request: Request):
         return HTMLResponse(auth_pages.notice_page("Accounts aren't set up yet", "The site owner needs to run: python manage_users.py migrate"), status_code=503)
     auth.record_signup(user)
     try:
-        await run_in_threadpool(auth.save_investor_profile, user["id"], investor)
+        await run_in_threadpool(auth.save_signup_profile, user["id"], details, investor)
     except Exception:                                                      # the account exists; a failed save must not undo or block the sign-up (Settings can take the answers later)
-        log.exception("Could not save the investor answers given at sign-up for account %s", user["id"])
+        log.exception("Could not save the answers given at sign-up for account %s", user["id"])
     if user["status"] == "pending":
         return HTMLResponse(auth_pages.pending_page(user["email"]), status_code=200)      # no session until an administrator approves
     return _start_session(request, user["id"])

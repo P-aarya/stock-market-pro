@@ -1,4 +1,5 @@
 """The sign-in and sign-up pages. Plain server-rendered HTML, so they work before the dashboard's scripts have loaded."""
+import datetime
 import html
 
 import auth                  # only for the lists of choices the sign-up questions offer
@@ -44,9 +45,10 @@ a{color:var(--cyan);font-weight:700;text-decoration:none}a:hover{text-decoration
 .disclaimer li+li{margin-top:8px}
 .disclaimer b{color:#d5deeb}
 .disclaimer p{margin:10px 0 0}
-/* the investor questions on the sign-up form */
-select,input[type=number]{width:100%;padding:12px;border-radius:9px;border:1px solid var(--line2);background:#10101e;color:var(--text);font-size:16px;font-family:inherit}
+/* the questions on the sign-up form */
+select,input[type=number],input[type=date]{width:100%;padding:12px;border-radius:9px;border:1px solid var(--line2);background:#10101e;color:var(--text);font-size:16px;font-family:inherit}
 select:focus,input[type=number]:focus{outline:2px solid var(--blue);outline-offset:1px;border-color:var(--blue)}
+input[type=date]{-webkit-appearance:none;appearance:none;display:block;min-width:0;min-height:46px}      /* iPhones otherwise draw it narrower and shorter than the rest */
 fieldset{margin:18px 0 0;padding:0;border:0;min-width:0}
 legend{padding:0;margin:0 0 6px;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
 legend small{text-transform:none;letter-spacing:0;font-weight:600}
@@ -64,9 +66,20 @@ legend small{text-transform:none;letter-spacing:0;font-weight:600}
 .progress .track i{display:block;height:100%;width:0;border-radius:2px;background:var(--blue);transition:width .2s}
 .nav{display:flex;gap:10px}
 .nav button{flex:1;width:auto}
-.nav .back{flex:0 0 96px;background:transparent;border:1px solid var(--line2);color:var(--text)}
-.nav .back:hover{background:#10101e}
+.nav .back{flex:0 0 96px}
+.nav .back,.nav .ghost{background:transparent;border:1px solid var(--line2);color:var(--text)}
+.nav .back:hover,.nav .ghost:hover{background:#10101e}
 .stepbtn{display:none}.wizard .stepbtn{display:block}
+/* choose-any questions: pills, as in Settings */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{position:relative;display:block;margin:0;color:var(--text);font-size:13px;font-weight:700;letter-spacing:0;text-transform:none;cursor:pointer}
+.chip input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+.chip span{display:block;padding:10px 14px;border:1px solid var(--line2);border-radius:20px;background:#10101e}
+.chip input:checked + span{border-color:var(--blue);background:rgba(79,142,247,.16)}
+.chip input:checked + span::before{content:'✓';margin-right:6px;color:var(--blue);font-weight:900}
+.chip input:focus-visible + span{outline:2px solid var(--blue);outline-offset:2px}
+.other-box{margin-top:10px}
+.wizard .other-box{display:none}.wizard .other-box.on{display:block}        /* a box for your own answer opens when "Other" is chosen */
 .opt input:focus:not(:focus-visible){outline:none}      /* a page opens with its first choice focused: a ring there after a mouse click would look like it was already picked */
 .opts{display:grid;gap:8px}
 .opts.three{grid-template-columns:repeat(3,1fr)}
@@ -100,14 +113,21 @@ ids.forEach(function(id){document.getElementById(id).addEventListener('input',up
 # is shown: it is still one form, sent once at the end (so a password is never passed from page to page), and the server checks everything.
 _WIZARD_SCRIPT = """<script>
 (function(){
-var form=document.querySelector('form'),pages=Array.prototype.slice.call(form.querySelectorAll('.step')),total=pages.length,current=1;
+var form=document.querySelector('form'),pages=Array.prototype.slice.call(form.querySelectorAll('.step')),current=1;
 var label=document.getElementById('step-label'),bar=document.getElementById('step-bar'),intro=document.querySelector('.intro'),error=document.querySelector('.err');
+var follows=document.getElementById('follows'),profession=document.getElementById('profession');
 form.noValidate=true;                  // the browser would refuse to send a form that has unanswered fields on pages that are not showing
 form.classList.add('wizard');
+/* A page that doesn't fit what the person follows (sectors when they follow only commodities, or the other way round) is passed over. */
+function applies(n){var skip=pages[n-1].getAttribute('data-skip');return !skip||follows.value!==skip}
+function route(){var list=[];for(var n=1;n<=pages.length;n++)if(applies(n))list.push(n);return list}
+/* The page that comes after page n, or 0 when n is the last one. */
+function after(n){var list=route();for(var i=0;i<list.length;i++)if(list[i]>n)return list[i];return 0}
+function progress(){var list=route(),at=list.indexOf(current)+1;label.textContent='Step '+at+' of '+list.length;bar.style.width=(100*at/list.length)+'%'}
 function show(n,remember){
-  current=Math.max(1,Math.min(total,n));
+  current=Math.max(1,Math.min(pages.length,n)); if(!applies(current))current=after(current);
   pages.forEach(function(page,i){page.classList.toggle('on',i===current-1)});
-  label.textContent='Step '+current+' of '+total; bar.style.width=(100*current/total)+'%';
+  progress();
   if(intro)intro.hidden=current!==1; if(error)error.hidden=current!==1;
   if(remember)history.pushState({step:current},'');
   window.scrollTo(0,0);
@@ -127,17 +147,35 @@ function problem(n){
   for(var i=0;i<fields.length;i++)if(!fields[i].checkValidity())return fields[i];
   return null;
 }
-function next(){var bad=problem(current); if(bad){bad.reportValidity();return} show(current+1,true)}
+function next(){var bad=problem(current); if(bad){bad.reportValidity();return} var n=after(current); if(n)show(n,true)}
+/* Every page that applies is in order: else go to the first one that isn't and say what is wrong. */
+function allGood(){
+  var list=route();
+  for(var i=0;i<list.length;i++){var bad=problem(list[i]); if(bad){if(list[i]!==current)show(list[i],true); bad.reportValidity(); return false}}
+  return true;
+}
+function openOtherBoxes(){
+  Array.prototype.forEach.call(form.querySelectorAll('.other-box'),function(box){
+    var name=box.getAttribute('data-for');
+    box.classList.toggle('on',name==='profession'?profession.value==='__other':!!form.querySelector('input[name='+name+'][value=__other]:checked'));
+  });
+}
+form.addEventListener('change',function(e){
+  openOtherBoxes(); progress();
+  if(e.target.value==='__other'){var box=e.target.closest('.step').querySelector('.other-box.on'); if(box)box.focus()}
+});
 form.addEventListener('click',function(e){
   var b=e.target.closest('button'); if(!b)return;
   if(b.classList.contains('next'))next(); else if(b.classList.contains('back'))history.back();
+  else if(b.classList.contains('finish')&&allGood())form.submit();        // offered on page 1 when the form came back: the other answers are still filled in
 });
 form.addEventListener('submit',function(e){
-  if(current<total){e.preventDefault();next();return}              // Enter on an earlier page means Next, never Create account
-  for(var n=1;n<=total;n++){var bad=problem(n); if(bad){e.preventDefault(); if(n!==current)show(n,true); bad.reportValidity(); return}}
+  if(after(current)){e.preventDefault();next();return}              // Enter on an earlier page means Next, never Create account
+  if(!allGood())e.preventDefault();
 });
 window.addEventListener('popstate',function(e){show(e.state&&e.state.step||1,false)});   // the browser's own Back button goes back one page too
 history.replaceState({step:1},'');
+openOtherBoxes();
 show(1,false);
 })();
 </script>"""
@@ -188,17 +226,47 @@ def login_page(error: str = "", email: str = "", signup_open: bool = True, notic
 <button type="submit">Sign in</button></form>{alt}{_SHOW_SCRIPT}""")
 
 
-def _investor_questions(answers=None) -> str:
-    """The five investor questions of the sign-up form, one page (.step) each, pages 2 to 6. `answers` holds what was filled in before
-    (after a mistake), so nothing is lost."""
+def _question_pages(answers=None) -> list:
+    """The question pages (.step) of the sign-up form, in the order Settings lists things: one page about you (five optional fields),
+    then one question per page, about what you follow (optional) and the five investor questions (needed). `answers` holds what was
+    filled in before (after a mistake)."""
     a = answers or {}
     esc = lambda v: html.escape(str(v), quote=True)
 
-    def select(name, label, choices):
+    def text(name, label, most, placeholder, autocomplete="off"):
+        return (f'<label for="{name}">{label}</label><input id="{name}" type="text" name="{name}" maxlength="{most}" placeholder="{esc(placeholder)}" '
+                f'autocomplete="{autocomplete}" value="{esc(a.get(name) or "")}">')
+
+    def select(name, label, choices, required=False, labelled=False):
+        """`labelled` shows the label: needed when the page holds more than this one box (else the page's heading says it)."""
         options = '<option value="">Choose…</option>' + "".join(
             f'<option value="{esc(k)}"{" selected" if a.get(name) == k else ""}>{html.escape(v)}</option>' for k, v in choices.items())
-        return f'<label class="sr" for="{name}">{label}</label><select id="{name}" name="{name}" required>{options}</select>'
+        hidden_label = "" if labelled else ' class="sr"'
+        return f'<label{hidden_label} for="{name}">{label}</label><select id="{name}" name="{name}"{" required" if required else ""}>{options}</select>'
 
+    def chips(name, label, choices, other_hint):
+        """Choose any, plus "Other" with a box to type it in."""
+        chosen = a.get(name) or []
+        pills = "".join(f'<label class="chip"><input type="checkbox" name="{name}" value="{esc(k)}"{" checked" if k in chosen else ""}><span>{html.escape(v)}</span></label>'
+                        for k, v in [*choices, ("__other", "Other")])
+        own = (f'<input class="other-box" data-for="{name}" type="text" name="{name}_other" maxlength="{auth.MAX_OTHER}" placeholder="{esc(other_hint)}" '
+               f'aria-label="Other: {label.lower()}" value="{esc(a.get(name + "_other") or "")}">')
+        return f'<fieldset><legend class="sr">{label}</legend><div class="chips">{pills}</div>{own}</fieldset>'
+
+    # about you: five short fields that share one page
+    yesterday = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
+    professions = {**{p: p for p in auth.PROFESSIONS}, "__other": "Other (type your own)"}
+    about_you = (
+        text("name", "Name", auth.MAX_NAME, "Your name", "name") + '<p class="hint">Shown at the top of the dashboard.</p>'
+        + text("city", "Region / city", auth.MAX_CITY, "e.g. New York, Charlotte or Harrisburg", "address-level2")
+        + f'<label for="birth_date">Date of birth</label><input id="birth_date" type="date" name="birth_date" min="1900-01-01" max="{yesterday}" '
+        f'autocomplete="bday" value="{esc(a.get("birth_date") or "")}"><p class="hint">Nothing is saved unless you pick a date.</p>'
+        + select("gender", "Gender", auth.GENDERS, labelled=True)
+        + select("profession", "Profession", professions, labelled=True)
+        + f'<input class="other-box" data-for="profession" type="text" name="profession_other" maxlength="{auth.MAX_PROFESSION}" placeholder="Your profession" '
+        f'aria-label="Your profession" value="{esc(a.get("profession_other") or "")}">')
+
+    # the investor questions
     risk = "".join(f'<label class="opt"><input type="radio" name="risk" value="{esc(k)}"{" checked" if a.get("risk") == k else ""} required>'
                    f'<span>{html.escape(v)}<small>{html.escape(auth.RISK_HINTS[k])}</small></span></label>' for k, v in auth.RISK_LEVELS.items())
     chosen = a.get("markets") or []
@@ -207,27 +275,45 @@ def _investor_questions(answers=None) -> str:
     alloc = "".join(f'<div><label for="plan_{k}">{html.escape(v)} %</label><input id="plan_{k}" name="plan_{k}" type="number" min="0" max="100" step="1" '
                     f'inputmode="numeric" placeholder="0" value="{esc(a.get("plan_" + k) or "")}"></div>' for k, v in auth.PLAN_BUCKETS.items())
 
+    about, follow, needed = "Optional", "About your investing · optional", "About your investing"
+    #  (group, id, title, question, control, the "follows" answer for which the page is passed over)
     pages = [
-        ("return", "Expected returns", "What yearly return do you hope your investments will make?", select("expected_return", "Expected returns", auth.EXPECTED_RETURNS)),
-        ("risk", "Risk appetite", "How much risk are you comfortable with?",
-         f'<fieldset><legend class="sr">Risk appetite</legend><div class="opts">{risk}</div></fieldset>'),
-        ("markets", "Markets you are interested in", "Choose any that apply.",
+        (about, "about", "About you", "These can be left empty: just press Next. Only you and our administrators can see your answers, "
+         "and you can change them any time in Settings.", about_you, ""),
+        (follow, "range", "Investing range", "How much do you invest, in US dollars?", select("invest_range", "Investing range (US $)", auth.INVEST_RANGES), ""),
+        (follow, "follows", "What do you follow?", "Stocks, commodities or both?", select("follows", "What do you follow?", auth.FOLLOWS), ""),
+        (follow, "purposes", "Main purpose", "What do you want to use Aymetrix for? Choose any.",
+         chips("purposes", "Main purpose", auth.PURPOSES.items(), "Your own answer"), ""),
+        (follow, "sectors", "Sectors you're interested in", "Choose any.",
+         chips("sectors", "Sectors", [(x, x) for x in auth.INTEREST_SECTORS], "e.g. Crypto, Gaming"), "commodities"),
+        (follow, "commodities", "Commodities you're interested in", "Choose any.",
+         chips("commodities", "Commodities", [(x, x) for x in auth.INTEREST_COMMODITIES], "e.g. Lithium, Uranium"), "stocks"),
+        (needed, "return", "Expected returns", "What yearly return do you hope your investments will make?",
+         select("expected_return", "Expected returns", auth.EXPECTED_RETURNS, required=True), ""),
+        (needed, "risk", "Risk appetite", "How much risk are you comfortable with?",
+         f'<fieldset><legend class="sr">Risk appetite</legend><div class="opts">{risk}</div></fieldset>', ""),
+        (needed, "markets", "Markets you are interested in", "Choose any that apply.",
          f'<fieldset><legend class="sr">Markets you are interested in</legend><div class="opts three">{markets}</div>'
-         '<p class="hint">Aymetrix covers the US stock market today.</p></fieldset>'),
-        ("salary", "Salary range", "Your yearly salary in US dollars. You can choose not to say; only you and our administrators can see your answers.",
-         select("salary", "Salary range (per year, US $)", auth.SALARY_RANGES)),
-        ("plan", "Investment plan", "How do you plan to split your investments? The three should add up to 100%.",
-         f'<fieldset><legend class="sr">Investment plan</legend><div class="alloc">{alloc}</div><p class="total" id="plan-total" aria-live="polite">Total: 0%</p></fieldset>'),
+         '<p class="hint">Aymetrix covers the US stock market today.</p></fieldset>', ""),
+        (needed, "salary", "Salary range", "Your yearly salary in US dollars. You can choose not to say; only you and our administrators can see your answers.",
+         select("salary", "Salary range (per year, US $)", auth.SALARY_RANGES, required=True), ""),
+        (needed, "plan", "Investment plan", "How do you plan to split your investments? The three should add up to 100%.",
+         f'<fieldset><legend class="sr">Investment plan</legend><div class="alloc">{alloc}</div><p class="total" id="plan-total" aria-live="polite">Total: 0%</p></fieldset>', ""),
     ]
+    # said once, on the first page of each group
+    intros = {
+        "range": "Also optional. Tells us what you use Aymetrix for, so we can make it more useful to you.",
+        "return": "The last five questions are needed to create your account. You can change the answers later in Settings.",
+    }
     out = []
-    for number, (key, title, question, control) in enumerate(pages, start=1):
-        intro = ('<p class="sub">Tells us how you invest, so we can make Aymetrix more useful to you. You can change these answers any time in '
-                 'Settings. Only you and our administrators can see them.</p>') if number == 1 else ""
-        forward = '<button type="submit">Create account</button>' if number == len(pages) else '<button type="button" class="stepbtn next">Next</button>'
-        out.append(f'<section class="step" data-step="{number + 1}" aria-labelledby="q-{key}"><p class="eyebrow">About your investing</p>'
+    for number, (group, key, title, question, control, skip) in enumerate(pages, start=2):
+        intro = f'<p class="sub">{intros[key]}</p>' if key in intros else ""
+        forward = '<button type="submit">Create account</button>' if number == len(pages) + 1 else '<button type="button" class="stepbtn next">Next</button>'
+        passed_over = f' data-skip="{skip}"' if skip else ""
+        out.append(f'<section class="step" data-step="{number}"{passed_over} aria-labelledby="q-{key}"><p class="eyebrow">{group}</p>'
                    f'<h2 id="q-{key}">{title}</h2>{intro}<p class="sub">{question}</p>{control}'
                    f'<div class="nav"><button type="button" class="stepbtn back">Back</button>{forward}</div></section>')
-    return "\n".join(out)
+    return out
 
 
 def register_page(error: str = "", email: str = "", needs_code: bool = False, closed: bool = False, answers=None) -> str:
@@ -236,10 +322,17 @@ def register_page(error: str = "", email: str = "", needs_code: bool = False, cl
 <p class="alt"><a href="/login">Back to sign in</a></p>""", backdrop="register")
     code = ('<label for="code">Invite code</label><input id="code" type="text" name="code" autocomplete="off" autocapitalize="none" spellcheck="false" required>'
             if needs_code else "")
+    pages = _question_pages(answers)
+    if answers is None:
+        forward = '<div class="nav"><button type="button" class="stepbtn next">Next</button></div>'
+    else:                       # the form came back after a mistake: nobody should have to click through every page again
+        forward = ('<div class="nav"><button type="button" class="stepbtn next ghost">Next</button><button type="button" class="stepbtn finish">Create account</button></div>'
+                   '<p class="hint stepbtn">Your other answers are kept. Create account sends them as they are; Next takes you through them.</p>')
+    questions = "\n".join(pages)
     return _page("Create account", f"""<h1>Create your account</h1><p class="sub intro">Your portfolio, transactions and watchlist stay private to you. New accounts start on the free plan, which opens the Home tab.</p>
 {_error(error)}
 <form method="post" action="/register">
-<div class="progress" aria-live="polite"><span id="step-label">Step 1 of 6</span><div class="track"><i id="step-bar"></i></div></div>
+<div class="progress" aria-live="polite"><span id="step-label">Step 1 of {len(pages) + 1}</span><div class="track"><i id="step-bar"></i></div></div>
 <div class="step on" data-step="1">
 <label for="email">Email</label>
 <input id="email" type="email" name="email" value="{html.escape(email, quote=True)}" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" required autofocus>
@@ -250,9 +343,9 @@ def register_page(error: str = "", email: str = "", needs_code: bool = False, cl
 <input id="confirm" type="password" name="confirm" data-pw autocomplete="new-password" minlength="8" required>
 {code}
 <label class="show"><input type="checkbox" id="show"> Show passwords</label>
-<div class="nav"><button type="button" class="stepbtn next">Next</button></div>
+{forward}
 </div>
-{_investor_questions(answers)}
+{questions}
 </form>
 <p class="alt">Already have an account? <a href="/login">Sign in</a></p>{_SHOW_SCRIPT}{_PLAN_SCRIPT}{_WIZARD_SCRIPT}""", below=DISCLAIMER, backdrop="register")
 

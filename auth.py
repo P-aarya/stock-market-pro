@@ -1341,11 +1341,10 @@ def get_details(user_id, today=None):
             **interests_from(row.get("interests")), "notifications": _prefs_from(row.get("notify_prefs"))}
 
 
-def save_profile(user_id, name, city, birth_date, gender, profession, now=None, invest_range=None, purposes=None, follows=None,
-                 sectors=None, commodities=None, others=None, investor=None):
-    """Save the Profile card: name plus the optional details and investing profile. Empty means 'not given'. `investor` is the
-    checked dict from clean_investor_profile; when it is None (a caller that doesn't send those answers) the saved ones are kept."""
-    now = int(time.time() if now is None else now)
+def clean_profile(name="", city="", birth_date="", gender="", profession="", invest_range="", purposes=None, follows="", sectors=None,
+                  commodities=None, others=None):
+    """The name and the optional details (everything on the Profile card apart from the five investor questions), checked and tidied.
+    Empty means 'not given'. Raises AuthError with a message to show the person."""
     name = clean_name(name)
     city = _clean_text(city, MAX_CITY, "Region / city")
     birth = clean_birth_date(birth_date)
@@ -1354,23 +1353,36 @@ def save_profile(user_id, name, city, birth_date, gender, profession, now=None, 
         raise AuthError("Please choose a gender from the list.")
     profession = clean_profession(profession)
     invest_range, interests = clean_interests(invest_range, purposes, follows, sectors, commodities, others)
+    return {"name": name, "city": city, "birth_date": birth, "gender": gender, "profession": profession, "invest_range": invest_range,
+            "interests": interests}
+
+
+def _store_profile(user_id, details, investor, now=None):
+    """Write details from clean_profile and answers from clean_investor_profile."""
+    now = int(time.time() if now is None else now)
+    interests = {**details["interests"], **{k: investor[k] for k in INVESTOR_KEYS}}
+    store.set_name(user_id, details["name"])
+    store.save_details(user_id, {"city": details["city"] or None, "birth_date": details["birth_date"], "gender": details["gender"] or None,
+                                 "profession": details["profession"] or None, "invest_range": details["invest_range"],
+                                 "interests": json.dumps(interests, sort_keys=True)}, now)
+    access_cache.invalidate(user_id)
+
+
+def save_profile(user_id, name, city, birth_date, gender, profession, now=None, invest_range=None, purposes=None, follows=None,
+                 sectors=None, commodities=None, others=None, investor=None):
+    """Save the Profile card: name plus the optional details and investing profile. Empty means 'not given'. `investor` is the
+    checked dict from clean_investor_profile; when it is None (a caller that doesn't send those answers) the saved ones are kept."""
+    details = clean_profile(name, city, birth_date, gender, profession, invest_range, purposes, follows, sectors, commodities, others)
     if investor is None:
         current = get_details(user_id)
         investor = {k: current[k] for k in INVESTOR_KEYS}
-    interests.update({k: investor[k] for k in INVESTOR_KEYS})
-    store.set_name(user_id, name)
-    store.save_details(user_id, {"city": city or None, "birth_date": birth, "gender": gender or None, "profession": profession or None,
-                                 "invest_range": invest_range, "interests": json.dumps(interests, sort_keys=True)}, now)
-    access_cache.invalidate(user_id)
-    return {"name": name, **{k: v for k, v in get_details(user_id).items() if k != "notifications"}}
+    _store_profile(user_id, details, investor, now)
+    return {"name": details["name"], **{k: v for k, v in get_details(user_id).items() if k != "notifications"}}
 
 
-def save_investor_profile(user_id, investor, now=None):
-    """Save the investor answers given at sign-up (already checked by clean_investor_profile), keeping anything else saved."""
-    now = int(time.time() if now is None else now)
-    interests = interests_from((store.details(user_id) or {}).get("interests"))
-    interests.update({k: investor[k] for k in INVESTOR_KEYS})
-    store.save_details(user_id, {"interests": json.dumps(interests, sort_keys=True)}, now)
+def save_signup_profile(user_id, details, investor, now=None):
+    """Save what a new account answered at sign-up: `details` from clean_profile and `investor` from clean_investor_profile."""
+    _store_profile(user_id, details, investor, now)
 
 
 def save_notifications(user_id, choices, now=None):

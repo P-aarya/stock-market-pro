@@ -1,6 +1,7 @@
-"""The investor questions asked when someone signs up: expected returns, risk appetite, markets, salary range and how they plan to
-split their investments. They are checked on the server before any account is made, saved with the person's other interests, shown and
-editable in Settings, and listed in the administrators' download. No database: accounts live in the in-memory store."""
+"""The questions asked when someone signs up, a page at a time: first the optional details of the Profile card (one page for name, city,
+date of birth, gender and profession, then one page each about what they follow), then the five investor questions (expected returns, risk appetite, markets, salary range and how
+they plan to split their investments). Everything is checked on the server before any account is made, saved, shown and editable in
+Settings, and listed in the administrators' download. No database: accounts live in the in-memory store."""
 import io
 import json
 import re
@@ -103,7 +104,7 @@ class TheSignUpPage(unittest.TestCase):
 
     def test_the_five_questions_are_on_the_form_with_the_choices_from_one_place(self):
         form = self.page.split('<form method="post" action="/register">')[1].split("</form>")[0]
-        for name in ("expected_return", "salary"):
+        for name in ("expected_return", "salary"):          # these two are needed, unlike the optional lists before them
             self.assertIn(f'<select id="{name}" name="{name}" required>', form)
         for key in list(auth.EXPECTED_RETURNS) + list(auth.SALARY_RANGES):
             self.assertIn(f'<option value="{key}"', form)
@@ -143,42 +144,195 @@ class TheSignUpPage(unittest.TestCase):
         self.assertIn("Total: ", self.page)
 
 
+# Everything on the Profile card that sign-up also asks (all optional), as a filled-in form sends it.
+PROFILE_ANSWERS = {"name": "Sam Lee", "city": "Harrisburg", "birth_date": "1990-04-05", "gender": "prefer_not", "profession": "Student",
+                   "invest_range": "1k_10k", "follows": "both", "purposes": ["learning", "long_term"], "sectors": ["Technology", "Energy"],
+                   "commodities": ["Gold", "Oil"]}
+
+
+def answers_on_file(email="new@example.com"):
+    uid = auth.store.find_by_email(email)["id"]
+    return {"name": auth.store.profile(uid)["full_name"] or "", **auth.get_details(uid)}
+
+
 class OnePageAtATime(unittest.TestCase):
-    """The sign-up form is six pages, shown one at a time with Next and Back. It stays one form that is sent once, at the end."""
+    """The sign-up form is twelve pages, shown one at a time with Next and Back. It stays one form that is sent once, at the end."""
     page = auth_pages.register_page()
+    LAST = 12
 
     def pages(self, text=None):
         form = (text or self.page).split('<form method="post" action="/register">')[1].split("</form>")[0]
-        parts = re.split(r'data-step="(\d)"', form)
+        parts = re.split(r'data-step="(\d+)"', form)
         return {int(number): body for number, body in zip(parts[1::2], parts[2::2])}
 
-    def test_the_account_details_come_first_then_one_question_on_each_page(self):
-        names = {number: sorted(set(re.findall(r'name="(\w+)"', body))) for number, body in self.pages().items()}
-        self.assertEqual(names, {1: ["confirm", "email", "password"], 2: ["expected_return"], 3: ["risk"], 4: ["markets"], 5: ["salary"],
-                                 6: ["plan_commodities", "plan_ipos", "plan_stocks"]})
-        self.assertEqual(re.findall(r"<h2 id=\"q-\w+\">([^<]+)</h2>", self.page), ["Expected returns", "Risk appetite", "Markets you are interested in", "Salary range", "Investment plan"])
+    def test_the_account_details_come_first_then_about_you_then_one_question_on_each_page_in_the_order_settings_lists_them(self):
+        names = {number: sorted(set(re.findall(r' name="(\w+)"', body))) for number, body in self.pages().items()}
+        self.assertEqual(names, {1: ["confirm", "email", "password"],
+                                 2: ["birth_date", "city", "gender", "name", "profession", "profession_other"],
+                                 3: ["invest_range"], 4: ["follows"], 5: ["purposes", "purposes_other"], 6: ["sectors", "sectors_other"],
+                                 7: ["commodities", "commodities_other"], 8: ["expected_return"], 9: ["risk"], 10: ["markets"], 11: ["salary"],
+                                 12: ["plan_commodities", "plan_ipos", "plan_stocks"]})
+        self.assertEqual(re.findall(r"<h2 id=\"q-\w+\">([^<]+)</h2>", self.page),
+                         ["About you", "Investing range", "What do you follow?", "Main purpose", "Sectors you're interested in",
+                          "Commodities you're interested in", "Expected returns", "Risk appetite", "Markets you are interested in",
+                          "Salary range", "Investment plan"])
+
+    def test_each_box_that_shares_the_about_you_page_says_what_it_is_for(self):
+        about = self.pages()[2]
+        self.assertEqual(re.findall(r'<label for="(\w+)">([^<]+)</label>', about),                  # a plain label: shown, not for screen readers only
+                         [("name", "Name"), ("city", "Region / city"), ("birth_date", "Date of birth"), ("gender", "Gender"), ("profession", "Profession")])
+        self.assertNotIn('class="sr"', about)
+
+    def test_the_choices_are_the_same_ones_settings_offers_with_an_other_answer_where_settings_has_one(self):
+        pages = self.pages()
+        values = lambda box: re.findall(r'<option value="([^"]+)"', re.search(rf'<select id="{box}".*?</select>', self.page, re.S).group(0))
+        boxes = lambda number: re.findall(r'type="checkbox" name="\w+" value="([^"]+)"', pages[number])
+        unescaped = lambda items: [i.replace("&amp;", "&") for i in items]
+        self.assertEqual(values("gender"), list(auth.GENDERS))
+        self.assertEqual(unescaped(values("profession")), [*auth.PROFESSIONS, "__other"])
+        self.assertEqual(values("invest_range"), list(auth.INVEST_RANGES))
+        self.assertEqual(values("follows"), list(auth.FOLLOWS))
+        self.assertEqual(boxes(5), [*auth.PURPOSES, "__other"])
+        self.assertEqual(boxes(6), [*auth.INTEREST_SECTORS, "__other"])
+        self.assertEqual(unescaped(boxes(7)), [*auth.INTEREST_COMMODITIES, "__other"])
+
+    def test_only_the_account_details_and_the_five_investor_questions_are_required(self):
+        for number, body in self.pages().items():
+            needed = re.search(r"<(input|select)\b[^>]* required", body) is not None
+            self.assertEqual(needed, number in (1, 8, 9, 11), number)           # markets and the plan are checked by the script and the server
+        self.assertIn("just press Next", self.pages()[2])
+        self.assertIn("needed to create your account", self.pages()[8])
 
     def test_next_goes_on_back_goes_back_and_only_the_last_page_sends_the_form(self):
-        for number, body in self.pages().items():
-            self.assertEqual(body.count('class="stepbtn next"'), 0 if number == 6 else 1, number)
+        pages = self.pages()
+        self.assertEqual(list(pages), list(range(1, self.LAST + 1)))
+        self.assertIn("Step 1 of 12", self.page)
+        for number, body in pages.items():
+            self.assertEqual(body.count('class="stepbtn next"'), 0 if number == self.LAST else 1, number)
             self.assertEqual(body.count('class="stepbtn back"'), 0 if number == 1 else 1, number)
-            self.assertEqual(body.count('type="submit"'), 1 if number == 6 else 0, number)
+            self.assertEqual(body.count('type="submit"'), 1 if number == self.LAST else 0, number)
         self.assertEqual(self.page.count("<form"), 1)                                   # one form, so a password is never passed from page to page
         for button in re.findall(r'<button [^>]*class="stepbtn[^"]*"', self.page):
             self.assertIn('type="button"', button)                                      # Next and Back never send anything themselves
 
+    def test_sectors_are_passed_over_for_commodity_followers_and_commodities_for_stock_followers(self):
+        pages = self.pages()
+        skips = {number: re.findall(r'^[^>]*data-skip="(\w+)"', body) for number, body in pages.items()}
+        self.assertEqual({number: s for number, s in skips.items() if s}, {6: ["commodities"], 7: ["stocks"]})
+
     def test_an_invite_code_is_asked_on_the_first_page(self):
         self.assertIn('name="code"', self.pages(auth_pages.register_page(needs_code=True))[1])
+
+    def test_a_form_that_came_back_can_be_sent_again_from_the_first_page(self):
+        self.assertNotIn('class="stepbtn finish"', self.page)                           # not on a fresh form: there is nothing to send yet
+        first = self.pages(auth_pages.register_page("That email is taken.", "a@b.co", answers={"risk": "low"}))[1]
+        self.assertIn('<button type="button" class="stepbtn finish">Create account</button>', first)
+        self.assertIn("Your other answers are kept", first)
 
     def test_without_javascript_every_page_shows_because_only_the_script_hides_any(self):
         css = self.page.split("<style>")[1].split("</style>")[0]
         self.assertEqual(css.count(".step{display:none"), 1)
         self.assertIn(".wizard .step{display:none}", css)                               # .wizard is added by the script, never in the HTML
+        self.assertIn(".wizard .other-box{display:none}", css)                          # likewise the "Other" boxes
         self.assertIn(".stepbtn{display:none}", css)                                    # and the Next and Back buttons are for the script too
         form = self.page.split('<form method="post" action="/register">')[1].split("</form>")[0]
         self.assertNotIn(" hidden", form)
         self.assertNotIn('class="wizard"', self.page)
         self.assertIn("form.noValidate=true", self.page)                                # else the browser would block sending: fields on unseen pages
+
+
+class TheOptionalAnswersAtSignUp(AccountsTestCase, unittest.TestCase):
+    def setUp(self):
+        super().setUp()
+        api.REQUIRE_APPROVAL = False
+
+    def post(self, **fields):
+        api._signups.reset()
+        data = {"email": "new@example.com", "password": GOOD, "confirm": GOOD, **SIGNUP_ANSWERS, **fields}
+        return TestClient(api.app, follow_redirects=False).post("/register", data=data)
+
+    def test_every_answer_is_saved_where_settings_reads_it(self):
+        self.assertEqual(self.post(**PROFILE_ANSWERS).status_code, 303)
+        got = answers_on_file()
+        for key, value in PROFILE_ANSWERS.items():
+            self.assertEqual(got[key], value, key)
+        self.assertEqual((got["risk"], got["plan"]), ("medium", {"stocks": 60, "commodities": 30, "ipos": 10}))        # and the investor answers with them
+        c = signed_in_client(auth.store.find_by_email("new@example.com")["id"], create=False)
+        account = c.get("/api/account").json()["account"]
+        self.assertEqual((account["name"], account["city"], account["birth_date"], account["sectors"]),
+                         ("Sam Lee", "Harrisburg", "1990-04-05", ["Technology", "Energy"]))
+
+    def test_leaving_them_all_empty_is_fine(self):
+        blank = {k: "" for k in ("name", "city", "birth_date", "gender", "profession", "profession_other", "invest_range", "follows",
+                                 "purposes_other", "sectors_other", "commodities_other")}
+        self.assertEqual(self.post(**blank).status_code, 303)
+        got = answers_on_file()
+        for key in ("name", "city", "birth_date", "gender", "profession", "follows"):
+            self.assertEqual(got[key], "", key)
+        self.assertEqual((got["invest_range"], got["purposes"], got["sectors"], got["commodities"]), ("", [], [], []))
+
+    def test_what_was_typed_in_an_other_box_counts_only_when_other_was_chosen(self):
+        self.assertEqual(self.post(profession="__other", profession_other="  Beekeeper ", purposes=["learning", "__other"], purposes_other="Teaching",
+                                   sectors=["__other"], sectors_other="Gaming", commodities=["Gold"], commodities_other="Lithium").status_code, 303)
+        got = answers_on_file()
+        self.assertEqual(got["profession"], "Beekeeper")
+        self.assertEqual((got["purposes"], got["purposes_other"]), (["learning"], "Teaching"))
+        self.assertEqual((got["sectors"], got["sectors_other"]), ([], "Gaming"))
+        self.assertEqual((got["commodities"], got["commodities_other"]), (["Gold"], ""))                # "Other" wasn't chosen there
+
+    def test_a_listed_profession_wins_over_anything_left_in_the_other_box(self):
+        self.assertEqual(self.post(profession="Retired", profession_other="Beekeeper").status_code, 303)
+        self.assertEqual(answers_on_file()["profession"], "Retired")
+
+    def test_the_list_that_does_not_fit_what_they_follow_is_left_out_as_in_settings(self):
+        both = dict(sectors=["Energy", "__other"], sectors_other="Gaming", commodities=["Gold", "__other"], commodities_other="Lithium")
+        for follows, sectors, commodities in (("stocks", (["Energy"], "Gaming"), ([], "")), ("commodities", ([], ""), (["Gold"], "Lithium")),
+                                              ("both", (["Energy"], "Gaming"), (["Gold"], "Lithium")), ("", (["Energy"], "Gaming"), (["Gold"], "Lithium"))):
+            auth.store = type(auth.store)(); auth.access_cache.clear()
+            self.assertEqual(self.post(follows=follows, **both).status_code, 303, follows)
+            got = answers_on_file()
+            self.assertEqual((got["sectors"], got["sectors_other"]), sectors, follows)
+            self.assertEqual((got["commodities"], got["commodities_other"]), commodities, follows)
+
+    def test_a_bad_optional_answer_stops_the_sign_up_before_any_account_exists(self):
+        for fields, word in ((dict(name="x" * 81), "name"), (dict(city="x" * 81), "city"), (dict(birth_date="2999-01-01"), "past"),
+                             (dict(birth_date="1850-01-01"), "year"), (dict(birth_date="yesterday"), "date of birth"), (dict(gender="robot"), "gender"),
+                             (dict(profession="__other", profession_other="x" * 61), "Profession"), (dict(invest_range="millions"), "investing range"),
+                             (dict(follows="crypto"), "Stocks, Commodities or Both"), (dict(purposes=["gambling"]), "purpose"),
+                             (dict(sectors=["Tulips"]), "sectors"), (dict(commodities=["Spice"]), "commodities"),
+                             (dict(sectors=["__other"], sectors_other="x" * 61), "own answer")):
+            r = self.post(**fields)
+            self.assertEqual(r.status_code, 400, fields); self.assertIn(word, r.text, fields)
+            self.assertEqual(auth.store.users, {}, fields)
+
+    def test_after_a_mistake_the_optional_answers_come_back_too(self):
+        r = self.post(**{**PROFILE_ANSWERS, "plan_ipos": "0", "profession": "__other", "profession_other": "Beekeeper",
+                         "purposes": ["trading", "__other"], "purposes_other": "Teaching"})
+        self.assertEqual(r.status_code, 400)
+        for piece in ('value="Sam Lee"', 'value="Harrisburg"', 'value="1990-04-05"', '<option value="prefer_not" selected>', '<option value="__other" selected>',
+                      'value="Beekeeper"', '<option value="1k_10k" selected>', '<option value="both" selected>', 'value="trading" checked',
+                      'value="__other" checked', 'value="Teaching"', 'value="Technology" checked', 'value="Gold" checked'):
+            self.assertIn(piece, r.text, piece)
+        self.assertNotIn('value="learning" checked', r.text); self.assertNotIn(GOOD, r.text)
+
+    def test_what_was_typed_comes_back_as_text_never_as_markup(self):
+        evil = '"><script>alert(1)</script>'
+        r = self.post(name=evil, city=evil, birth_date=evil, profession="__other", profession_other=evil, purposes=["__other"], purposes_other=evil,
+                      sectors_other=evil, commodities_other=evil)
+        self.assertEqual(r.status_code, 400)
+        self.assertNotIn("<script>alert(1)", r.text)
+
+    def test_the_longest_answers_all_arrive(self):
+        # the server reads only so much of a form: the last question must still get through when every box is full, in a script that takes several bytes a letter
+        wide = lambda n: "\u4e2d" * n
+        password = wide(40) + "-horse-9"
+        r = self.post(password=password, confirm=password, name=wide(80), city=wide(80), birth_date="1990-04-05", gender="prefer_not",
+                      profession="__other", profession_other=wide(60), invest_range="prefer_not", follows="both",
+                      purposes=[*auth.PURPOSES, "__other"], purposes_other=wide(60), sectors=[*auth.INTEREST_SECTORS, "__other"], sectors_other=wide(60),
+                      commodities=[*auth.INTEREST_COMMODITIES, "__other"], commodities_other=wide(60))
+        self.assertEqual(r.status_code, 303, r.text[:2000])
+        got = answers_on_file()
+        self.assertEqual((got["commodities_other"], got["plan"]), (wide(60), {"stocks": 60, "commodities": 30, "ipos": 10}))
 
 
 class SigningUp(AccountsTestCase, unittest.TestCase):
@@ -237,9 +391,9 @@ class SigningUp(AccountsTestCase, unittest.TestCase):
             self.assertEqual(self.post(risk="extreme").status_code, 400)
 
     def test_a_failure_to_save_the_answers_never_undoes_or_blocks_the_sign_up(self):
-        with mock.patch.object(auth, "save_investor_profile", side_effect=RuntimeError("database hiccup")), self.assertLogs(level="ERROR") as logs:
+        with mock.patch.object(auth, "save_signup_profile", side_effect=RuntimeError("database hiccup")), self.assertLogs(level="ERROR") as logs:
             r = self.post()
-        self.assertIn("Could not save the investor answers", logs.output[0])                             # the failure is logged for the owner, not shown to the person
+        self.assertIn("Could not save the answers", logs.output[0])                             # the failure is logged for the owner, not shown to the person
         self.assertEqual((r.status_code, r.headers["location"]), (303, "/"))
         self.assertIsNotNone(auth.store.find_by_email("new@example.com"))
 
