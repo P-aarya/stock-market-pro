@@ -25,10 +25,10 @@ const functions = [...script.matchAll(/^(?:async\s+)?function\s+([A-Za-z_$][\w$]
   });
 
   await t('everything Aarya built is on the page', () => {
-    for (const id of ['nt-bell', 'nt-panel', 'nt-badge', 'nt-list', 'alert-modal', 'alerts-list', 'news-grid', 'news-modal', 'eco-controls',
+    for (const id of ['nt-bell', 'nt-panel', 'nt-badge', 'nt-list', 'alert-modal', 'alerts-list', 'eco-controls',
                       'eco-calendar-body', 'btn-eco-cal', 'btn-earn-cal', 'fss-dividends', 'fs-dividends-content', 'pred-sent-strip'])
       assert(ids.has(id) || new RegExp(`id=\\\\?["']${id}`).test(script), `missing #${id}`);
-    for (const fn of ['loadWorldNews', 'loadEcoCalendar', 'switchCalTab', 'loadDividends', 'loadSentimentPanel', 'loadSpikeExplorer', 'ntToggleBell', 'saveAlert', 'openNewsModal', 'timeAgo'])
+    for (const fn of ['loadWorldNews', 'loadEcoCalendar', 'switchCalTab', 'loadDividends', 'loadSentimentPanel', 'loadSpikeExplorer', 'ntToggleBell', 'saveAlert', 'nwCard', 'timeAgo'])
       assert(functions.includes(fn), `missing function ${fn}`);
   });
 
@@ -67,10 +67,12 @@ const functions = [...script.matchAll(/^(?:async\s+)?function\s+([A-Za-z_$][\w$]
   await t('headlines, sources, links and pictures from outside feeds are never inserted into the page as markup', () => {
     const body = (name) => { const a = script.indexOf(`function ${name}(`); assert(a >= 0, name); const b = script.indexOf('\nfunction ', a + 10); const c = script.indexOf('\nasync function ', a + 10);
       return script.slice(a, Math.min(...[b, c].filter(x => x > 0))); };
-    for (const fn of ['renderWorldNews', 'renderStockNews', 'renderModalNews']) {
+    const links = { nwCard: /data-url="\$\{escapeHtml\(safeHttpUrl\(n\.url\)\)\}" onclick="openNewsLink\(this\)"/,           // the News tab
+                    renderHomeNews: /href="\$\{escapeHtml\(safeHttpUrl\(n\.url\)\)\}" target="_blank" rel="noopener noreferrer"/ };    // Home's headlines
+    for (const [fn, link] of Object.entries(links)) {
       const src = body(fn);
       assert(/escapeHtml\(n\.title/.test(src) && /escapeHtml\(n\.source/.test(src), `${fn}: title and source escaped`);
-      assert(/data-url="\$\{escapeHtml\(safeHttpUrl\(n\.url\)\)\}" onclick="openNewsLink\(this\)"/.test(src), `${fn}: the link is checked and opened safely`);
+      assert(link.test(src), `${fn}: the link is checked and opened safely`);
       assert(!/window\.open\('\$\{n\.url/.test(src), `${fn}: no URL is written into an inline script`);
     }
     assert(!/src="\$\{n\.image\}"/.test(script), 'pictures go through safeHttpUrl');
@@ -78,6 +80,23 @@ const functions = [...script.matchAll(/^(?:async\s+)?function\s+([A-Za-z_$][\w$]
     assert(/escapeHtml\(h\.title/.test(sent) && /safeHttpUrl\(h\.url\)/.test(sent) && /escapeHtml\(h\.source\)/.test(sent), 'sentiment headlines');
     const spikes = body('loadSpikeExplorer');
     assert(/escapeHtml\(sp\.reason/.test(spikes) && /safeHttpUrl\(sp\.reason_url\)/.test(spikes) && /escapeHtml\(sp\.driver\)/.test(spikes), 'price-spike headlines');
+  });
+
+  await t('the Market tab has no news section of its own: news is on the News tab, which Home\'s "More news" opens', () => {
+    const market = html.slice(html.indexOf('<div class="page" id="page-market">'), html.indexOf('<div class="page" id="page-ipos">'));
+    assert(market.length > 1000, 'found the Market tab');
+    assert(!/news-grid|news-card|World Finance|loadWorldNews|openNewsModal/.test(market), 'a news block is back on the Market tab');
+    assert(!ids.has('mkt-news-card') && !ids.has('news-modal'), 'the old card or its popup is back');
+    assert(ids.has('page-news') && ids.has('nw-list'), 'the News tab is there');
+    assert(/onclick="goTab\('news'\)">More news/.test(html), 'Home\'s "More news" opens the News tab');
+  });
+
+  await t('Home still gets its headlines: at start-up, and again every 15 minutes while it is open', () => {
+    assert(/async function loadMarketNews\(\)\{\s*loadWorldNews\(\);\s*\}/.test(script), 'start-up asks for them');
+    const loader = script.slice(script.indexOf('async function loadWorldNews(){'), script.indexOf('function timeAgo('));
+    assert(/api\('\/api\/news\/world'\)/.test(loader) && /worldNewsData = d;/.test(loader) && /renderHomeNews\(\)/.test(loader) && /renderHomeNews\(true\)/.test(loader));
+    assert(!/getElementById\('news-grid'\)/.test(script), 'nothing writes into the removed list');
+    assert(/setInterval\(\(\) => \{ if\(homeOn\(\)\) loadWorldNews\(\); \}, 15 \* 60 \* 1000\);/.test(script));
   });
 
   done();

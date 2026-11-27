@@ -131,7 +131,7 @@ def upgrade_info(feature) -> dict:
 DESCRIPTIONS = {
     "initial_screen":   "Your portfolio snapshot, market movers and charts, recently viewed and saved stocks, commodities and news, and the stock pages you open from it (charts, company details, financials, earnings, dividends)",
     "portfolio_view":   "View your portfolio and your transaction history",
-    "market":           "The full stock table with search, filters and sorting, live currency rates and world finance news",
+    "market":           "The full stock table with search, filters and sorting, and live currency rates",
     "portfolio_mgt":    "Add and edit your own holdings and transactions",
     "raise_ticket":     "Raise a Help Desk ticket about a problem or question, and follow the replies",
     "stock_prediction": "AI price predictions: the top 5 predicted stocks, and a forecast on every stock page",
