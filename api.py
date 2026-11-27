@@ -4196,7 +4196,7 @@ def _fred_series(series_id):
         return hit[1] if hit else {}   # FRED was unreachable a moment ago - don't wait on it again yet
     url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
     try:
-        req = _ed_req.Request(url, headers={"User-Agent": "Mozilla/5.0 (StockMarketPro)"})
+        req = _ed_req.Request(url)      # Python's own client name: FRED never answers one that claims to be a browser ("Mozilla/...")
         with _ed_req.urlopen(req, timeout=10) as resp:
             text = resp.read().decode("utf-8", "ignore")
         rows = list(_ed_csv.reader(_ed_io.StringIO(text)))
