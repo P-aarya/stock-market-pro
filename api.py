@@ -9,6 +9,9 @@ import mysql.connector
 import yfinance as yf
 import commodity_groups
 import market_history
+import my_finance
+import my_money
+import news_store
 import pandas as pd
 from datetime import datetime, timezone
 from typing import Optional
@@ -2420,6 +2423,34 @@ def _build_stock_news(ticker, count):
     return _nu_merge(results, count)
 
 
+@app.get("/api/news")
+def news_tab(cats: str = "", mine: bool = False, ticker: str = "", days: int = 30, q: str = "",
+             offset: int = 0, limit: int = 20, user_id: int = Depends(current_user_id)):
+    """The News tab: headlines from the last `days` days (up to 30), newest first, `limit` at a time.
+    cats: comma-separated categories (empty = all); mine: only news about stocks in your portfolio or watchlist;
+    ticker: only news about that stock (fetched straight away if little is stored for it); q: words in the headline."""
+    categories = [c for c in cats.split(",") if c.strip()] or None
+    tickers = None
+    if ticker.strip():
+        t = ticker.strip().upper()[:10]
+        tickers = [t]
+    elif mine:
+        tickers = sorted(set(portfolio.held_tickers(user_id)) | set(watchlist.get_watchlist(user_id)))
+    try:
+        items, more = news_store.search(get_db, categories, tickers, days, q, offset, limit)
+        if ticker.strip() and offset == 0 and len(items) < 5 and re.match(r"^[A-Z0-9.\-]{1,10}$", tickers[0]):
+            try:
+                if news_store.fetch_stock_now(get_db, tickers[0]):
+                    items, more = news_store.search(get_db, categories, tickers, days, q, offset, limit)
+            except Exception as e:
+                print(f"News fetch for {tickers[0]} failed: {e}")
+    except Exception as e:
+        print(f"News tab error: {e}")
+        return {"status": "error", "message": "News isn't available right now. Please try again in a minute.", "items": []}
+    return {"status": "success", "items": items, "more": more, "mine_count": len(tickers or []) if mine else None,
+            "categories": [{"key": k, "label": l} for k, l in news_store.CATEGORIES]}
+
+
 @app.get("/api/news/world")
 def get_world_news():
     """Live world finance news from RSS feeds, newest first, with category and image."""
@@ -2624,6 +2655,164 @@ def get_portfolio(request: Request, user_id: int = Depends(current_user_id)):
 @app.get("/api/portfolio/summary")
 def get_portfolio_summary(user_id: int = Depends(current_user_id)):
     return portfolio.summarize(portfolio.list_holdings(user_id))
+
+
+# ── Where your money is: savings, deposits, property... that people add themselves (my_money.py) ──
+class MoneyItemIn(BaseModel):
+    kind: str = Field(max_length=20)
+    name: str = Field(default="", max_length=200)
+    amount: float
+
+
+def _money_call(fn, *args):
+    try:
+        return {"status": "success", **fn(*args)}
+    except my_money.MoneyError as e:
+        return agent_error(e.status, e.message)
+    except Exception:
+        log.exception("Other money failed")
+        return agent_error(500, "Something went wrong. Please try again.")
+
+
+@app.get("/api/my-money")
+def my_money_list(user_id: int = Depends(current_user_id)):
+    """The things you added yourself (savings, fixed deposits, real estate...), largest first, plus the kinds you can add."""
+    try:
+        return {"status": "success", "items": my_money.list_items(user_id), "kinds": my_money.KINDS}
+    except Exception:
+        log.exception("Other money failed")
+        return agent_error(500, "Couldn't load your other money. Please try again.")
+
+
+@app.post("/api/my-money")
+def my_money_add(body: MoneyItemIn, user_id: int = Depends(current_user_id)):
+    return _money_call(my_money.add_item, user_id, body.kind, body.name, body.amount)
+
+
+@app.put("/api/my-money/{item_id}")
+def my_money_update(item_id: int, body: MoneyItemIn, user_id: int = Depends(current_user_id)):
+    return _money_call(my_money.update_item, user_id, item_id, body.kind, body.name, body.amount)
+
+
+@app.delete("/api/my-money/{item_id}")
+def my_money_delete(item_id: int, user_id: int = Depends(current_user_id)):
+    return _money_call(my_money.delete_item, user_id, item_id)
+
+
+# ── Your personal finance (profile menu): monthly money, optional giving, goals and the wishlist (my_finance.py) ──
+class MonthlyIn(BaseModel):
+    income: Optional[float] = None
+    housing: Optional[float] = None
+    bills: Optional[float] = None
+    food: Optional[float] = None
+    transport: Optional[float] = None
+    repayments: Optional[float] = None
+    other_spend: Optional[float] = None
+
+
+class GivingIn(BaseModel):
+    on: bool = False
+    mode: Optional[str] = Field(default=None, max_length=10)
+    value: Optional[float] = None
+    causes: str = Field(default="", max_length=200)
+
+
+class GoalIn(BaseModel):
+    name: str = Field(max_length=200)
+    target: float
+    target_date: str = Field(max_length=10)
+    saved: Optional[float] = 0
+
+
+def _finance_call(fn, *args):
+    try:
+        return {"status": "success", **fn(*args)}
+    except my_finance.FinanceError as e:
+        return agent_error(e.status, e.message)
+    except Exception:
+        log.exception("Your personal finance failed")
+        return agent_error(500, "Something went wrong. Please try again.")
+
+
+@app.get("/api/finance")
+def finance_get(user_id: int = Depends(current_user_id)):
+    return _finance_call(my_finance.get_all, user_id)
+
+
+@app.put("/api/finance/monthly")
+def finance_monthly_save(body: MonthlyIn, user_id: int = Depends(current_user_id)):
+    return _finance_call(my_finance.save_monthly, user_id, body.model_dump() if hasattr(body, "model_dump") else body.dict())
+
+
+@app.delete("/api/finance/monthly")
+def finance_monthly_clear(user_id: int = Depends(current_user_id)):
+    return _finance_call(my_finance.clear_monthly, user_id)
+
+
+@app.put("/api/finance/giving")
+def finance_giving_save(body: GivingIn, user_id: int = Depends(current_user_id)):
+    return _finance_call(my_finance.save_giving, user_id, body.on, body.mode, body.value, body.causes)
+
+
+@app.delete("/api/finance/giving")
+def finance_giving_clear(user_id: int = Depends(current_user_id)):
+    return _finance_call(my_finance.clear_giving, user_id)
+
+
+@app.post("/api/finance/goals")
+def finance_goal_add(body: GoalIn, user_id: int = Depends(current_user_id)):
+    return _finance_call(my_finance.add_goal, user_id, body.name, body.target, body.target_date, body.saved)
+
+
+@app.put("/api/finance/goals/{goal_id}")
+def finance_goal_update(goal_id: int, body: GoalIn, user_id: int = Depends(current_user_id)):
+    return _finance_call(my_finance.update_goal, user_id, goal_id, body.name, body.target, body.target_date, body.saved)
+
+
+@app.delete("/api/finance/goals/{goal_id}")
+def finance_goal_delete(goal_id: int, user_id: int = Depends(current_user_id)):
+    return _finance_call(my_finance.delete_goal, user_id, goal_id)
+
+
+class WishIn(BaseModel):
+    kind: str = Field(max_length=10)                       # "stock" or "item"
+    name: str = Field(max_length=200)                      # the stock's symbol, or what the thing is
+    category: Optional[str] = Field(default=None, max_length=20)
+    amount: Optional[float] = None                         # a stock's budget (optional) or the thing's cost
+    want_by: Optional[str] = Field(default=None, max_length=10)
+    loan: bool = False
+    loan_years: Optional[int] = None
+
+
+def _wish_args(b):
+    return (b.kind, b.name, b.category, b.amount, b.want_by, b.loan, b.loan_years)
+
+
+@app.post("/api/finance/wishlist")
+def finance_wish_add(body: WishIn, user_id: int = Depends(current_user_id)):
+    return _finance_call(my_finance.add_wish, user_id, *_wish_args(body))
+
+
+@app.put("/api/finance/wishlist/{wish_id}")
+def finance_wish_update(wish_id: int, body: WishIn, user_id: int = Depends(current_user_id)):
+    return _finance_call(my_finance.update_wish, user_id, wish_id, *_wish_args(body))
+
+
+@app.delete("/api/finance/wishlist/{wish_id}")
+def finance_wish_delete(wish_id: int, user_id: int = Depends(current_user_id)):
+    return _finance_call(my_finance.delete_wish, user_id, wish_id)
+
+
+@app.get("/api/finance/wishlist-stocks")
+def finance_wish_stocks(request: Request, user_id: int = Depends(current_user_id)):
+    """What our data says about each stock on the wishlist; the model's signal only on plans with stock prediction."""
+    def read(uid):
+        try:
+            holdings = portfolio.list_holdings(uid)
+        except Exception:
+            holdings = []
+        return my_finance.wishlist_stocks(uid, "stock_prediction" in _plan_features(request), holdings)
+    return _finance_call(read, user_id)
 
 
 @app.get("/api/portfolio/history")
@@ -2970,13 +3159,24 @@ def _xlsx(data: bytes, filename: str):
 
 @app.get("/api/account/export")
 def export_my_data(user_id: int = Depends(current_user_id)):
-    """Your Portfolio and Transactions as one Excel file."""
+    """Your Portfolio, Transactions, Other money and Your personal finance as one Excel file."""
     try:
         import exports
         user = auth.get_user(user_id)
         holdings = portfolio.list_holdings(user_id)
+        try:
+            other = my_money.list_items(user_id)
+        except Exception:
+            log.exception("Other money for the Excel download failed")
+            other = None
+        try:
+            finance = my_finance.get_all(user_id)
+        except Exception:
+            log.exception("Your personal finance for the Excel download failed")
+            finance = None
         data = exports.my_data_workbook((user or {}).get("email", ""), holdings, portfolio.summarize(holdings),
-                                        portfolio.list_transactions(user_id), portfolio.transaction_summary(user_id))
+                                        portfolio.list_transactions(user_id), portfolio.transaction_summary(user_id),
+                                        other_money=other, finance=finance)
     except Exception:
         log.exception("Making the Excel download failed")
         return agent_error(500, "Something went wrong making your file. Please try again.")

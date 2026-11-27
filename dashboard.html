@@ -88,46 +88,46 @@ body{background:var(--bg0);color:var(--t1);font-family:var(--sans);min-height:10
 .g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
 .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;align-items:start;}
 .g2{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:14px;align-items:start;}
-:is(#page-market,#page-home) .g2{align-items:stretch;} /* Market tab: side-by-side cards always the same height, no gaps */
-:is(#page-market,#page-home) .g2>.card{display:flex;flex-direction:column;}
-:is(#page-market,#page-home) .g2>.card>.gauge{flex:1 1 auto;justify-content:center;} /* sentiment gauge centred in its card */
+:is(#page-market,#page-home,#page-news) .g2{align-items:stretch;} /* Market tab: side-by-side cards always the same height, no gaps */
+:is(#page-market,#page-home,#page-news) .g2>.card{display:flex;flex-direction:column;}
+:is(#page-market,#page-home,#page-news) .g2>.card>.gauge{flex:1 1 auto;justify-content:center;} /* sentiment gauge centred in its card */
 .chbox{position:relative;flex:1 1 auto;min-height:var(--chmin,190px);} /* chart grows to fill its card - no blank space */
 .chbox>canvas{position:absolute;inset:0;}
 /* ═══ MARKET TAB — 3-per-row chart grid ═══ */
-:is(#page-market,#page-home) .g3{align-items:stretch;}
-:is(#page-market,#page-home) .g3>.card{display:flex;flex-direction:column;min-width:0;}
-:is(#page-market,#page-home) .g3>.card.span2{grid-column:span 2;}
-:is(#page-market,#page-home) .g3>.card.span3{grid-column:1/-1;}
-:is(#page-market,#page-home) .g3>.card>.gauge{flex:1 1 auto;justify-content:center;}
-:is(#page-market,#page-home) .gltable td{padding:8px 10px;}
-:is(#page-market,#page-home) .gltable th{padding:8px 10px;}
-@media(max-width:1200px){:is(#page-market,#page-home) .g3{grid-template-columns:repeat(2,1fr);}:is(#page-market,#page-home) .g3>.card.span2{grid-column:1/-1;}}
-@media(max-width:760px){:is(#page-market,#page-home) .g3,:is(#page-market,#page-home) .g2,:is(#page-market,#page-home) .g4{grid-template-columns:1fr;}:is(#page-market,#page-home) .g3>.card.span2{grid-column:auto;}}
+:is(#page-market,#page-home,#page-news) .g3{align-items:stretch;}
+:is(#page-market,#page-home,#page-news) .g3>.card{display:flex;flex-direction:column;min-width:0;}
+:is(#page-market,#page-home,#page-news) .g3>.card.span2{grid-column:span 2;}
+:is(#page-market,#page-home,#page-news) .g3>.card.span3{grid-column:1/-1;}
+:is(#page-market,#page-home,#page-news) .g3>.card>.gauge{flex:1 1 auto;justify-content:center;}
+:is(#page-market,#page-home,#page-news) .gltable td{padding:8px 10px;}
+:is(#page-market,#page-home,#page-news) .gltable th{padding:8px 10px;}
+@media(max-width:1200px){:is(#page-market,#page-home,#page-news) .g3{grid-template-columns:repeat(2,1fr);}:is(#page-market,#page-home,#page-news) .g3>.card.span2{grid-column:1/-1;}}
+@media(max-width:760px){:is(#page-market,#page-home,#page-news) .g3,:is(#page-market,#page-home,#page-news) .g2,:is(#page-market,#page-home,#page-news) .g4{grid-template-columns:1fr;}:is(#page-market,#page-home,#page-news) .g3>.card.span2{grid-column:auto;}}
 
 /* ═══ MARKET TAB — monochrome: white text, green = up/profit, red = down/loss, no glow ═══ */
-:is(#page-market,#page-home){--cyan:#ffffff;--blue:#ffffff;--yellow:#ffffff;--purple:#ffffff;--orange:#ffffff;--pink:#ffffff;--mline:#4a4f63;}
-:is(#page-market,#page-home) *{box-shadow:none!important;text-shadow:none!important;}
-:is(#page-market,#page-home) .ctitle::before,:is(#page-market,#page-home) .stitle::before{background:#00d4ff;} /* heading bars: original cyan */
-:is(#page-market,#page-home) .sc:not([style*="--green"]):not([style*="--red"]){border-top-color:var(--mline)!important;}
-:is(#page-market,#page-home) .ic{border-left-color:var(--mline)!important;}
-:is(#page-market,#page-home) .info-note{border-left-color:var(--mline);}
-:is(#page-market,#page-home) .badge:not(.ai-wrap *){background:transparent!important;color:var(--t2)!important;border:1px solid var(--mline)!important;}
-:is(#page-market,#page-home) .pgbtn:hover,:is(#page-market,#page-home) .pgbtn.on,:is(#page-market,#page-home) .fbtn:hover,:is(#page-market,#page-home) .fbtn.on,:is(#page-market,#page-home) .ai-risk-btn.on{background:#fff;color:#000;border-color:#fff;}
-:is(#page-market,#page-home) .btnp{background:transparent;color:var(--t1);border:1px solid var(--mline);}
-:is(#page-market,#page-home) .btnp:hover{background:#fff;color:#000;}
-:is(#page-market,#page-home) .stab.on{color:var(--t1);}
-:is(#page-market,#page-home) .srch:focus,:is(#page-market,#page-home) .sel:focus,:is(#page-market,#page-home) .ai-input:focus{border-color:var(--mline);}
-:is(#page-market,#page-home) .ai-wrap{--cyan:#00d4ff;--blue:#4f8ef7;--yellow:#ffc800;--purple:#a55eea;--orange:#ff6b35;} /* AI Stock Finder keeps its original colours */
-:is(#page-market,#page-home) .gbar{background:linear-gradient(90deg,#ff4444,#8a8fa0,#00e676);}
-:is(#page-market,#page-home) .news-card:hover{border-color:var(--mline);}
-:is(#page-market,#page-home) .news-card-source{color:var(--t2);}
-:is(#page-market,#page-home) .news-card-cat{background:transparent!important;color:var(--t3)!important;border:1px solid var(--b2);}
-:is(#page-market,#page-home) .news-card-img-placeholder{filter:grayscale(1);}
-:is(#page-market,#page-home) .mlogo{width:20px;height:20px;border-radius:50%;background:#fff;object-fit:contain;padding:2px;vertical-align:middle;margin-right:7px;flex-shrink:0;}
-:is(#page-market,#page-home) .mlogo-l{width:20px;height:20px;border-radius:50%;background:var(--bg4);border:1px solid var(--b2);color:var(--t1);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;vertical-align:middle;margin-right:7px;flex-shrink:0;}
-:is(#page-market,#page-home) td.sym{white-space:nowrap;}
-:is(#page-market,#page-home) .disclaimer{background:var(--bg2)!important;border-color:var(--b1)!important;color:var(--t3)!important;}
-:is(#page-market,#page-home) #heatmap-wrap,:is(#page-market,#page-home) #h-heatmap-wrap{flex:1 1 auto;grid-auto-rows:1fr;} /* tiles stretch to fill the card - no blank space */
+:is(#page-market,#page-home,#page-news){--cyan:#ffffff;--blue:#ffffff;--yellow:#ffffff;--purple:#ffffff;--orange:#ffffff;--pink:#ffffff;--mline:#4a4f63;}
+:is(#page-market,#page-home,#page-news) *{box-shadow:none!important;text-shadow:none!important;}
+:is(#page-market,#page-home,#page-news) .ctitle::before,:is(#page-market,#page-home,#page-news) .stitle::before{background:#00d4ff;} /* heading bars: original cyan */
+:is(#page-market,#page-home,#page-news) .sc:not([style*="--green"]):not([style*="--red"]){border-top-color:var(--mline)!important;}
+:is(#page-market,#page-home,#page-news) .ic{border-left-color:var(--mline)!important;}
+:is(#page-market,#page-home,#page-news) .info-note{border-left-color:var(--mline);}
+:is(#page-market,#page-home,#page-news) .badge:not(.ai-wrap *){background:transparent!important;color:var(--t2)!important;border:1px solid var(--mline)!important;}
+:is(#page-market,#page-home,#page-news) .pgbtn:hover,:is(#page-market,#page-home,#page-news) .pgbtn.on,:is(#page-market,#page-home,#page-news) .fbtn:hover,:is(#page-market,#page-home,#page-news) .fbtn.on,:is(#page-market,#page-home,#page-news) .ai-risk-btn.on{background:#fff;color:#000;border-color:#fff;}
+:is(#page-market,#page-home,#page-news) .btnp{background:transparent;color:var(--t1);border:1px solid var(--mline);}
+:is(#page-market,#page-home,#page-news) .btnp:hover{background:#fff;color:#000;}
+:is(#page-market,#page-home,#page-news) .stab.on{color:var(--t1);}
+:is(#page-market,#page-home,#page-news) .srch:focus,:is(#page-market,#page-home,#page-news) .sel:focus,:is(#page-market,#page-home,#page-news) .ai-input:focus{border-color:var(--mline);}
+:is(#page-market,#page-home,#page-news) .ai-wrap{--cyan:#00d4ff;--blue:#4f8ef7;--yellow:#ffc800;--purple:#a55eea;--orange:#ff6b35;} /* AI Stock Finder keeps its original colours */
+:is(#page-market,#page-home,#page-news) .gbar{background:linear-gradient(90deg,#ff4444,#8a8fa0,#00e676);}
+:is(#page-market,#page-home,#page-news) .news-card:hover{border-color:var(--mline);}
+:is(#page-market,#page-home,#page-news) .news-card-source{color:var(--t2);}
+:is(#page-market,#page-home,#page-news) .news-card-cat{background:transparent!important;color:var(--t3)!important;border:1px solid var(--b2);}
+:is(#page-market,#page-home,#page-news) .news-card-img-placeholder{filter:grayscale(1);}
+:is(#page-market,#page-home,#page-news) .mlogo{width:20px;height:20px;border-radius:50%;background:#fff;object-fit:contain;padding:2px;vertical-align:middle;margin-right:7px;flex-shrink:0;}
+:is(#page-market,#page-home,#page-news) .mlogo-l{width:20px;height:20px;border-radius:50%;background:var(--bg4);border:1px solid var(--b2);color:var(--t1);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;vertical-align:middle;margin-right:7px;flex-shrink:0;}
+:is(#page-market,#page-home,#page-news) td.sym{white-space:nowrap;}
+:is(#page-market,#page-home,#page-news) .disclaimer{background:var(--bg2)!important;border-color:var(--b1)!important;color:var(--t3)!important;}
+:is(#page-market,#page-home,#page-news) #heatmap-wrap,:is(#page-market,#page-home,#page-news) #h-heatmap-wrap{flex:1 1 auto;grid-auto-rows:1fr;} /* tiles stretch to fill the card - no blank space */
 .txrow{align-items:stretch;} /* Transactions: cards in a row share one height, no gaps */
 .g31{display:grid;grid-template-columns:3fr 1fr;gap:12px;margin-bottom:16px;align-items:start;}
 
@@ -237,6 +237,12 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 .pgbtn{background:var(--bg3);border:1px solid var(--b1);border-radius:6px;padding:5px 11px;color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;transition:all 0.12s;}
 .pgbtn:hover,.pgbtn.on{background:var(--blue);color:#fff;border-color:var(--blue);}
 .pginfo{font-size:12px;font-weight:600;color:var(--t3);}
+.pgbtn:disabled{opacity:.4;cursor:default;background:var(--bg3);color:var(--t2);border-color:var(--b1);}
+.tpg{justify-content:space-between;}
+.tpg .pginfo:first-child{margin-right:auto;}
+.tpg-size{display:inline-flex;align-items:center;gap:4px;margin-left:12px;}
+.tpg-size .pgbtn{padding:4px 8px;}
+@media(max-width:600px){.tpg{justify-content:center;}.tpg .pginfo:first-child{width:100%;text-align:center;margin:0 0 4px;}.tpg-size{margin-left:0;}}
 
 .load{display:flex;align-items:center;justify-content:center;padding:32px;color:var(--t3);font-size:13px;font-weight:600;gap:10px;}
 .spin{width:18px;height:18px;border:2px solid var(--b2);border-top-color:var(--blue);border-radius:50%;animation:spin 0.8s linear infinite;}
@@ -614,8 +620,14 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
     <button class="ntab" id="ntab-watchlist" onclick="showPage('watchlist',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.1 8.3 22 9.3 17 14.1 18.2 21 12 17.8 5.8 21 7 14.1 2 9.3 8.9 8.3 12 2"/></svg></span><span class="lbl">Watchlist</span></button>
     <button class="ntab" id="ntab-commodities" data-feature="commodities" onclick="showPage('commodities',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg></span><span class="lbl" data-short="Commod.">Commodities</span></button>
     <button class="ntab" id="ntab-learn" data-feature="learn" onclick="showPage('learn',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/></svg></span><span class="lbl">Learn</span></button>
+    <button class="ntab" id="ntab-news" onclick="showPage('news',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h13a1 1 0 0 1 1 1v14a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2z"/><path d="M18 9h2a1 1 0 0 1 1 1v9a2 2 0 0 1-2 2"/><path d="M8 8h6"/><path d="M8 12h6"/><path d="M8 16h4"/></svg></span><span class="lbl">News</span></button>
     <button class="ntab" id="ntab-portfolio" data-feature="portfolio_view" onclick="showPage('portfolio',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg></span><span class="lbl">Portfolio</span></button>
     <button class="ntab" id="ntab-transactions" data-feature="portfolio_view" onclick="showPage('transactions',this)"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span><span class="lbl" data-short="Trades">Transactions</span></button>
+    <button class="ntab ntab-more" id="ntab-more" type="button" onclick="toggleMoreTabs(event)" aria-haspopup="true" aria-expanded="false"><span class="ico"><svg class="lic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></span><span class="lbl">More</span></button>
+  </div>
+  <div class="more-menu" id="more-menu" hidden role="menu">
+    <button type="button" role="menuitem" id="more-learn" onclick="moreGo('learn')"></button>
+    <button type="button" role="menuitem" id="more-news" onclick="moreGo('news')"></button>
   </div>
   <div class="nav-r">
     <button id="nt-bell" class="nt-bell" onclick="ntToggleBell(event)" title="Notifications"><svg class="lic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span id="nt-badge" class="nt-badge" style="display:none">0</span></button>
@@ -1105,9 +1117,27 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <div class="kseg" role="group" aria-label="Break down by"><button class="kseg-b on" type="button" data-by="sector" onclick="setAllocBy('sector')">By sector</button><button class="kseg-b" type="button" data-by="type" onclick="setAllocBy('type')">By type</button></div></div>
       <div id="sec-alloc"><div class="load"><div class="spin"></div></div></div></div>
   </div>
-  <div class="card" style="margin-bottom:16px">
+  <div class="g2 pf-row2">
+  <div class="card pf-pnl-card">
     <div class="chdr"><div class="ctitle">P&L Per Holding</div><div class="pnl-key"><span class="pk-st"></span>Stocks<span class="pk-co"></span>Commodities</div></div>
-    <div style="height:190px"><canvas id="pnl-c"></canvas></div>
+    <div class="pf-pnl-box"><canvas id="pnl-c"></canvas></div>
+  </div>
+  <div class="card" id="money-card">
+    <div class="chdr"><div class="ctitle">Where your money is</div><div class="money-btns"><button class="btn money-add" type="button" id="money-edit-btn" onclick="toggleMoneyEdit()" hidden>Edit</button><button class="btn btnp money-add" type="button" id="money-add-btn" onclick="openMoneyForm()">+ Add</button></div></div>
+    <div class="money-wrap">
+      <div class="money-donut" id="money-donut"><canvas id="money-c"></canvas><div class="money-mid"><div class="money-total" id="money-total">$--</div><div class="money-cap">Total</div></div></div>
+      <div class="money-legend" id="money-legend"><div class="load"><div class="spin"></div>Loading...</div></div>
+    </div>
+    <div class="money-form" id="money-form" hidden>
+      <div><label class="flbl" for="money-kind">What is it?</label><select class="finp" id="money-kind"></select></div>
+      <div><label class="flbl" for="money-name">Name (optional)</label><input class="finp" id="money-name" maxlength="80" placeholder="e.g. Barclays savings"/></div>
+      <div><label class="flbl" for="money-amt">Amount (US$)</label><input class="finp" type="number" id="money-amt" min="0" step="any" placeholder="5000"/></div>
+      <div class="money-form-btns"><button class="btn btnp" type="button" id="money-save" onclick="saveMoney()">Add</button><button class="btn" type="button" onclick="closeMoneyForm()">Cancel</button></div>
+    </div>
+    <div id="money-msg" class="money-msg"></div>
+    <div class="money-items" id="money-items" hidden></div>
+    <div class="peer-legend">Stocks and commodities come from your Transactions. Add savings, deposits, property and more yourself, in US$. Only you can see them.</div>
+  </div>
   </div>
   <div class="card" style="margin-bottom:16px">
     <div class="stitle">Holdings</div>
@@ -1120,6 +1150,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <thead><tr><th>Ticker</th><th>Company</th><th>Type</th><th>Sector</th><th>Qty</th><th>Avg Buy</th><th>Current</th><th>Invested</th><th>Value</th><th>P&L $</th><th>P&L %</th><th>Day %</th><th>Analyst</th><th title="The prediction model's price for 3 months from now">3M Target</th></tr></thead>
       <tbody id="tb-pf"><tr><td colspan="14"><div class="load"><div class="spin"></div></div></td></tr></tbody>
     </table></div>
+    <div class="pgn tpg" id="pf-pgn"></div>
   </div>
   <div class="info-note pf-from-tx">Your holdings come from your transactions. To buy or sell, add it on the <button class="linkbtn" type="button" onclick="goTab('transactions')">Transactions tab</button> and it shows up here automatically.</div>
 
@@ -1146,7 +1177,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
   <div class="card" style="margin-bottom:16px">
     <div class="stitle">Transactions</div>
     <div class="toolbar">
-      <input class="srch" style="width:200px" placeholder="Search..." id="tx-srch" oninput="renderTx()"/>
+      <input class="srch" style="width:200px" placeholder="Search..." id="tx-srch" oninput="txPg=1;renderTx()"/>
       <button class="fbtn on" onclick="setTxF('all',this)">All</button>
       <button class="fbtn" onclick="setTxF('BUY',this)">Buy</button>
       <button class="fbtn" onclick="setTxF('SELL',this)">Sell</button>
@@ -1160,6 +1191,7 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
       <thead><tr><th>Date</th><th>Ticker</th><th>Company</th><th>Stock / commodity</th><th>Type</th><th>Qty</th><th>Price</th><th>Total</th><th>Notes</th><th></th></tr></thead>
       <tbody id="tb-tx"><tr><td colspan="10"><div class="load"><div class="spin"></div></div></td></tr></tbody>
     </table></div>
+    <div class="pgn tpg" id="tx-pgn"></div>
   </div>
   <div class="card" id="tx-form-card" data-feature="portfolio_mgt">
     <div class="stitle" id="tx-form-title">Add Transaction</div>
@@ -1186,6 +1218,141 @@ tbody td{padding:10px 12px;white-space:nowrap;font-weight:500;}
 </div>
 
 <!-- ═══════════ COMMODITIES PAGE ═══════════ -->
+<!-- ═══ YOUR PERSONAL FINANCE (profile menu): questions on the left, answers on the right; tips only when asked (my_finance.py) ═══ -->
+<div class="page" id="page-finance">
+  <div class="fin-head">
+    <h2 class="fin-h">Your personal finance</h2>
+    <p class="fin-sub">Answer the questions in each section and the answers update as you type. Press Analysis for a closer look. Amounts in US dollars. General guidance, not financial advice.</p>
+  </div>
+  <div class="fin-kpis" id="fin-kpis"></div>
+  <div class="fin-tabs" role="tablist" aria-label="Your personal finance sections">
+    <button class="fin-tab on" type="button" role="tab" data-t="monthly" onclick="finTab('monthly')">Monthly money</button>
+    <button class="fin-tab" type="button" role="tab" data-t="invest" onclick="finTab('invest')">Investments</button>
+    <button class="fin-tab" type="button" role="tab" data-t="goals" onclick="finTab('goals')">Goals</button>
+    <button class="fin-tab" type="button" role="tab" data-t="wish" onclick="finTab('wish')">Wishlist</button>
+    <button class="fin-tab" type="button" role="tab" data-t="give" onclick="finTab('give')">Donations</button>
+    <button class="fin-tab" type="button" role="tab" data-t="calc" onclick="finTab('calc')">Calculators</button>
+  </div>
+  <div class="fin-msg" id="fin-msg" role="status" aria-live="polite"></div>
+
+  <!-- 1 Monthly money -->
+  <section class="fin-panel on" id="fin-p-monthly" role="tabpanel">
+    <div class="card fin-q"><div class="chdr"><div class="ctitle">Questions</div><div class="fin-acts" id="fm-acts"></div></div><div id="fm-body"></div></div>
+    <div class="card fin-a"><div class="chdr"><div class="ctitle">Your answer</div><button class="fin-sugg" type="button" data-s="monthly" onclick="finSuggest('monthly')">Analysis</button></div>
+      <div id="fm-ans"></div><div class="fin-tips" id="fin-tips-monthly" hidden></div></div>
+  </section>
+
+  <!-- 2 Investments -->
+  <section class="fin-panel" id="fin-p-invest" role="tabpanel">
+    <div class="card fin-q"><div class="chdr"><div class="ctitle">What you own</div><button class="btn btnp fin-sbtn" type="button" onclick="finInvForm()">+ Add</button></div>
+      <div id="fi-body"></div>
+      <div class="fin-form" id="fi-form" hidden>
+        <label class="fin-fl">Type<select class="sel" id="fi-kind"></select></label>
+        <label class="fin-fl">Name <small>(optional)</small><input class="srch" id="fi-name" maxlength="80" placeholder="e.g. HSBC savings"></label>
+        <label class="fin-fl">Amount ($)<input class="srch" id="fi-amt" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 5000"></label>
+        <div class="fin-fbtns"><button class="btn btnp" type="button" id="fi-save" onclick="finInvSave()">Add</button><button class="btn" type="button" onclick="finInvClose()">Cancel</button></div>
+      </div>
+      <p class="fin-note">The same items as “Where your money is” on the Portfolio page: add them once, they show in both. Shares and commodities come from your Transactions.</p>
+    </div>
+    <div class="card fin-a"><div class="chdr"><div class="ctitle">Your answer</div><button class="fin-sugg" type="button" data-s="invest" onclick="finSuggest('invest')">Analysis</button></div>
+      <div id="fi-ans"></div><div class="fin-tips" id="fin-tips-invest" hidden></div></div>
+  </section>
+
+  <!-- 3 Goals -->
+  <section class="fin-panel" id="fin-p-goals" role="tabpanel">
+    <div class="card fin-q"><div class="chdr"><div class="ctitle" id="fg-title">Add a goal</div></div>
+      <div class="fin-form fin-form-open">
+        <label class="fin-fl">What is it for?<input class="srch" id="fg-name" maxlength="80" placeholder="e.g. Car, Home deposit, Holiday" oninput="finRenderGoals()"></label>
+        <label class="fin-fl">How much does it cost? ($)<input class="srch" id="fg-target" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 25000" oninput="finRenderGoals()"></label>
+        <label class="fin-fl">By when?<input class="srch" id="fg-date" type="month" oninput="finRenderGoals()"></label>
+        <label class="fin-fl">Already saved for it ($)<input class="srch" id="fg-saved" type="number" min="0" step="any" inputmode="decimal" placeholder="0" oninput="finRenderGoals()"></label>
+        <div class="fin-preview" id="fg-preview"></div>
+        <div class="fin-fbtns"><button class="btn btnp" type="button" id="fg-save" onclick="finGoalSave()">Save goal</button><button class="btn" type="button" id="fg-cancel" hidden onclick="finGoalReset()">Cancel</button></div>
+      </div>
+    </div>
+    <div class="card fin-a"><div class="chdr"><div class="ctitle">Your goals</div><button class="fin-sugg" type="button" data-s="goals" onclick="finSuggest('goals')">Analysis</button></div>
+      <div id="fg-list"></div><div class="fin-tips" id="fin-tips-goals" hidden></div></div>
+  </section>
+
+  <!-- 4 Wishlist: stocks to buy, and things to buy (maybe with a loan) -->
+  <section class="fin-panel fin-wish" id="fin-p-wish" role="tabpanel">
+    <div class="fin-sub2" role="group" aria-label="Wishlist part">
+      <button type="button" class="on" data-w="stock" onclick="finWishPart('stock')">Stocks to buy</button>
+      <button type="button" data-w="item" onclick="finWishPart('item')">Things to buy &amp; loans</button>
+    </div>
+    <div class="fin-wgrid" id="fw-stock">
+      <div class="card fin-q"><div class="chdr"><div class="ctitle" id="fws-title">Add a stock</div></div>
+        <div class="fin-form fin-form-open">
+          <label class="fin-fl">Which stock?<span class="fin-ac"><input class="srch" id="fws-t" maxlength="40" autocomplete="off" placeholder="Type a name or symbol, e.g. Apple" oninput="finStockSearch()" onkeydown="if(event.key==='Enter'){event.preventDefault();finWishStockSave();}"><span class="fin-acbox" id="fws-ac" hidden></span></span></label>
+          <label class="fin-fl">Budget ($) <small>(optional)</small><input class="srch" id="fws-b" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 2000"></label>
+          <div class="fin-fbtns"><button class="btn btnp" type="button" id="fws-save" onclick="finWishStockSave()">Add to wishlist</button><button class="btn" type="button" id="fws-cancel" hidden onclick="finWishStockReset()">Cancel</button></div>
+        </div>
+        <p class="fin-note">For each stock we look at the data we collect every day (price, 1-year range, trend, valuation, analysts, results date and, on plans with predictions, our model) and say what it shows. It is not a recommendation to buy.</p>
+      </div>
+      <div class="card fin-a"><div class="chdr"><div class="ctitle">What our data says</div><button class="fin-sugg" type="button" data-s="wstock" onclick="finSuggest('wstock')">Analysis</button></div>
+        <div id="fws-list"></div><div class="fin-tips" id="fin-tips-wstock" hidden></div></div>
+    </div>
+    <div class="fin-wgrid" id="fw-item" hidden>
+      <div class="card fin-q"><div class="chdr"><div class="ctitle" id="fwi-title">Add something to buy</div></div>
+        <div class="fin-form fin-form-open">
+          <label class="fin-fl">What is your monthly income? ($) <small>(after tax; the same answer as in Monthly money)</small><input class="srch" id="fwi-inc" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 5000"></label>
+          <label class="fin-fl">What is it?<input class="srch" id="fwi-n" maxlength="80" placeholder="e.g. Car, Laptop, Flat deposit"></label>
+          <label class="fin-fl">What kind?<select class="sel" id="fwi-c" onchange="finWishItemPreview()"><option value="car">Car or vehicle</option><option value="home">Home</option><option value="education">Education</option><option value="other">Something else</option></select></label>
+          <label class="fin-fl">How much does it cost? ($)<input class="srch" id="fwi-a" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 25000" oninput="finWishItemPreview()"></label>
+          <label class="fin-fl">When would you like it? <small>(optional)</small><input class="srch" id="fwi-d" type="month"></label>
+          <label class="fin-fl fin-fl-row"><span>Thinking of a loan for it?</span><span class="fin-sw"><input type="checkbox" id="fwi-l" onchange="finWishItemPreview()"><i></i><em id="fwi-ll">No</em></span></label>
+          <label class="fin-fl" id="fwi-yw" hidden>Loan length in years <small>(optional, the usual length is used if empty)</small><input class="srch" id="fwi-y" type="number" min="1" max="40" step="1" inputmode="numeric" placeholder="e.g. 5"></label>
+          <div class="fin-fbtns"><button class="btn btnp" type="button" id="fwi-save" onclick="finWishItemSave()">Add to wishlist</button><button class="btn" type="button" id="fwi-cancel" hidden onclick="finWishItemReset()">Cancel</button></div>
+        </div>
+      </div>
+      <div class="card fin-a"><div class="chdr"><div class="ctitle">Saving or a loan</div><button class="fin-sugg" type="button" data-s="witem" onclick="finSuggest('witem')">Analysis</button></div>
+        <div id="fwi-list"></div><div class="fin-tips" id="fin-tips-witem" hidden></div></div>
+    </div>
+  </section>
+
+  <!-- 5 Donations (optional) -->
+  <section class="fin-panel" id="fin-p-give" role="tabpanel">
+    <div class="card fin-q"><div class="chdr"><div class="ctitle">Questions</div><div class="fin-acts" id="fd-acts"></div></div><div id="fd-body"></div></div>
+    <div class="card fin-a"><div class="chdr"><div class="ctitle">Your answer</div><button class="fin-sugg" type="button" data-s="give" onclick="finSuggest('give')">Analysis</button></div>
+      <div id="fd-ans"></div><div class="fin-tips" id="fin-tips-give" hidden></div></div>
+  </section>
+
+  <!-- 6 Calculators: anyone can use them; nothing is saved -->
+  <section class="fin-panel" id="fin-p-calc" role="tabpanel">
+    <div class="card">
+      <div class="chdr"><div class="ctitle">Calculators</div><span class="fin-mini">Nothing here is saved</span></div>
+      <div class="fin-calcs" id="fc-pick"></div>
+      <div class="fin-calc-grid"><div id="fc-in"></div><div class="fin-calc-out" id="fc-out"></div></div>
+    </div>
+  </section>
+  <p class="fin-foot">General guidance worked out from your own numbers, not financial advice. Your answers are only visible to you, are included in “Download my data”, and are deleted with your account.</p>
+</div>
+
+<!-- ═══ NEWS: headlines from the past 30 days, collected every 30 minutes by the price updater (news_store.py) ═══ -->
+<div class="page" id="page-news">
+  <div class="card">
+    <div class="chdr"><div class="ctitle">News</div><button class="nw-reset" type="button" onclick="nwResetFilters()">Reset filters</button></div>
+    <p class="nw-intro">Headlines from the past 30 days, updated every 30 minutes. Click a story to read it on the publisher's website.</p>
+    <div class="nw-bar">
+      <input class="srch nw-q" id="nw-q" type="search" placeholder="Search headlines" maxlength="80" oninput="nwSoon()" aria-label="Search headlines">
+      <input class="srch nw-tk" id="nw-tk" type="search" placeholder="Stock, e.g. AAPL" maxlength="10" oninput="nwTickerTyped()" aria-label="News about one stock">
+      <select class="sel nw-cat" id="nw-cat" onchange="nwSaveAndLoad()" aria-label="Category">
+        <option value="">All categories</option><option value="world">World</option><option value="global">Global</option><option value="finance">Finance</option><option value="business">Business</option><option value="economic">Economic</option><option value="tax">Tax</option><option value="retail">Retail</option><option value="tech">Tech</option><option value="crypto">Crypto</option><option value="commodities">Commodities</option><option value="stocks">Stock news</option><option value="entertainment">Entertainment</option><option value="sport">Sport</option>
+      </select>
+      <select class="sel" id="nw-days" onchange="nwSaveAndLoad()" aria-label="Period">
+        <option value="1">Last 24 hours</option><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option>
+      </select>
+      <div class="nw-scope" role="group" aria-label="Which news">
+        <button class="fbtn on" type="button" id="nw-all" onclick="nwSetMine(false)">All news</button>
+        <button class="fbtn" type="button" id="nw-mine" onclick="nwSetMine(true)">My stocks</button>
+      </div>
+    </div>
+    <div class="nw-note" id="nw-note" hidden></div>
+    <div id="nw-list"></div>
+    <div class="nw-more"><button class="fbtn" type="button" id="nw-more" hidden onclick="nwLoad(true)">Load more</button></div>
+  </div>
+</div>
+
 <!-- ═══ LEARN: beginner videos, podcasts and tips (Admin Center → Learn changes them) ═══ -->
 <div class="page" id="page-learn">
   <p class="learn-intro">Short videos, podcasts and practical tips to help you learn how the stock market works. Videos open on YouTube and podcasts in a new tab. Each tip links to the official investor-education page it comes from.</p>
@@ -1781,11 +1948,14 @@ function addAccountMenu(nav){
   prof.innerHTML='<svg class="lic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg><span>Profile and plan</span>';
   const out=document.createElement('a');out.href='/logout';out.className='nsignout';out.setAttribute('role','menuitem');
   out.innerHTML='<svg class="lic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Sign out</span>';
-  menu.appendChild(nm);menu.appendChild(em);menu.appendChild(hr);menu.appendChild(prof);menu.appendChild(out);
+  const fin=document.createElement('button');fin.type='button';fin.className='nmenu-item';fin.id='nprof-finance';fin.setAttribute('role','menuitem');
+  fin.innerHTML='<svg class="lic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M16 15h2"/><path d="M6 6V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/></svg><span>Your personal finance</span>';
+  menu.appendChild(nm);menu.appendChild(em);menu.appendChild(hr);menu.appendChild(prof);menu.appendChild(fin);menu.appendChild(out);
   wrap.appendChild(btn);wrap.appendChild(menu);nav.appendChild(wrap);
   const setOpen=(open)=>{menu.classList.toggle('open',open);btn.setAttribute('aria-expanded',open?'true':'false');};
   btn.addEventListener('click',(e)=>{e.stopPropagation();setOpen(!menu.classList.contains('open'));});
   prof.addEventListener('click',()=>{setOpen(false);openProfile();});
+  fin.addEventListener('click',()=>{setOpen(false);showPage('finance');});
   document.addEventListener('click',(e)=>{if(!wrap.contains(e.target))setOpen(false);});
   document.addEventListener('keydown',(e)=>{if(e.key==='Escape')setOpen(false);});
   return {gear,btn,menu};
@@ -1984,6 +2154,9 @@ function showPage(n,btn){
   if(n==='commodities'){loadCommodities();loadMacro();loadComCo();}
   if(n==='watchlist')loadWatchlist();
   if(n==='learn')loadLearn();
+  if(n==='news')loadNews();
+  if(n==='finance')loadFinance();
+  if(typeof moreTabsState==='function')moreTabsState(n);
   if(n==='profile')loadProfile();
   if(n==='ipos'&&(!ipoFetchedAt||Date.now()-ipoFetchedAt>IPO_REFRESH_MS))loadIPOs();
 }
@@ -3573,6 +3746,799 @@ function renderWorldNews(){
   }).join('')}</div>`;
 }
 
+// ═══ YOUR PERSONAL FINANCE: Monthly money, Investments, Goals, Wishlist, Donations (optional) and Calculators ═══
+// Answers are saved per account (/api/finance); the numbers on the right are worked out here as people type. The Analysis only
+// shows when its button is pressed, and Clear hides it. The calculators work for everyone and save nothing.
+const FIN_Q=[['income','How much comes in each month?','Pay after tax, plus any other income'],['housing','Rent or home loan',''],
+  ['bills','Bills','Power, water, phone, internet'],['food','Food and shopping',''],['transport','Transport','Fuel, fares, car costs'],
+  ['repayments','Loan or card repayments',''],['other_spend','Everything else','Fun, subscriptions, gifts…']];
+const FIN_SPEND=[['housing','Home','#4f8ef7'],['bills','Bills','#06b6d4'],['food','Food','#f5a623'],['transport','Transport','#a855f7'],
+  ['repayments','Repayments','#ff4444'],['other_spend','Other','#7a8ba0']];
+let finData=null,finHold=null,finTabNow='monthly',finEditM=false,finEditG=false,finGoalId=null,finCalc='loan',finOpen={},finLoading=false,finWishNow='stock',finWishStocks=null,finWishSeq=0,finWsOpen=new Set();
+const finN=v=>{const x=parseFloat(v);return isFinite(x)?x:null;};
+const finUsd=v=>v==null||!isFinite(v)?'—':(v<0?'-':'')+'$'+Math.abs(v).toLocaleString('en-US',{maximumFractionDigits:0});
+const finUsd2=v=>v==null||!isFinite(v)?'—':(v<0?'-':'')+'$'+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const finPct=(v,d=0)=>v==null||!isFinite(v)?'—':(+v.toFixed(d)).toString()+'%';          // 1.5% stays, 1.0% shows as 1%
+function finSay(text,ok){const el=document.getElementById('fin-msg');if(!el)return;el.textContent=text||'';el.className='fin-msg'+(text?(ok?' ok':' bad'):'');
+  clearTimeout(finSay.t);if(text&&ok)finSay.t=setTimeout(()=>{el.textContent='';el.className='fin-msg';},4000);}
+async function finSend(method,url,body){
+  try{
+    const res=await fetch(API+url,{method,headers:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
+    let d=null;try{d=await res.json();}catch(e){}
+    if(!res.ok||!d||d.status!=='success'){finSay(apiMessage(d,res),false);return null;}
+    finSay(d.message,true);return d;
+  }catch(e){finSay("Couldn't reach the server. Please try again.",false);return null;}
+}
+const finLocked=()=>typeof can==='function'&&!can('portfolio_view');
+
+async function loadFinance(){
+  finTab(finTabNow,true);
+  if(finLocked()){finRenderAll();return;}
+  if(finLoading)return;finLoading=true;
+  try{
+    const [d,h]=await Promise.all([api('/api/finance'),api('/api/portfolio'),moneyItems===null?loadMoney():null]);
+    if(d&&d.status==='success')finData=d;
+    else if(!finData){finData={monthly:{},has_monthly:false,giving:{on:false},goals:[]};finSay((d&&d.message)||"Couldn't load your answers. Reload to try again.",false);}
+    finHold=Array.isArray(h)?h:(finHold||[]);
+    finEditM=!finData.has_monthly;
+  }finally{finLoading=false;}
+  finRenderAll();
+}
+function finTab(t,quiet){
+  finTabNow=t;
+  document.querySelectorAll('.fin-tab').forEach(b=>{const on=b.dataset.t===t;b.classList.toggle('on',on);b.setAttribute('aria-selected',on);});
+  document.querySelectorAll('.fin-panel').forEach(p=>p.classList.toggle('on',p.id==='fin-p-'+t));
+  if(t==='calc')finRenderCalc();
+  if(!quiet&&t==='invest')finRenderInvest();
+  if(t==='wish'&&finData&&!finLocked()&&finWishStocks===null)finLoadWishStocks();
+}
+function finRenderAll(){
+  if(finLocked()){
+    const box=`<div class="fin-lock">${LOCK_ICON}<div><b>${escapeHtml(lockText('portfolio_view').label)} isn’t part of your plan.</b> ${escapeHtml(lockText('portfolio_view').where)}. The Calculators tab works on every plan.</div><button class="btn btnp" type="button" onclick="seePlans()">See plans</button></div>`;
+    ['monthly','invest','goals','wish','give'].forEach(t=>{document.getElementById('fin-p-'+t).innerHTML=box;});
+    document.getElementById('fin-kpis').innerHTML='';
+    if(finTabNow!=='calc')finTab('calc');
+    return;
+  }
+  if(!finData)return;
+  finRenderMonthly();finRenderInvest();finRenderGoals();finRenderWishItems();finRenderWishStocks();finRenderGive();finRenderKpis();
+  if(finTabNow==='wish'&&finWishStocks===null)finLoadWishStocks();
+}
+
+/* ---- numbers everyone else uses ---- */
+function finMonthlyNow(){                       // the answers being typed (while editing) or the saved ones
+  const m={};
+  if(finEditM&&document.getElementById('fm-income'))FIN_Q.forEach(([k])=>{m[k]=finN(document.getElementById('fm-'+k).value);});
+  else FIN_Q.forEach(([k])=>{m[k]=finData&&finData.monthly?finData.monthly[k]:null;});
+  const spend=FIN_SPEND.reduce((a,[k])=>a+(m[k]||0),0);
+  const ok=m.income!=null&&FIN_SPEND.some(([k])=>m[k]!=null);   // what's saved needs income and at least one spending answer
+  return {m,spend,ok,save:ok?m.income-spend:null,rate:ok&&m.income>0?(m.income-spend)/m.income*100:null};
+}
+function finGiveNow(){                          // the giving plan being typed or the saved one: {on, monthly}
+  let g=finData&&finData.giving||{on:false};
+  if(document.getElementById('fd-on')&&finEditGive)g={on:document.getElementById('fd-on').checked,mode:document.getElementById('fd-mode').value,value:finN(document.getElementById('fd-value').value),causes:document.getElementById('fd-causes').value};
+  if(!g.on)return {on:false,monthly:0,g};
+  const inc=finMonthlyNow().m.income;
+  const monthly=g.mode==='pct'?(inc!=null&&g.value!=null?inc*g.value/100:null):g.value;
+  return {on:true,monthly,g};
+}
+function finSavings(){return (moneyItems||[]).filter(x=>x.kind==='savings').reduce((a,x)=>a+(+x.amount||0),0);}
+function finOwn(){
+  const h=finHold||[],items=moneyItems||[];
+  const st=h.filter(x=>!isCommodity(x)&&x.current_value!=null).reduce((a,x)=>a+(+x.current_value||0),0);
+  const co=h.filter(x=>isCommodity(x)&&x.current_value!=null).reduce((a,x)=>a+(+x.current_value||0),0);
+  const slices=[];if(st>0)slices.push({key:'stocks',label:'Shares',value:st});if(co>0)slices.push({key:'commodities',label:'Commodities',value:co});
+  const by={};items.forEach(m=>{by[m.kind]=(by[m.kind]||0)+(+m.amount||0);});
+  Object.keys(by).forEach(k=>slices.push({key:k,label:moneyKinds[k]||k,value:by[k]}));
+  slices.sort((a,b)=>b.value-a.value);
+  return {shares:st,commod:co,total:slices.reduce((a,x)=>a+x.value,0),slices};
+}
+function finMonthsTo(dateStr){                  // whole months from now until the goal's month (at least 1)
+  const d=new Date(String(dateStr).slice(0,7)+'-01T00:00:00'),n=new Date();
+  return Math.max(1,(d.getFullYear()-n.getFullYear())*12+(d.getMonth()-n.getMonth()));
+}
+function finGoalPlan(){                         // each goal's monthly need, and which ones the monthly saving covers (earliest first)
+  const mm=finMonthlyNow(),gv=finGiveNow();
+  const avail=mm.save!=null?mm.save-(gv.on&&gv.monthly?gv.monthly:0):null;
+  let left=avail;
+  return (finData&&finData.goals||[]).map(g=>{
+    const months=finMonthsTo(g.target_date),rest=Math.max(0,g.target-g.saved),need=rest/months,done=rest<=0;
+    let status=null;
+    if(done)status='done';else if(left!=null){status=need<=left+0.005?'ok':'behind';if(status==='ok')left-=need;}
+    return {...g,months,rest,need,done,status};
+  });
+}
+function finRenderKpis(){
+  const own=finOwn(),mm=finMonthlyNow(),gv=finGiveNow(),plan=finGoalPlan();
+  const ok=plan.filter(g=>g.status==='ok'||g.status==='done').length,known=plan.some(g=>g.status);
+  const k=(l,v,s,c='')=>`<div class="fin-kpi"><div class="fin-kl">${l}</div><div class="fin-kv ${c}">${v}</div><div class="fin-ks">${s}</div></div>`;
+  document.getElementById('fin-kpis').innerHTML=
+    k('What you own',finUsd(own.total),own.total?'shares + savings + other':'add it under Investments')+
+    k('You save each month',mm.ok?finUsd(mm.save):'—',mm.ok?finPct(mm.rate)+' of what comes in':'answer Monthly money',mm.ok?(mm.save>=0?'g':'r'):'')+
+    k('Goals on track',plan.length?(known?`${ok} of ${plan.length}`:String(plan.length)+' goal'+(plan.length>1?'s':'')):'—',plan.length?(known?(ok===plan.length?'all on track':'some need more each month'):'answer Monthly money to check'):'add one under Goals')+
+    (gv.on?k('Giving this year',gv.monthly!=null?finUsd(gv.monthly*12):'—','optional · '+(gv.g.mode==='pct'?finPct(gv.g.value,1)+' of income':'fixed amount')):k('Giving','Off','optional · see Donations'));
+}
+
+/* ---- Analysis: shown only when asked, with Clear to close. An overall line first, then each point and why it matters ---- */
+function finSuggest(sec){finOpen[sec]=true;finTips(sec);}
+function finClearTips(sec){finOpen[sec]=false;const el=document.getElementById('fin-tips-'+sec);if(el){el.hidden=true;el.innerHTML='';}
+  const b=document.querySelector(`.fin-sugg[data-s="${sec}"]`);if(b){b.hidden=false;b.focus();}}
+function finTips(sec){
+  const el=document.getElementById('fin-tips-'+sec),b=document.querySelector(`.fin-sugg[data-s="${sec}"]`);if(!el)return;
+  if(!finOpen[sec]){el.hidden=true;if(b)b.hidden=false;return;}
+  const list={monthly:finTipsMonthly,invest:finTipsInvest,goals:finTipsGoals,give:finTipsGive,wstock:finTipsWishStocks,witem:finTipsWishItems}[sec]();
+  const dot={good:'var(--green)',warn:'#f5a623',bad:'var(--red)',info:'var(--t3)'};
+  el.innerHTML=`<div class="fin-tips-h"><span>Analysis</span><button class="fin-clear" type="button" onclick="finClearTips('${sec}')">Clear</button></div>`+
+    (list.length?`<div class="fin-overall">${finOverall(sec,list)}</div>`+list.map(([t,h,x])=>`<div class="fin-tip"><span class="fin-dot" style="background:${dot[t]}"></span><div><b>${h}</b> ${x}</div></div>`).join(''):'<div class="fin-tip"><div>Nothing to look at yet. Answer the questions first.</div></div>');
+  el.hidden=false;if(b)b.hidden=true;
+}
+/** The first line of an Analysis: how things look overall, from the points below it. */
+function finOverall(sec,list){
+  const bad=list.filter(x=>x[0]==='bad').length,warn=list.filter(x=>x[0]==='warn').length,good=list.filter(x=>x[0]==='good').length;
+  if(!bad&&!warn&&!good)return '<b>Overall:</b> answer the questions above for a fuller picture.';
+  if(sec==='wstock'){
+    const st=(finWishStocks&&finWishStocks.stocks)||[],c=v=>st.filter(x=>x.verdict===v).length;
+    return `<b>Overall:</b> ${[[c('good'),'look good'],[c('wait'),'to wait for'],[c('careful'),'to be careful with']].filter(x=>x[0]).map(x=>`${x[0]} ${x[1]}`).join(', ')||'no data yet'}. This is what the data shows today, not a recommendation to buy.`;
+  }
+  if(bad)return `<b>Overall: needs attention.</b> Start with the ${bad>1?bad+' red points':'red point'} below, then the orange ones.`;
+  if(warn)return `<b>Overall:</b> ${good?`${good} good sign${good>1?'s':''} (green) and `:''}${warn} thing${warn>1?'s':''} worth a closer look (orange).`;
+  return '<b>Overall: in good shape.</b> Keep doing what you are doing.';
+}
+function finTipsMonthly(){
+  const mm=finMonthlyNow(),m=mm.m,out=[];
+  if(!mm.ok)return [['info','Start with what comes in.','Enter your monthly income and spending to see the analysis.']];
+  if(mm.save<0)out.push(['bad','You spend more than comes in.',`You're short by ${finUsd(-mm.save)} a month. Look at the biggest spending colour in the bar first.`]);
+  else if(mm.rate>=20)out.push(['good','Good saving rate.',`You save ${finPct(mm.rate)} of what comes in. Saving 20% or more is a common target.`]);
+  else if(mm.rate>=10)out.push(['warn','A fair saving rate.',`You save ${finPct(mm.rate)}. A common target is 20% (${finUsd(m.income*0.2)} a month).`]);
+  else out.push(['warn','Low saving rate.',`You save ${finPct(mm.rate)}. Even 10% (${finUsd(m.income*0.1)} a month) builds a safety cushion over time.`]);
+  const sav=finSavings();
+  if(mm.spend>0){
+    if(!sav)out.push(['info','Safety money.',`Add your savings under Investments to see how many months of spending they cover. A common aim is 3–6 months (${finUsd(mm.spend*3)}–${finUsd(mm.spend*6)}).`]);
+    else{const mo=sav/mm.spend;
+      if(mo<3)out.push(['warn',`Safety money: ${mo.toFixed(1)} months.`,`Your savings (${finUsd(sav)}) cover ${mo.toFixed(1)} months of spending. A common aim is 3–6 months (${finUsd(mm.spend*3)}–${finUsd(mm.spend*6)}).`]);
+      else if(mo<=12)out.push(['good',`Safety money: ${mo.toFixed(1)} months.`,'Your savings cover at least 3 months of spending.']);
+      else out.push(['info',`Safety money: ${mo.toFixed(0)} months.`,'That is a lot of cash. Money beyond 6–12 months of spending could be put to work for your goals.']);}
+  }
+  if(m.income>0&&m.housing!=null){const p=m.housing/m.income*100;
+    out.push(p>35?['warn',`Home costs ${finPct(p)} of income.`,'That is above the usual 35% limit, which leaves less room to save.']:['good',`Home costs ${finPct(p)} of income.`,'Under the usual 35% limit.']);}
+  if(m.income>0&&m.repayments){const p=m.repayments/m.income*100;
+    if(p>20)out.push(['warn',`Repayments take ${finPct(p)} of income.`,'Paying off the most expensive loan or card first saves the most interest.']);}
+  const gv=finGiveNow();if(gv.on&&gv.monthly)out.push(['info','Giving.',`After your planned giving (${finUsd(gv.monthly)} a month) you save ${finUsd(mm.save-gv.monthly)} a month.`]);
+  return out;
+}
+function finTipsInvest(){
+  const own=finOwn(),out=[],h=(finHold||[]).filter(x=>!isCommodity(x)&&x.current_value>0);
+  if(!own.total)return [['info','Nothing here yet.','Add your savings, deposits or property with + Add, and buy shares in Transactions.']];
+  if(own.shares>0&&h.length){
+    const top=[...h].sort((a,b)=>b.current_value-a.current_value)[0],p=top.current_value/own.shares*100;
+    if(p>40)out.push(['warn',`${finPct(p)} of your shares are in one company (${escapeHtml(top.ticker)}).`,'Spreading across more companies lowers the risk of one bad result.']);
+    const sec={};h.forEach(x=>{const s=x.sector||'Other';sec[s]=(sec[s]||0)+x.current_value;});
+    const [sn,sv]=Object.entries(sec).sort((a,b)=>b[1]-a[1])[0];
+    if(sv/own.shares>0.6&&Object.keys(sec).length>=1&&h.length>1)out.push(['warn',`Most of your shares are in ${escapeHtml(sn)} (${finPct(sv/own.shares*100)}).`,'Other sectors often move differently when one sector falls.']);
+    if(h.length<5)out.push(['info',`You own ${h.length} compan${h.length===1?'y':'ies'}.`,'Owning more companies, or a fund, spreads the risk.']);
+  }
+  const cash=own.slices.filter(s=>s.key==='savings'||s.key==='fd').reduce((a,s)=>a+s.value,0);
+  if(cash/own.total>0.6)out.push(['info',`${finPct(cash/own.total*100)} of your money is cash or deposits.`,'Safe, but it may grow slower than prices rise. Keep your safety money, and think about what the rest is for.']);
+  if(own.slices.length>=4)out.push(['good','A good mix.',`Your money is spread over ${own.slices.length} kinds of assets.`]);
+  else if(own.slices.length<=2)out.push(['warn','Few kinds of assets.','Most of your money is in one or two kinds. A mix behaves better when one kind falls.']);
+  return out;
+}
+function finTipsGoals(){
+  const plan=finGoalPlan(),mm=finMonthlyNow(),gv=finGiveNow(),out=[];
+  if(!plan.length)return [['info','No goals yet.','Add something you are saving for, like a car or a home deposit.']];
+  const need=plan.filter(g=>!g.done).reduce((a,g)=>a+g.need,0);
+  if(!mm.ok)out.push(['info','Answer Monthly money.',`Your goals need ${finUsd(need)} a month. Fill in Monthly money to check whether that fits.`]);
+  else{const avail=mm.save-(gv.on&&gv.monthly?gv.monthly:0);
+    if(need<=avail)out.push(['good','Your goals fit.',`They need ${finUsd(need)} a month and you save ${finUsd(avail)}.`]);
+    else out.push(['warn','Your goals need more than you save.',`They need ${finUsd(need)} a month but you save ${finUsd(avail)}. Push a date back, lower a goal, or save for one at a time.`]);}
+  plan.filter(g=>g.done).forEach(g=>out.push(['good',`${escapeHtml(g.name)}: reached!`,'You have already saved enough for this goal.']));
+  plan.filter(g=>!g.done&&g.months<=6&&g.rest>0).forEach(g=>out.push(['info',`${escapeHtml(g.name)} is soon.`,`Money needed within ${g.months} month${g.months>1?'s':''} is usually best kept in savings rather than shares, whose prices can fall.`]));
+  return out;
+}
+function finTipsGive(){
+  const gv=finGiveNow(),mm=finMonthlyNow(),out=[];
+  if(!gv.on)return [['info','Giving is off.','Donations are optional. Switch it on if you would like to plan regular giving.']];
+  if(gv.monthly==null)return [['info','Answer Monthly money.','Enter what comes in each month to see how much a share of income comes to.']];
+  if(mm.ok){const after=mm.save-gv.monthly;
+    out.push(after>=0?['good','Fits your budget.',`After giving you still save ${finUsd(after)} a month.`]:['warn','More than you save.',`Giving ${finUsd(gv.monthly)} a month leaves you ${finUsd(-after)} short. A smaller amount you can keep up is better than a bigger one you have to stop.`]);
+    if(mm.m.income>0){const p=gv.monthly/mm.m.income*100;out.push(['info',`That is ${finPct(p,1)} of what comes in.`,'Many people give 1–10%. Any amount you can keep up helps.']);}}
+  out.push(['info','Records.','Keep receipts for donations: in many countries gifts to registered charities can reduce your tax.']);
+  return out;
+}
+
+/* ---- 1 Monthly money ---- */
+function finRenderMonthly(){
+  const body=document.getElementById('fm-body'),acts=document.getElementById('fm-acts');if(!body)return;
+  if(finEditM){
+    body.innerHTML=FIN_Q.map(([k,l,h])=>`<label class="fin-qr"><span>${l}${h?`<small>${h}</small>`:''}</span><span class="fin-in"><i>$</i><input id="fm-${k}" type="number" min="0" step="any" inputmode="decimal" placeholder="0" value="${finData.monthly&&finData.monthly[k]!=null?finData.monthly[k]:''}" oninput="finLive()"></span></label>`).join('')+
+      `<div class="fin-fbtns"><button class="btn btnp" type="button" id="fm-save" onclick="finSaveMonthly()">Save answers</button>${finData.has_monthly?'<button class="btn" type="button" onclick="finCancelMonthly()">Cancel</button>':''}</div>`;
+    acts.innerHTML='';
+  }else{
+    body.innerHTML=FIN_Q.map(([k,l])=>`<div class="fin-qr fin-ro"><span>${l}</span><b>${finData.monthly[k]!=null?finUsd2(finData.monthly[k]):'<span class="fin-mini">not answered</span>'}</b></div>`).join('');
+    acts.innerHTML=`<button class="fin-ic" type="button" onclick="finEditMonthly()">Edit</button><button class="fin-ic fin-rm" type="button" onclick="finRemoveMonthly()">Remove</button>`;
+  }
+  finRenderMonthlyAns();
+}
+function finRenderMonthlyAns(){
+  const el=document.getElementById('fm-ans');if(!el)return;
+  const mm=finMonthlyNow(),m=mm.m;
+  if(!mm.ok){el.innerHTML='<div class="fin-empty">Enter how much comes in each month, and your spending, to see what you save.</div>';finTips('monthly');return;}
+  const base=Math.max(m.income,mm.spend)||1;
+  const parts=FIN_SPEND.filter(([k])=>m[k]>0).map(([k,l,c])=>({l,c,v:m[k]}));
+  if(mm.save>0)parts.push({l:'Saved',c:'var(--green)',v:mm.save});
+  el.innerHTML=`<div class="fin-mini">You save each month</div><div class="fin-big ${mm.save>=0?'g':'r'}">${finUsd(mm.save)} <span class="fin-mini">(${finPct(mm.rate)})</span></div>
+    <div class="fin-bar">${parts.map(p=>`<i style="width:${p.v/base*100}%;background:${p.c}" title="${p.l}: ${finUsd(p.v)}"></i>`).join('')}</div>
+    <div class="fin-leg">${parts.map(p=>`<span><b style="background:${p.c}"></b>${p.l} ${m.income>0?finPct(p.v/m.income*100):''}</span>`).join('')}</div>
+    <div class="fin-rows"><div><span>Comes in</span><b>${finUsd(m.income)}</b></div><div><span>Goes out</span><b>${finUsd(mm.spend)}</b></div><div><span>Left over</span><b class="${mm.save>=0?'g':'r'}">${finUsd(mm.save)}</b></div></div>`;
+  finTips('monthly');
+}
+function finLive(){finRenderMonthlyAns();finRenderKpis();finRenderGoals(true);finRenderWishItems();finRenderWishItems();finRenderGiveAns();}
+function finEditMonthly(){finEditM=true;finRenderMonthly();document.getElementById('fm-income')?.focus();}
+function finCancelMonthly(){finEditM=false;finRenderMonthly();finLive();}
+async function finSaveMonthly(){
+  const body={};FIN_Q.forEach(([k])=>{body[k]=finN(document.getElementById('fm-'+k).value);});
+  if(body.income==null){finSay('Enter how much comes in each month.',false);return;}
+  const b=document.getElementById('fm-save');b.disabled=true;
+  const d=await finSend('PUT','/api/finance/monthly',body);b.disabled=false;
+  if(d){finData.monthly=d.monthly;finData.has_monthly=true;finEditM=false;finRenderMonthly();finLive();}
+}
+async function finRemoveMonthly(){
+  if(!confirm('Remove all your Monthly money answers?'))return;
+  const d=await finSend('DELETE','/api/finance/monthly');
+  if(d){FIN_Q.forEach(([k])=>{finData.monthly[k]=null;});finData.has_monthly=false;finEditM=true;finRenderMonthly();finLive();}
+}
+
+/* ---- 2 Investments ---- */
+let finInvId=null,finPieKey='';
+function finRenderInvest(){
+  const body=document.getElementById('fi-body');if(!body||finLocked())return;
+  const own=finOwn(),items=moneyItems||[];
+  const rows=[];
+  if(own.shares>0)rows.push(`<tr><td>Shares</td><td class="fin-mini">from Transactions</td><td class="n">${finUsd(own.shares)}</td><td class="fin-mini">auto</td></tr>`);
+  if(own.commod>0)rows.push(`<tr><td>Commodities</td><td class="fin-mini">from Transactions</td><td class="n">${finUsd(own.commod)}</td><td class="fin-mini">auto</td></tr>`);
+  items.forEach(m=>rows.push(`<tr><td>${escapeHtml(m.name||m.kind_label)}</td><td>${escapeHtml(m.kind_label)}</td><td class="n">${finUsd(m.amount)}</td><td class="fin-rowacts"><button class="fin-ic" type="button" onclick="finInvForm(${m.id})" aria-label="Edit ${escapeHtml(m.name||m.kind_label)}">Edit</button><button class="fin-ic fin-rm" type="button" onclick="finInvDelete(${m.id})" aria-label="Remove ${escapeHtml(m.name||m.kind_label)}">Remove</button></td></tr>`));
+  body.innerHTML=rows.length?`<table class="fin-tbl"><thead><tr><th>Item</th><th>Type</th><th class="n">Value</th><th></th></tr></thead><tbody>${rows.join('')}</tbody>
+    <tfoot><tr><td>Total</td><td></td><td class="n">${finUsd(own.total)}</td><td></td></tr></tfoot></table>`:'<div class="fin-empty">Nothing yet. Press + Add for savings, deposits, property or a pension.</div>';
+  const ans=document.getElementById('fi-ans');
+  if(!own.total){ans.innerHTML='<div class="fin-empty">Add what you own to see how your money is spread.</div>';dc('fin-pie');finPieKey='';finTips('invest');return;}
+  const key=JSON.stringify(own.slices.map(s=>[s.key,Math.round(s.value)]));
+  if(key!==finPieKey||!document.getElementById('fin-pie')){
+    ans.innerHTML=`<div class="fin-piewrap"><div class="fin-pie"><canvas id="fin-pie" aria-label="How your money is spread"></canvas></div>
+      <div class="fin-leg fin-legcol">${own.slices.map(s=>`<span><b style="background:${MONEY_COLORS[s.key]||MONEY_COLORS.other}"></b>${escapeHtml(s.label)} <em>${finPct(s.value/own.total*100)}</em></span>`).join('')}</div></div>`;
+    finPieKey=key;dc('fin-pie');
+    const ctx=document.getElementById('fin-pie').getContext&&document.getElementById('fin-pie').getContext('2d');
+    if(ctx&&typeof Chart!=='undefined')charts['fin-pie']=new Chart(ctx,{type:'doughnut',data:{labels:own.slices.map(s=>s.label),datasets:[{data:own.slices.map(s=>s.value),backgroundColor:own.slices.map(s=>MONEY_COLORS[s.key]||MONEY_COLORS.other),borderColor:'#0d1117',borderWidth:2}]},
+      options:{responsive:true,maintainAspectRatio:false,cutout:'62%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${finUsd(c.raw)} (${finPct(c.raw/own.total*100)})`}}}}});
+  }
+  finTips('invest');
+}
+function finInvForm(id){
+  const f=document.getElementById('fi-form'),sel=document.getElementById('fi-kind');
+  sel.innerHTML=Object.entries(moneyKinds).map(([k,v])=>`<option value="${escapeHtml(k)}">${escapeHtml(v)}</option>`).join('');
+  const m=id?(moneyItems||[]).find(x=>x.id===id):null;finInvId=m?m.id:null;
+  sel.value=m?m.kind:'savings';document.getElementById('fi-name').value=m?m.name:'';document.getElementById('fi-amt').value=m?m.amount:'';
+  document.getElementById('fi-save').textContent=m?'Save':'Add';f.hidden=false;document.getElementById('fi-amt').focus();
+}
+function finInvClose(){document.getElementById('fi-form').hidden=true;finInvId=null;}
+async function finInvSave(){
+  const body={kind:document.getElementById('fi-kind').value,name:document.getElementById('fi-name').value.trim(),amount:parseFloat(document.getElementById('fi-amt').value)};
+  if(!(body.amount>0)){finSay('Enter an amount more than $0.',false);return;}
+  const b=document.getElementById('fi-save');b.disabled=true;
+  const d=await finSend(finInvId?'PUT':'POST',finInvId?`/api/my-money/${encodeURIComponent(finInvId)}`:'/api/my-money',body);b.disabled=false;
+  if(d){finInvClose();await loadMoney();finRenderInvest();finRenderKpis();finTips('monthly');}
+}
+async function finInvDelete(id){
+  const m=(moneyItems||[]).find(x=>x.id===id);if(!m||!confirm(`Remove ${m.name||m.kind_label} (${finUsd(m.amount)})?`))return;
+  const d=await finSend('DELETE',`/api/my-money/${encodeURIComponent(id)}`);
+  if(d){await loadMoney();finRenderInvest();finRenderKpis();finTips('monthly');}
+}
+
+/* ---- 3 Goals ---- */
+function finGoalForm(){return {name:document.getElementById('fg-name').value.trim(),target:finN(document.getElementById('fg-target').value),
+  date:document.getElementById('fg-date').value,saved:finN(document.getElementById('fg-saved').value)||0};}
+function finRenderGoals(listOnly){
+  const list=document.getElementById('fg-list');if(!list||!finData)return;
+  if(!listOnly){                                   // the preview under the form: what this goal needs a month
+    const f=finGoalForm(),pv=document.getElementById('fg-preview');
+    if(f.target>0&&f.date){const months=finMonthsTo(f.date),need=Math.max(0,f.target-f.saved)/months;
+      pv.innerHTML=`Save <b>${finUsd(need)} a month</b> for ${months} month${months>1?'s':''} to reach ${finUsd(f.target)}.`;}
+    else pv.innerHTML='';
+  }
+  const plan=finGoalPlan();
+  list.innerHTML=plan.length?plan.map(g=>{
+    const pct=Math.min(100,g.target?g.saved/g.target*100:0),when=new Date(g.target_date+'T00:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'});
+    const st=g.status==='done'?'<span class="g">Reached</span>':g.status==='ok'?'<span class="g">On track</span>':g.status==='behind'?'<span class="r">Needs more than you save</span>':'';
+    return `<div class="fin-goal"><div class="fin-gh"><span>${escapeHtml(g.name)} <em>· ${when}</em></span><span>${finUsd(g.saved)} / ${finUsd(g.target)}</span></div>
+      <div class="fin-bar"><i style="width:${pct}%;background:${g.status==='behind'?'#f5a623':'var(--green)'}"></i></div>
+      <div class="fin-gf"><span class="fin-mini">${g.done?'Done.':`Save <b>${finUsd(g.need)} a month</b> for ${g.months} month${g.months>1?'s':''}.`} ${st}</span>
+      <span class="fin-rowacts"><button class="fin-ic" type="button" onclick="finGoalEdit(${g.id})">Edit</button><button class="fin-ic fin-rm" type="button" onclick="finGoalDelete(${g.id})">Remove</button></span></div></div>`;
+  }).join(''):'<div class="fin-empty">No goals yet. Add one on the left: a car, a home deposit, a holiday…</div>';
+  finTips('goals');
+}
+function finGoalEdit(id){
+  const g=(finData.goals||[]).find(x=>x.id===id);if(!g)return;
+  finGoalId=id;document.getElementById('fg-title').textContent='Edit goal';
+  document.getElementById('fg-name').value=g.name;document.getElementById('fg-target').value=g.target;
+  document.getElementById('fg-date').value=g.target_date.slice(0,7);document.getElementById('fg-saved').value=g.saved||'';
+  document.getElementById('fg-save').textContent='Save changes';document.getElementById('fg-cancel').hidden=false;
+  finRenderGoals();document.getElementById('fg-name').focus();
+}
+function finGoalReset(){
+  finGoalId=null;document.getElementById('fg-title').textContent='Add a goal';
+  ['fg-name','fg-target','fg-date','fg-saved'].forEach(i=>{document.getElementById(i).value='';});
+  document.getElementById('fg-save').textContent='Save goal';document.getElementById('fg-cancel').hidden=true;finRenderGoals();
+}
+async function finGoalSave(){
+  const f=finGoalForm();
+  if(!f.name){finSay('Say what the goal is for, e.g. Car.',false);return;}
+  if(!(f.target>0)){finSay('Enter how much it costs.',false);return;}
+  if(!f.date){finSay('Choose when you want it by.',false);return;}
+  // a month is chosen; the goal is due at the end of that month
+  const [y,mo]=f.date.split('-').map(Number),last=new Date(y,mo,0).getDate();
+  const body={name:f.name,target:f.target,target_date:`${f.date}-${String(last).padStart(2,'0')}`,saved:f.saved};
+  const b=document.getElementById('fg-save');b.disabled=true;
+  const d=await finSend(finGoalId?'PUT':'POST',finGoalId?`/api/finance/goals/${encodeURIComponent(finGoalId)}`:'/api/finance/goals',body);b.disabled=false;
+  if(d){const r=await api('/api/finance');if(r&&r.status==='success')finData.goals=r.goals;finGoalReset();finRenderKpis();}
+}
+async function finGoalDelete(id){
+  const g=(finData.goals||[]).find(x=>x.id===id);if(!g||!confirm(`Remove the goal “${g.name}”?`))return;
+  const d=await finSend('DELETE',`/api/finance/goals/${encodeURIComponent(id)}`);
+  if(d){finData.goals=finData.goals.filter(x=>x.id!==id);if(finGoalId===id)finGoalReset();else finRenderGoals();finRenderKpis();}
+}
+
+/* ---- 4 Wishlist: stocks to buy (what our data says) and things to buy (saving first, or a loan) ---- */
+// Typical US rates, checked November 2026 (Freddie Mac for mortgages; usual ranges for the rest). A person's own rate depends on
+// their credit score and lender, which the page says. [type, typical range shown, rate used for the estimate, usual length in months]
+const FIN_LOANS={
+  car:[['Car loan','6–9%',7.5,60],['Personal loan','10–15%',12.5,60]],
+  home:[['Mortgage, 30 years','about 7–7.5%',7.25,360],['Mortgage, 15 years','about 6.5–7%',6.75,180]],
+  education:[['Student loan','6–8%',7,120],['Personal loan','10–15%',12.5,60]],
+  other:[['Personal loan','10–15%',12.5,36],['0% card offer','0% at first, then 20%+',0,15],['Credit card','20–25%',22,36]],
+};
+const FIN_ITEM_KINDS={car:'Car or vehicle',home:'Home',education:'Education',other:'Something else'};
+function finPay(P,ratePct,months){const i=ratePct/100/12;return i?P*i/(1-Math.pow(1+i,-months)):P/months;}
+function finWishPart(w){
+  finWishNow=w;
+  document.querySelectorAll('.fin-sub2 button').forEach(b=>b.classList.toggle('on',b.dataset.w===w));
+  document.getElementById('fw-stock').hidden=w!=='stock';document.getElementById('fw-item').hidden=w!=='item';
+}
+const finWishes=k=>((finData&&finData.wishlist)||[]).filter(x=>x.kind===k);
+async function finWishReload(){const r=await api('/api/finance');if(r&&r.status==='success')finData.wishlist=r.wishlist;}
+
+// stocks
+let finWsId=null,finAcSeq=0,finAcTimer=null;
+function finStockSearch(){
+  clearTimeout(finAcTimer);
+  finAcTimer=setTimeout(async()=>{
+    const q=document.getElementById('fws-t').value.trim(),box=document.getElementById('fws-ac');
+    if(!q){box.hidden=true;return;}
+    const seq=++finAcSeq,res=await api('/api/stocks/search?q='+encodeURIComponent(q)+'&limit=6');
+    if(seq!==finAcSeq)return;
+    const rows=(Array.isArray(res)?res:[]).slice(0,6);
+    box.innerHTML=rows.length?rows.map(r=>`<button type="button" data-t="${escapeHtml(r.ticker)}" onclick="finStockPick(this.dataset.t)"><b>${escapeHtml(r.ticker)}</b> ${escapeHtml((r.company_name||'').slice(0,34))}</button>`).join(''):'<div class="fin-mini" style="padding:8px 10px">No matching stocks</div>';
+    box.hidden=false;
+  },200);
+}
+function finStockPick(t){document.getElementById('fws-t').value=t;document.getElementById('fws-ac').hidden=true;document.getElementById('fws-b').focus();}
+if(typeof document!=='undefined'&&document.addEventListener)document.addEventListener('click',e=>{const b=document.getElementById('fws-ac');if(b&&!b.hidden&&!e.target.closest('.fin-ac'))b.hidden=true;});
+async function finLoadWishStocks(){
+  if(!finWishes('stock').length){finWishStocks={stocks:[]};finRenderWishStocks();return;}
+  const seq=++finWishSeq;finWishStocks=null;finRenderWishStocks();
+  const d=await api('/api/finance/wishlist-stocks');
+  if(seq!==finWishSeq)return;
+  finWishStocks=d&&d.status==='success'?d:{stocks:[],failed:true};
+  finRenderWishStocks();
+}
+function finRenderWishStocks(){
+  const el=document.getElementById('fws-list');if(!el||!finData)return;
+  const ws=finWishes('stock');
+  if(!ws.length){el.innerHTML='<div class="fin-empty">No stocks yet. Add one you are thinking of buying, and we will show what our data says about it.</div>';finTips('wstock');return;}
+  if(finWishStocks===null){el.innerHTML='<div class="load"><div class="spin"></div>Looking at the data…</div>';return;}
+  const reads={};(finWishStocks.stocks||[]).forEach(r=>{reads[r.id]=r;});
+  const dot={good:'var(--green)',warn:'#f5a623',bad:'var(--red)',info:'var(--t3)'};
+  const anyOpen=ws.some(w=>finWsOpen.has(w.id));
+  el.innerHTML=(anyOpen?'<div class="fin-wstop"><button class="fin-clear" type="button" onclick="finWsCloseAll()">Close all</button></div>':'')+(finWishStocks.failed?'<div class="fin-empty">Couldn’t load the data. <button type="button" class="nw-link" onclick="finLoadWishStocks()">Try again</button></div>':'')+ws.map(w=>{
+    const r=reads[w.id]||{},open=finWsOpen.has(w.id),pts=r.points||[];
+    return `<div class="fin-ws${open?' open':''}"><div class="fin-wsh"><div><b>${escapeHtml(w.name)}</b> <span class="fin-mini">${escapeHtml(r.name&&r.name!==w.name?r.name:'')}</span>
+        <div class="fin-mini">${r.price?finUsd2(r.price):''}${r.sector?' · '+escapeHtml(r.sector):''}${w.amount?' · budget '+finUsd(w.amount):''}</div></div>
+        ${r.label?`<span class="fin-verdict v-${r.verdict||'none'}">${escapeHtml(r.label)}</span>`:''}</div>
+      <div class="fin-wsbar"><label class="fin-chk"><input type="checkbox" ${open?'checked':''} ${pts.length?'':'disabled'} onchange="finWsToggle(${w.id},this.checked)"><span>${open?'Hide analysis':'Show analysis'}</span></label>
+        <span class="fin-rowacts"><button class="fin-ic" type="button" onclick="finWishStockEdit(${w.id})">Edit</button><button class="fin-ic fin-rm" type="button" onclick="finWishDelete(${w.id})">Remove</button></span></div>
+      ${open&&pts.length?`<div class="fin-wsbody"><ul class="fin-pts">${pts.map(([t,h,x])=>`<li><span class="fin-dot" style="background:${dot[t]||dot.info}"></span><span><b>${escapeHtml(h)}</b> ${escapeHtml(x)}</span></li>`).join('')}</ul>
+        <div class="fin-wsclose"><button class="fin-clear" type="button" onclick="finWsToggle(${w.id},false)">Close</button></div></div>`:''}</div>`;
+  }).join('')+(finWishStocks&&finWishStocks.predictions===false?'<p class="fin-note">Our model’s signal is included on plans with stock predictions.</p>':'');
+  finTips('wstock');
+}
+/** Each stock's analysis opens with its tick box (or Show analysis) and closes with the box, its Close button or Close all. */
+function finWsToggle(id,on){if(on)finWsOpen.add(id);else finWsOpen.delete(id);finRenderWishStocks();}
+function finWsCloseAll(){finWsOpen.clear();finRenderWishStocks();}
+function finWishStockEdit(id){
+  const w=finWishes('stock').find(x=>x.id===id);if(!w)return;
+  finWsId=id;document.getElementById('fws-title').textContent='Edit stock';
+  document.getElementById('fws-t').value=w.name;document.getElementById('fws-b').value=w.amount||'';
+  document.getElementById('fws-save').textContent='Save changes';document.getElementById('fws-cancel').hidden=false;document.getElementById('fws-b').focus();
+}
+function finWishStockReset(){
+  finWsId=null;document.getElementById('fws-title').textContent='Add a stock';
+  document.getElementById('fws-t').value='';document.getElementById('fws-b').value='';document.getElementById('fws-ac').hidden=true;
+  document.getElementById('fws-save').textContent='Add to wishlist';document.getElementById('fws-cancel').hidden=true;
+}
+async function finWishStockSave(){
+  const t=document.getElementById('fws-t').value.trim().split(/\s+/)[0].toUpperCase();
+  if(!t){finSay('Type the stock you are thinking of buying.',false);return;}
+  const body={kind:'stock',name:t,amount:finN(document.getElementById('fws-b').value)};
+  const b=document.getElementById('fws-save');b.disabled=true;
+  const d=await finSend(finWsId?'PUT':'POST',finWsId?`/api/finance/wishlist/${encodeURIComponent(finWsId)}`:'/api/finance/wishlist',body);b.disabled=false;
+  if(d){await finWishReload();finWishStockReset();finLoadWishStocks();}
+}
+async function finWishDelete(id){
+  const w=((finData&&finData.wishlist)||[]).find(x=>x.id===id);if(!w||!confirm(`Remove ${w.name} from your wishlist?`))return;
+  const d=await finSend('DELETE',`/api/finance/wishlist/${encodeURIComponent(id)}`);
+  if(d){finData.wishlist=finData.wishlist.filter(x=>x.id!==id);
+    if(w.kind==='stock'){finWsOpen.delete(id);if(finWsId===id)finWishStockReset();if(finWishStocks&&finWishStocks.stocks)finWishStocks.stocks=finWishStocks.stocks.filter(x=>x.id!==id);finRenderWishStocks();}
+    else{if(finWiId===id)finWishItemReset();finRenderWishItems();}}
+}
+function finTipsWishStocks(){
+  const ws=finWishes('stock'),st=(finWishStocks&&finWishStocks.stocks)||[],out=[];
+  if(!ws.length)return [];
+  const by=v=>st.filter(x=>x.verdict===v).map(x=>escapeHtml(x.ticker));
+  if(by('good').length)out.push(['good',`Looks good: ${by('good').join(', ')}.`,'Most of the signals we check are positive right now.']);
+  if(by('wait').length)out.push(['warn',`Wait for now: ${by('wait').join(', ')}.`,'Mixed signals, a price near its high, or results coming soon. Look again in a week or two.']);
+  if(by('careful').length)out.push(['bad',`Be careful: ${by('careful').join(', ')}.`,'Several signals are negative. If you still want it, consider a smaller amount.']);
+  const sec={};st.forEach(x=>{if(x.sector)sec[x.sector]=(sec[x.sector]||0)+1;});
+  const top=Object.entries(sec).sort((a,b)=>b[1]-a[1])[0];
+  if(top&&st.length>=3&&top[1]/st.length>=0.6)out.push(['warn',`Most of your wishlist is ${escapeHtml(top[0])}.`,'Choosing stocks from different sectors spreads the risk.']);
+  const own=new Set((finHold||[]).map(h=>String(h.ticker||'').toUpperCase()));
+  const dup=ws.filter(w=>own.has(w.name)).map(w=>escapeHtml(w.name));
+  if(dup.length)out.push(['info',`You already own ${dup.join(', ')}.`,'Buying more adds to a position you already have.']);
+  const budget=ws.reduce((a,w)=>a+(w.amount||0),0),mm=finMonthlyNow();
+  if(budget>0){const sav=finSavings();
+    out.push(['info',`Your budgets add up to ${finUsd(budget)}.`,mm.ok&&mm.save>0?`That is about ${Math.ceil(budget/mm.save)} month${Math.ceil(budget/mm.save)>1?'s':''} of what you save.`+(sav&&mm.spend?' Keep 3–6 months of spending as safety money before investing.':''):'Answer Monthly money to see how long that takes to save.']);}
+  return out;
+}
+
+// things to buy
+let finWiId=null;
+function finWishItemPreview(){
+  const on=document.getElementById('fwi-l').checked;
+  document.getElementById('fwi-ll').textContent=on?'Yes':'No';document.getElementById('fwi-yw').hidden=!on;
+}
+function finWishItemEdit(id){
+  const w=finWishes('item').find(x=>x.id===id);if(!w)return;
+  finWiId=id;document.getElementById('fwi-title').textContent='Edit';
+  document.getElementById('fwi-n').value=w.name;document.getElementById('fwi-c').value=w.category||'other';document.getElementById('fwi-a').value=w.amount||'';
+  document.getElementById('fwi-d').value=w.want_by?w.want_by.slice(0,7):'';document.getElementById('fwi-l').checked=!!w.loan;document.getElementById('fwi-y').value=w.loan_years||'';
+  finWishItemPreview();document.getElementById('fwi-save').textContent='Save changes';document.getElementById('fwi-cancel').hidden=false;document.getElementById('fwi-n').focus();
+}
+function finWishItemReset(){
+  finWiId=null;document.getElementById('fwi-title').textContent='Add something to buy';
+  ['fwi-n','fwi-a','fwi-d','fwi-y'].forEach(i=>{document.getElementById(i).value='';});document.getElementById('fwi-c').value='car';document.getElementById('fwi-l').checked=false;
+  finWishItemPreview();document.getElementById('fwi-save').textContent='Add to wishlist';document.getElementById('fwi-cancel').hidden=true;
+}
+/** The income box shows the shared Monthly money answer (or what is being typed there). */
+function finFillIncome(){const el=document.getElementById('fwi-inc');if(!el||document.activeElement===el)return;const v=finMonthlyNow().m.income;el.value=v!=null?v:'';}
+/** A changed income is saved as the Monthly money answer, keeping the other Monthly money answers as they are. */
+async function finSaveIncome(inc){
+  const saved=finData.monthly&&finData.monthly.income;
+  if(inc==null||inc===saved)return true;
+  if(inc<0){finSay('Monthly income can’t be below $0.',false);return false;}
+  const body={...(finData.monthly||{}),income:inc};
+  const d=await finSend('PUT','/api/finance/monthly',body);if(!d)return false;
+  finData.monthly=d.monthly;finData.has_monthly=true;
+  const typing=finEditM&&document.getElementById('fm-income');
+  if(typing)document.getElementById('fm-income').value=inc;else{finEditM=false;finRenderMonthly();}
+  finLive();return true;
+}
+async function finWishItemSave(){
+  const name=document.getElementById('fwi-n').value.trim(),amount=finN(document.getElementById('fwi-a').value),month=document.getElementById('fwi-d').value;
+  const inc=finN(document.getElementById('fwi-inc').value);
+  if(!name){finSay('Say what you would like to buy, e.g. Car.',false);return;}
+  if(!(amount>0)){finSay('Enter how much it costs.',false);return;}
+  if(!(await finSaveIncome(inc)))return;
+  let want=null;if(month){const [y,mo]=month.split('-').map(Number);want=`${month}-${String(new Date(y,mo,0).getDate()).padStart(2,'0')}`;}
+  const loan=document.getElementById('fwi-l').checked,yrs=finN(document.getElementById('fwi-y').value);
+  const body={kind:'item',name,category:document.getElementById('fwi-c').value,amount,want_by:want,loan,loan_years:loan&&yrs?Math.round(yrs):null};
+  const b=document.getElementById('fwi-save');b.disabled=true;
+  const d=await finSend(finWiId?'PUT':'POST',finWiId?`/api/finance/wishlist/${encodeURIComponent(finWiId)}`:'/api/finance/wishlist',body);b.disabled=false;
+  if(d){await finWishReload();finWishItemReset();finRenderWishItems();}
+}
+function finSaveRate(){const mm=finMonthlyNow(),gv=finGiveNow();return mm.ok?mm.save-(gv.on&&gv.monthly?gv.monthly:0):null;}
+function finLoanRows(w){                       // each loan type for this thing: monthly payment and total interest
+  const P=w.amount;
+  return (FIN_LOANS[w.category]||FIN_LOANS.other).filter(([n])=>!(n==='0% card offer'&&P>10000)).map(([n,range,rate,months])=>{
+    const m=n==='0% card offer'?15:(w.loan_years?w.loan_years*12:months),pay=finPay(P,rate,m);
+    return {n,range,rate,m,pay,interest:pay*m-P};
+  });
+}
+function finRenderWishItems(){
+  const el=document.getElementById('fwi-list');if(!el||!finData)return;
+  finFillIncome();
+  const items=finWishes('item'),save=finSaveRate(),inc=finMonthlyNow().m.income;
+  if(!items.length){el.innerHTML='<div class="fin-empty">Nothing yet. Add something you would like to buy, like a car or a laptop. We will show how long saving takes and, if you want a loan, what each kind would cost.</div>';finTips('witem');return;}
+  el.innerHTML=items.map(w=>{
+    const when=w.want_by?new Date(w.want_by+'T00:00:00').toLocaleDateString('en-US',{month:'short',year:'numeric'}):'';
+    let saving;
+    if(save==null)saving='Answer Monthly money (what you spend) to see how long saving for it would take.';
+    else if(save<=0)saving='<span class="r">You don’t save anything each month at the moment, so saving for it isn’t possible yet.</span>';
+    else{const n=Math.ceil(w.amount/save),by=new Date();by.setMonth(by.getMonth()+n);
+      const late=w.want_by?n-finMonthsTo(w.want_by):null;
+      saving=`Saving <b>${finUsd(save)} a month</b>, you could buy it in <b>${n} month${n>1?'s':''}</b> (${by.toLocaleDateString('en-US',{month:'short',year:'numeric'})}).`+
+        (late==null?'':late<=0?' <span class="g">That is in time.</span>':` <span class="r">That is ${late} month${late>1?'s':''} after you want it.</span>`);}
+    let loan='';
+    if(w.loan){const rows=finLoanRows(w),best=rows.reduce((a,r)=>r.interest<a.interest?r:a,rows[0]),low=rows.reduce((a,r)=>r.pay<a.pay?r:a,rows[0]);
+      loan=`<table class="fin-tbl fin-loans"><thead><tr><th>Loan type</th><th class="n">Each month</th><th class="n">Total interest</th></tr></thead><tbody>${rows.map(r=>`<tr class="${r===best?'best':''}"><td>${escapeHtml(r.n)}${r===best?' <span class="fin-best">lowest total cost</span>':''}<div class="fin-mini">${r.m>=24?Math.round(r.m/12)+' years':r.m+' months'} · typical ${escapeHtml(r.range)}</div></td><td class="n">${finUsd(r.pay)}</td><td class="n">${finUsd(r.interest)}</td></tr>`).join('')}</tbody></table>`+
+        (inc>0?`<div class="fin-mini fin-afford">The smallest monthly payment (${escapeHtml(low.n)}, ${finUsd(low.pay)}) is ${finPct(low.pay/inc*100)} of what comes in each month${low.pay/inc>0.2?' <span class="r">(heavy: over 20%)</span>':low.pay/inc>0.1?' (manageable)':' <span class="g">(fits well)</span>'}.</div>`:'');}
+    const ofInc=inc>0?`<div class="fin-mini fin-saving">That is <b>${(w.amount/inc).toFixed(w.amount/inc<10?1:0).replace(/\.0$/,'')} month${w.amount/inc===1?'':'s'} of your income</b>.</div>`:'';
+    return `<div class="fin-ws"><div class="fin-wsh"><div><b>${escapeHtml(w.name)}</b> <span class="fin-mini">${FIN_ITEM_KINDS[w.category]||''}${when?' · by '+when:''}</span></div><b>${finUsd(w.amount)}</b></div>
+      ${ofInc}<div class="fin-mini fin-saving">${saving}</div>${loan}
+      <div class="fin-rowacts fin-wsa"><button class="fin-ic" type="button" onclick="finWishItemEdit(${w.id})">Edit</button><button class="fin-ic fin-rm" type="button" onclick="finWishDelete(${w.id})">Remove</button></div></div>`;
+  }).join('')+(items.some(w=>w.loan)?'<p class="fin-note">Typical US rates, November 2026. Your rate depends on your credit score and the lender, so compare offers before you borrow.</p>':'');
+  finTips('witem');
+}
+function finTipsWishItems(){
+  const items=finWishes('item'),save=finSaveRate(),out=[],mm=finMonthlyNow();
+  if(!items.length)return [];
+  const total=items.reduce((a,w)=>a+w.amount,0);
+  if(save>0)out.push(['info',`Everything on the list costs ${finUsd(total)}.`,`Saving ${finUsd(save)} a month, that is about ${Math.ceil(total/save)} months. Buying one thing at a time, most-wanted first, keeps it realistic.`]);
+  else if(save!=null)out.push(['bad','Nothing left to save each month.','With what comes in and goes out now, these would all need loans. Look at Monthly money first.']);
+  const sav=finSavings();
+  if(mm.ok&&mm.spend>0&&sav/mm.spend<3)out.push(['warn','Safety money first.',`Before a big purchase, try to keep 3 months of spending (${finUsd(mm.spend*3)}) aside, so a surprise doesn’t become debt.`]);
+  items.filter(w=>w.loan).forEach(w=>{
+    const rows=finLoanRows(w),best=rows.reduce((a,r)=>r.interest<a.interest?r:a,rows[0]),low=rows.reduce((a,r)=>r.pay<a.pay?r:a,rows[0]),inc=mm.m.income;
+    const months=save>0?Math.ceil(w.amount/save):null,heavy=inc>0&&low.pay/inc>0.2;
+    out.push([heavy?'warn':'info',`${escapeHtml(w.name)}: a ${escapeHtml(best.n.toLowerCase())} costs least overall.`,`About ${finUsd(best.pay)} a month and ${finUsd(best.interest)} interest in total.`+
+      (low!==best?` A ${escapeHtml(low.n.toLowerCase())} has smaller payments (${finUsd(low.pay)} a month) but costs more interest over time.`:'')+
+      (months?` Saving first would take ${months} months and costs no interest.`:'')+(heavy?` Even the smallest payment is ${finPct(low.pay/inc*100)} of what comes in, which is a lot.`:'')]);
+    if(w.category==='home')out.push(['info','Home loans need a deposit.','Lenders usually want 5–20% of the price up front, and a bigger deposit often gets a lower rate.']);
+    if(w.category==='other'&&rows.some(r=>r.n==='Credit card'))out.push(['warn','Avoid putting it on a credit card.','Card interest is usually 20% or more. A 0% offer only works if you pay it all off before the offer ends.']);
+  });
+  return out;
+}
+
+/* ---- 5 Donations (optional) ---- */
+let finEditGive=false;
+function finRenderGive(){
+  const body=document.getElementById('fd-body'),acts=document.getElementById('fd-acts');if(!body)return;
+  const g=finData.giving||{on:false};
+  if(finEditGive){
+    body.innerHTML=`<label class="fin-qr"><span>Do you want to plan giving?<small>Optional. Planning only: no money moves through Aymetrix.</small></span><span class="fin-sw"><input type="checkbox" id="fd-on" ${g.on||!g.mode?'checked':''} onchange="finGiveToggle()"><i></i><em id="fd-onl"></em></span></label>
+      <div id="fd-more">
+      <label class="fin-qr"><span>How do you want to give?</span><select class="sel" id="fd-mode" onchange="finGiveModeChanged()"><option value="pct">A share of income (%)</option><option value="fixed">A fixed amount each month ($)</option></select></label>
+      <label class="fin-qr"><span id="fd-vl">How much?</span><span class="fin-in"><i id="fd-unit">%</i><input id="fd-value" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 1" oninput="finRenderGiveAns();finRenderKpis()"></span></label>
+      <label class="fin-qr"><span>Causes you care about<small>Optional, just for you</small></span><input class="srch fin-txt" id="fd-causes" maxlength="80" placeholder="e.g. Education"></label></div>
+      <div class="fin-fbtns"><button class="btn btnp" type="button" id="fd-save" onclick="finGiveSave()">Save</button><button class="btn" type="button" onclick="finGiveCancel()">Cancel</button></div>`;
+    document.getElementById('fd-mode').value=g.mode||'pct';document.getElementById('fd-value').value=g.value!=null?g.value:'';document.getElementById('fd-causes').value=g.causes||'';
+    acts.innerHTML='';finGiveToggle(true);finGiveModeChanged(true);
+  }else if(g.on){
+    body.innerHTML=`<div class="fin-qr fin-ro"><span>Plan giving</span><b>On</b></div>
+      <div class="fin-qr fin-ro"><span>How</span><b>${g.mode==='pct'?finPct(g.value,1)+' of income':finUsd2(g.value)+' a month'}</b></div>
+      <div class="fin-qr fin-ro"><span>Causes</span><b>${g.causes?escapeHtml(g.causes):'<span class="fin-mini">not answered</span>'}</b></div>`;
+    acts.innerHTML=`<button class="fin-ic" type="button" onclick="finGiveEdit()">Edit</button><button class="fin-ic fin-rm" type="button" onclick="finGiveRemove()">Remove</button>`;
+  }else{
+    body.innerHTML=`<div class="fin-empty">Giving is off. Donations are optional. If you would like to plan regular giving, set it up here.</div><div class="fin-fbtns"><button class="btn btnp" type="button" onclick="finGiveEdit()">Set up giving</button></div>`;
+    acts.innerHTML='';
+  }
+  finRenderGiveAns();
+}
+function finGiveToggle(quiet){const on=document.getElementById('fd-on').checked;document.getElementById('fd-more').hidden=!on;document.getElementById('fd-onl').textContent=on?'On':'Off';if(!quiet){finRenderGiveAns();finRenderKpis();}}
+function finGiveModeChanged(quiet){const pct=document.getElementById('fd-mode').value==='pct';document.getElementById('fd-unit').textContent=pct?'%':'$';
+  document.getElementById('fd-vl').textContent=pct?'What share of income?':'How much each month?';document.getElementById('fd-value').placeholder=pct?'e.g. 1':'e.g. 50';if(!quiet){finRenderGiveAns();finRenderKpis();}}
+function finRenderGiveAns(){
+  const el=document.getElementById('fd-ans');if(!el||!finData)return;
+  const gv=finGiveNow(),mm=finMonthlyNow();
+  if(!gv.on)el.innerHTML='<div class="fin-empty">Giving is off, so it isn’t counted in your monthly money or goals.</div>';
+  else if(gv.monthly==null)el.innerHTML=`<div class="fin-empty">${gv.g.mode==='pct'?'Answer Monthly money (what comes in) to see how much this is.':'Enter how much to give each month.'}</div>`;
+  else el.innerHTML=`<div class="fin-mini">You’d give</div><div class="fin-big">${finUsd(gv.monthly)} a month · ${finUsd(gv.monthly*12)} a year</div>
+    ${mm.ok?`<div class="fin-rows"><div><span>You save now</span><b>${finUsd(mm.save)}</b></div><div><span>After giving</span><b class="${mm.save-gv.monthly>=0?'g':'r'}">${finUsd(mm.save-gv.monthly)}</b></div></div>`:''}
+    <p class="fin-note">Planning only: no money moves through Aymetrix.</p>`;
+  finTips('give');
+}
+function finGiveEdit(){finEditGive=true;finRenderGive();}
+function finGiveCancel(){finEditGive=false;finRenderGive();finRenderKpis();finRenderGoals(true);finRenderWishItems();}
+async function finGiveSave(){
+  const on=document.getElementById('fd-on').checked;
+  const body={on,mode:on?document.getElementById('fd-mode').value:null,value:on?finN(document.getElementById('fd-value').value):null,causes:document.getElementById('fd-causes').value.trim()};
+  if(on&&!(body.value>0)){finSay(body.mode==='pct'?'Enter a share of income, e.g. 1.':'Enter how much to give each month.',false);return;}
+  const b=document.getElementById('fd-save');b.disabled=true;
+  const d=await finSend('PUT','/api/finance/giving',body);b.disabled=false;
+  if(d){finData.giving=d.giving;finEditGive=false;finRenderGive();finRenderKpis();finRenderGoals(true);finRenderWishItems();finTips('monthly');}
+}
+async function finGiveRemove(){
+  if(!confirm('Remove your giving plan?'))return;
+  const d=await finSend('DELETE','/api/finance/giving');
+  if(d){finData.giving={on:false,mode:null,value:null,causes:''};finRenderGive();finRenderKpis();finRenderGoals(true);finRenderWishItems();finTips('monthly');}
+}
+
+/* ---- 6 Calculators (everyone; nothing saved) ---- */
+const FIN_COMPOUND='This is the compounded amount: the growth also earns growth each year, which is why it speeds up over time.';
+// fields: [id, label, unit, default, hint]
+const FIN_CALCS={
+  loan:{name:'Loan',fields:[['amt','Loan amount','$',20000],['rate','Interest rate (per year)','%',7.5],['yrs','Length (years)','yrs',5]],
+    run:v=>{const n=Math.round(v.yrs*12),i=v.rate/100/12;if(!(v.amt>0)||!(n>0)||v.rate<0)return null;
+      const pay=i?v.amt*i/(1-Math.pow(1+i,-n)):v.amt/n,tot=pay*n;
+      return {big:['Monthly payment',finUsd2(pay)],rows:[['Total paid',finUsd(tot)],['Total interest',finUsd(tot-v.amt),'r']],bar:[['Amount borrowed',v.amt,'var(--blue)'],['Interest',tot-v.amt,'var(--red)']]};}},
+  stock:{name:'Stock return',fields:[['buy','Buy price (per share)','$',100],['sell','Sell or current price (per share)','$',125],['qty','Number of shares','',10],['yrs','Years held','yrs',3,'How long you held it (or have held it so far), e.g. 0.5 for six months']],
+    run:v=>{if(!(v.buy>0)||!(v.qty>0)||!(v.sell>=0))return null;const cost=v.buy*v.qty,val=v.sell*v.qty,p=val-cost,roi=p/cost*100;
+      const rows=[['You paid',finUsd2(cost)],['Worth now / sold for',finUsd2(val)],['ROI (total return)',`${roi>=0?'+':''}${roi.toFixed(2)}%`,roi>=0?'g':'r']];
+      let note='ROI is the total profit or loss as a % of what you paid.';
+      if(v.yrs>0&&v.sell>0){const ann=(Math.pow(v.sell/v.buy,1/v.yrs)-1)*100;
+        rows.push(['Return per year (average)',`${ann>=0?'+':''}${ann.toFixed(2)}%`,ann>=0?'g':'r']);
+        note+=` Return per year is the steady yearly rate that turns ${finUsd2(v.buy)} into ${finUsd2(v.sell)} in ${v.yrs} year${v.yrs===1?'':'s'}, compounded, so it is lower than ROI divided by the years.`;}
+      return {big:[p>=0?'Profit':'Loss',`<span class="${p>=0?'g':'r'}">${p>=0?'+':'-'}${finUsd2(Math.abs(p))}</span>`],rows,note};}},
+  grow:{name:'Savings growth',fields:[['amt','Amount you put in now','$',10000],['rate','Growth per year','%',6,'What it earns each year, e.g. about 4% in a savings account'],['yrs','Years','yrs',10]],
+    run:v=>{if(!(v.amt>0)||!(v.yrs>0))return null;const fv=v.amt*Math.pow(1+v.rate/100,v.yrs);
+      return {big:[`After ${v.yrs} year${v.yrs>1?'s':''}`,finUsd(fv)],rows:[['You put in',finUsd(v.amt)],['Growth',finUsd(fv-v.amt),fv>=v.amt?'g':'r']],bar:[['You put in',v.amt,'var(--blue)'],['Growth',Math.max(0,fv-v.amt),'var(--green)']],compound:true};}},
+  sip:{name:'Monthly investing',fields:[['m','Amount each month','$',300],['rate','Growth per year','%',8,'What the investments might grow by each year (not guaranteed)'],['yrs','Years','yrs',10]],
+    run:v=>{const n=Math.round(v.yrs*12),i=Math.pow(1+v.rate/100,1/12)-1;if(!(v.m>0)||!(n>0))return null;
+      const fv=i?v.m*(Math.pow(1+i,n)-1)/i:v.m*n,put=v.m*n;
+      return {big:[`After ${v.yrs} year${v.yrs>1?'s':''}`,finUsd(fv)],rows:[['You put in',finUsd(put)],['Growth',finUsd(fv-put),fv>=put?'g':'r']],bar:[['You put in',put,'var(--blue)'],['Growth',Math.max(0,fv-put),'var(--green)']],compound:true};}},
+  goal:{name:'Saving for a goal',fields:[['target','Goal amount','$',25000],['have','Already saved','$',5000],['yrs','Years to get there','yrs',3],['rate','Growth per year','%',4,'How much your saved money earns each year while you save: about 4% in a savings account, 0 if you keep it as cash']],
+    run:v=>{const n=Math.round(v.yrs*12),i=Math.pow(1+(v.rate||0)/100,1/12)-1;if(!(v.target>0)||!(n>0))return null;
+      const grown=(v.have||0)*Math.pow(1+i,n),left=v.target-grown;
+      if(left<=0)return {big:['Each month','$0'],rows:[['What you have grows to',finUsd(grown),'g']],note:'You already have enough, if it grows as expected.',compound:v.rate>0};
+      const pm=i?left*i/(Math.pow(1+i,n)-1):left/n,put=pm*n+(v.have||0),growth=v.target-put;
+      return {big:['Save each month',finUsd2(pm)],rows:[['You put in',finUsd(put)],['Growth',finUsd(growth),'g']],bar:growth>0.5?[['You put in',put,'var(--blue)'],['Growth',growth,'var(--green)']]:null,compound:growth>0.5};}},
+};
+function finRenderCalc(){
+  const pick=document.getElementById('fc-pick');if(!pick)return;
+  pick.innerHTML=Object.entries(FIN_CALCS).map(([k,c])=>`<button type="button" class="${k===finCalc?'on':''}" onclick="finPickCalc('${k}')">${c.name}</button>`).join('');
+  const c=FIN_CALCS[finCalc];
+  document.getElementById('fc-in').innerHTML=c.fields.map(([k,l,u,d,h])=>`<label class="fin-qr"><span>${l}${h?`<small>${h}</small>`:''}</span><span class="fin-in">${u&&u!=='yrs'?`<i>${u}</i>`:''}<input id="fc-${k}" type="number" min="0" step="any" inputmode="decimal" value="${d}" oninput="finCalcRun()">${u==='yrs'?'<i class="fin-after">years</i>':''}</span></label>`).join('');
+  finCalcRun();
+}
+function finPickCalc(k){finCalc=k;finRenderCalc();}
+function finCalcRun(){
+  const c=FIN_CALCS[finCalc],v={};c.fields.forEach(([k])=>{v[k]=finN(document.getElementById('fc-'+k).value);});
+  const r=c.run(v),out=document.getElementById('fc-out');
+  if(!r){out.innerHTML='<div class="fin-empty">Fill in every box with a number above 0.</div>';return;}
+  const tot=r.bar?r.bar.reduce((a,x)=>a+x[1],0):0;
+  out.innerHTML=`<div class="fin-mini">${r.big[0]}</div><div class="fin-big">${r.big[1]}</div>
+    <div class="fin-rows">${r.rows.map(([l,x,c])=>`<div><span>${l}</span><b class="${c||''}">${x}</b></div>`).join('')}</div>
+    ${r.bar&&tot>0?`<div class="fin-bar">${r.bar.map(([l,x,col])=>`<i style="width:${x/tot*100}%;background:${col}"></i>`).join('')}</div><div class="fin-leg">${r.bar.map(([l,x,col])=>`<span><b style="background:${col}"></b>${l} ${finPct(x/tot*100)}</span>`).join('')}</div>`:''}
+    ${r.compound?`<p class="fin-note fin-comp">${FIN_COMPOUND}</p>`:''}${r.note?`<p class="fin-note">${r.note}</p>`:''}<p class="fin-note">An estimate: real returns go up and down, and fees and taxes aren’t included.</p>`;
+}
+
+// ═══ NEWS TAB: stored headlines (GET /api/news), with categories, period, search, one stock or "My stocks" ═══
+// The category list matches news_store.CATEGORIES (a test checks). One category at a time, from a dropdown; "All categories" = every one.
+const NW_CATS=[['world','World'],['global','Global'],['finance','Finance'],['business','Business'],['economic','Economic'],
+  ['tax','Tax'],['retail','Retail'],['tech','Tech'],['crypto','Crypto'],['commodities','Commodities'],['stocks','Stock news'],
+  ['entertainment','Entertainment'],['sport','Sport']];
+const NW_PAGE=20;
+let nwReady=false,nwMine=false,nwItems=[],nwSeq=0,nwTimer=null,nwLoadedAt=0;
+/** The chosen category: '' = all of them (the dropdown shows one at a time). */
+function nwCat(){const v=document.getElementById('nw-cat')?.value||'';return NW_CATS.some(c=>c[0]===v)?v:'';}
+function nwRestore(){
+  if(nwReady)return;
+  nwReady=true;
+  try{
+    const saved=JSON.parse(localStorage.getItem('nw-filters')||'null');
+    if(saved){
+      const c=document.getElementById('nw-cat');if(c&&NW_CATS.some(x=>x[0]===saved.cat))c.value=saved.cat;
+      const d=document.getElementById('nw-days');if(d&&['1','7','30'].includes(String(saved.days)))d.value=String(saved.days);
+      nwMine=!!saved.mine;
+    }
+  }catch(e){}
+}
+function nwSave(){
+  try{localStorage.setItem('nw-filters',JSON.stringify({cat:nwCat(),days:+document.getElementById('nw-days').value,mine:nwMine}));}catch(e){}
+}
+function nwTicker(){const v=(document.getElementById('nw-tk')?.value||'').trim().toUpperCase();return /^[A-Z0-9.\-]{1,10}$/.test(v)?v:'';}
+/** The category doesn't apply while one stock or "My stocks" is chosen: every story about those stocks is shown. */
+function nwCatsApply(){return !nwMine&&!nwTicker();}
+function renderNwFilters(){
+  const sel=document.getElementById('nw-cat');if(!sel)return;
+  const on=nwCatsApply();
+  sel.disabled=!on;
+  document.getElementById('nw-all').classList.toggle('on',!nwMine);
+  document.getElementById('nw-mine').classList.toggle('on',nwMine);
+  const note=document.getElementById('nw-note'),t=nwTicker();
+  note.hidden=on;
+  if(!on)note.innerHTML=t?`Showing every story about <b>${escapeHtml(t)}</b>. <button type="button" class="nw-link" onclick="nwClearTicker()">Show all news</button>`
+                         :'Showing every story about the stocks in your portfolio and watchlist.';
+}
+function nwSetMine(v){nwMine=!!v;if(v)document.getElementById('nw-tk').value='';nwSaveAndLoad();}
+function nwClearTicker(){document.getElementById('nw-tk').value='';nwSaveAndLoad();}
+function nwPickTicker(ev,t){if(ev)ev.stopPropagation();document.getElementById('nw-tk').value=t;nwMine=false;nwSaveAndLoad();
+  if(typeof window!=='undefined'&&window.scrollTo)window.scrollTo(0,0);}
+function nwResetFilters(){
+  nwMine=false;document.getElementById('nw-cat').value='';
+  document.getElementById('nw-q').value='';document.getElementById('nw-tk').value='';document.getElementById('nw-days').value='30';
+  nwSaveAndLoad();
+}
+function nwSaveAndLoad(){nwSave();renderNwFilters();nwLoad(false);}
+function nwSoon(){clearTimeout(nwTimer);nwTimer=setTimeout(()=>nwLoad(false),350);}      // search as you type, without a request per key
+function nwTickerTyped(){
+  const raw=(document.getElementById('nw-tk').value||'').trim();
+  if(raw&&nwMine){nwMine=false;nwSave();}
+  renderNwFilters();
+  if(!raw||nwTicker())nwSoon();
+}
+function nwWhen(ts){
+  if(!ts)return '';
+  const age=Date.now()/1000-ts;
+  if(age<7*86400)return timeAgo(ts);
+  return new Date(ts*1000).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+}
+function nwCard(n){
+  const img=safeHttpUrl(n.image);
+  const label=k=>(NW_CATS.find(c=>c[0]===k)||[k,k])[1];
+  const tags=(n.tickers||[]).slice(0,4).map(t=>`<button type="button" class="nw-tk-tag" title="News about ${escapeHtml(t)}" onclick="nwPickTicker(event,'${escapeHtml(t)}')">${escapeHtml(t)}</button>`).join('')+
+             (n.categories||[]).filter(k=>k!=='stocks'||!(n.tickers||[]).length).slice(0,2).map(k=>`<span class="news-card-cat">${escapeHtml(label(k))}</span>`).join('');
+  return `<div class="nw-card" role="link" tabindex="0" data-url="${escapeHtml(safeHttpUrl(n.url))}" onclick="openNewsLink(this)" onkeydown="if(event.key==='Enter')openNewsLink(this)">
+    ${img?`<img class="nw-img" src="${escapeHtml(img)}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'nw-img nw-ph',innerHTML:LI.news}))"/>`:`<div class="nw-img nw-ph">${LI.news}</div>`}
+    <div class="nw-body">
+      <div class="nw-title">${escapeHtml(n.title||'')}</div>
+      ${n.summary?`<div class="nw-sum">${escapeHtml(n.summary)}</div>`:''}
+      <div class="nw-meta"><span class="nw-src">${escapeHtml(n.source||'News')}</span><span class="nw-time">${nwWhen(n.published)}</span>${tags?`<span class="nw-tags">${tags}</span>`:''}</div>
+    </div>
+  </div>`;
+}
+function renderNwList(){
+  const list=document.getElementById('nw-list');
+  list.innerHTML=nwItems.length?`<div class="nw-grid">${nwItems.map(nwCard).join('')}</div>`:'';
+}
+async function nwLoad(more){
+  nwRestore();
+  const seq=++nwSeq,list=document.getElementById('nw-list'),btn=document.getElementById('nw-more');
+  if(!more){nwItems=[];list.innerHTML='<div class="load"><div class="spin"></div>Loading news...</div>';btn.hidden=true;}
+  else{btn.disabled=true;btn.textContent='Loading...';}
+  const p=new URLSearchParams({days:document.getElementById('nw-days').value,offset:more?nwItems.length:0,limit:NW_PAGE});
+  const t=nwTicker(),q=(document.getElementById('nw-q').value||'').trim();
+  if(t)p.set('ticker',t);else if(nwMine)p.set('mine','true');else if(nwCat())p.set('cats',nwCat());       // no cats = every category
+  if(q)p.set('q',q);
+  const d=await api('/api/news?'+p.toString());
+  if(seq!==nwSeq)return;                                             // a newer filter change has already asked again
+  btn.disabled=false;btn.textContent='Load more';
+  if(!d||d.status!=='success'){
+    if(more){btn.hidden=false;return;}
+    list.innerHTML=`<div class="empty">${escapeHtml((d&&d.message)||'Could not load the news.')} <button type="button" class="nw-link" onclick="nwLoad(false)">Try again</button></div>`;
+    return;
+  }
+  nwItems=more?nwItems.concat(d.items):d.items;nwLoadedAt=Date.now();
+  renderNwList();
+  btn.hidden=!d.more;
+  if(!nwItems.length){
+    let msg='No headlines match these filters. Try more categories, a longer period or different words.';
+    if(nwMine&&d.mine_count===0)msg='Your portfolio and watchlist are empty. Add a stock to either one to see its news here.';
+    else if(t)msg=`No recent news found for ${escapeHtml(t)}. Check the symbol, or try a longer period.`;
+    list.innerHTML=`<div class="empty">${msg}</div>`;
+  }
+}
+/** Opening the tab: draw the filters, and fetch again only if it's been more than 5 minutes. */
+function loadNews(){
+  nwRestore();renderNwFilters();
+  if(!nwLoadedAt||Date.now()-nwLoadedAt>5*60*1000)nwLoad(false);
+}
+
+// ═══ Phone tab bar: Learn and News sit behind "More" so the other tabs keep room for their labels ═══
+function moreTabsState(n){
+  const b=document.getElementById('ntab-more');
+  if(b&&b.classList){if(n==='learn'||n==='news')b.classList.add('on');else b.classList.remove('on');}
+  closeMoreTabs();
+}
+function toggleMoreTabs(ev){
+  if(ev)ev.stopPropagation();
+  const m=document.getElementById('more-menu');if(!m)return;
+  if(!m.hidden){closeMoreTabs();return;}
+  const cur=document.querySelector('.page.on')?.id;
+  const item=(n,label,feat)=>{const el=document.getElementById('more-'+n);
+    el.className=cur==='page-'+n?'on':'';
+    el.innerHTML=document.querySelector('#ntab-'+n+' .ico').innerHTML+`<span>${label}</span>`+(feat&&!can(feat)?`<span class="more-lock">${LOCK_ICON}</span>`:'');};
+  item('learn','Learn','learn');item('news','News',null);
+  m.hidden=false;document.body.classList.add('more-open');                  // the chat bubble would sit on top of the menu
+  document.getElementById('ntab-more').setAttribute('aria-expanded','true');
+}
+function closeMoreTabs(){
+  const m=document.getElementById('more-menu');if(m)m.hidden=true;
+  if(document.body&&document.body.classList)document.body.classList.remove('more-open');
+  const b=document.getElementById('ntab-more');if(b&&b.setAttribute)b.setAttribute('aria-expanded','false');
+}
+function moreGo(n){closeMoreTabs();showPage(n,document.getElementById('ntab-'+n));}
+if(typeof document!=='undefined'&&document.addEventListener){
+  document.addEventListener('click',e=>{const m=document.getElementById('more-menu');if(m&&!m.hidden&&!m.contains(e.target))closeMoreTabs();});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMoreTabs();});
+}
+
 function showNewsNotification(article, count){
   if(!article) return;
   if(Notification.permission === 'granted'){
@@ -4878,8 +5844,38 @@ function closeFS(){document.getElementById('fsm').classList.remove('open');docum
 
 // Portfolio
 let pfRows=[],pfEditId=null,pfKind='all',allocBy='sector';
+// ── Pages for the Holdings and Transactions tables: 5 rows to begin with (5 / 10 / 25 to choose, remembered in this browser) ──
+const TPG_SIZES=[5,10,25];
+function tpgSize(key){try{const v=+localStorage.getItem('tpg-'+key);return TPG_SIZES.includes(v)?v:5;}catch(e){return 5;}}
+function tpgSetSize(key,v){try{localStorage.setItem('tpg-'+key,String(v));}catch(e){}}
+let pfPg=1,txPg=1,pfSize=tpgSize('pf'),txSize=tpgSize('tx');
+/** One page of `rows`, and the bar under the table: "Showing 6–10 of 23  ‹ Prev 1 2 3 Next ›  Rows 5 10 25". */
+function tablePage(rows,page,size,barId,goFn,sizeFn){
+  const pages=Math.max(1,Math.ceil(rows.length/size)),p=Math.min(Math.max(1,page),pages);
+  const bar=document.getElementById(barId);
+  if(bar){
+    if(rows.length<=TPG_SIZES[0]){bar.innerHTML='';}
+    else{
+      const a=(p-1)*size+1,b=Math.min(p*size,rows.length);
+      let h=`<span class="pginfo">Showing ${a}–${b} of ${rows.length}</span>`;
+      if(pages>1){
+        h+=`<button class="pgbtn" type="button" ${p<=1?'disabled':''} onclick="${goFn}(${p-1})">‹ Prev</button>`;
+        const lo=Math.max(1,Math.min(p-2,pages-4)),hi=Math.min(pages,lo+4);
+        for(let i=lo;i<=hi;i++)h+=`<button class="pgbtn${i===p?' on':''}" type="button" onclick="${goFn}(${i})">${i}</button>`;
+        h+=`<button class="pgbtn" type="button" ${p>=pages?'disabled':''} onclick="${goFn}(${p+1})">Next ›</button>`;
+      }
+      h+=`<span class="tpg-size"><span class="pginfo">Rows</span>${TPG_SIZES.map(n=>`<button class="pgbtn${n===size?' on':''}" type="button" onclick="${sizeFn}(${n})">${n}</button>`).join('')}</span>`;
+      bar.innerHTML=h;
+    }
+  }
+  return {page:p,rows:rows.slice((p-1)*size,p*size)};
+}
+function goPfPg(p){pfPg=p;renderHoldings();}
+function setPfSize(n){pfSize=n;tpgSetSize('pf',n);pfPg=1;renderHoldings();}
+function goTxPg(p){txPg=p;renderTx();}
+function setTxSize(n){txSize=n;tpgSetSize('tx',n);txPg=1;renderTx();}
 function setPfKind(k){
-  pfKind=k;
+  pfKind=k;pfPg=1;
   document.querySelectorAll('#pf-kinds .fbtn').forEach(b=>b.classList.toggle('on',b.dataset.kind===k));
   renderHoldings();
 }
@@ -4895,9 +5891,11 @@ function renderHoldings(){
   const n={all:h.length,stock:h.filter(x=>!isCommodity(x)).length,commodity:h.filter(isCommodity).length};
   Object.entries(n).forEach(([k,v])=>{const el=document.getElementById('pf-kn-'+k);if(el)el.textContent=v;});
   const rows=pfKind==='all'?h:h.filter(x=>(isCommodity(x)?'commodity':'stock')===pfKind);
+  if(!h.length||!rows.length){const b=document.getElementById('pf-pgn');if(b)b.innerHTML='';}
   if(!h.length){document.getElementById('tb-pf').innerHTML='<tr><td colspan="14" class="empty">No holdings yet. Add a BUY on the <button class="linkbtn" type="button" onclick="goTab(\'transactions\')">Transactions tab</button>.</td></tr>';return;}
   if(!rows.length){document.getElementById('tb-pf').innerHTML=`<tr><td colspan="14" class="empty">No ${pfKind==='commodity'?'commodities':'stocks'} in your holdings.</td></tr>`;return;}
-  document.getElementById('tb-pf').innerHTML=rows.map(x=>`<tr data-t="${escapeHtml(x.ticker)}"${isCommodity(x)?' style="cursor:default"':' onclick="openStock(this.dataset.t)"'}>
+  const pg=tablePage(rows,pfPg,pfSize,'pf-pgn','goPfPg','setPfSize');pfPg=pg.page;
+  document.getElementById('tb-pf').innerHTML=pg.rows.map(x=>`<tr data-t="${escapeHtml(x.ticker)}"${isCommodity(x)?' style="cursor:default"':' onclick="openStock(this.dataset.t)"'}>
     <td class="sym">${escapeHtml(holdingName(x))}</td><td style="color:var(--t2);font-weight:600">${isCommodity(x)?escapeHtml('per '+(x.unit||'unit')):escapeHtml(x.company_name||'--')}</td>
     <td>${kindCell(x)}</td>
     <td style="font-size:10px;color:var(--t3);font-weight:700">${escapeHtml(x.sector||'--')}</td>
@@ -4958,7 +5956,7 @@ async function loadPortfolio(){
     return;
   }
   pfRows=h;
-  loadPortfolioPerformance();loadPortfolioTrend();
+  loadPortfolioPerformance();loadPortfolioTrend();if(moneyItems===null)loadMoney();else renderMoney();
   renderHoldings();renderAllocList();
   if(!h.length){
     drawAllocDonut('alloc-c','alloc-st-empty','alloc-st-v',[]);drawAllocDonut('alloc-c2','alloc-co-empty','alloc-co-v',[]);dc('pnl-c');
@@ -4977,6 +5975,94 @@ async function loadPortfolio(){
       borderColor:bars.map(x=>x&&isCommodity(x)?'#F5A623':'transparent'),borderWidth:bars.map(x=>x&&isCommodity(x)?2:0),borderRadius:4}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{filter:i=>bars[i.dataIndex]!=null,callbacks:{label:c=>{const x=bars[c.dataIndex];return x?`${kindLabel(x)}: ${(c.raw>=0?'+':'')+fb(c.raw)}`:'';}}}},
       scales:{x:{ticks:{color:'#c0cce0',font:{size:10,weight:'600'}},grid:{display:false}},y:{ticks:{color:'#58697a',callback:v=>fb(v)},grid:{color:'rgba(28,28,48,0.5)'}}}}});
+}
+// ── Where your money is: stocks and commodities (from Transactions) + what people add themselves (savings, FD, property...) ──
+const MONEY_COLORS={stocks:'#00c8ff',commodities:'#ffc800',savings:'#00e676',fd:'#a78bfa',real_estate:'#ff6b9d',pension:'#ff9f43',bonds:'#4dd0e1',crypto:'#f368e0',gold:'#d4a017',other:'#7a8ba0'};
+let moneyItems=null,moneyKinds={},moneyEditId=null,moneyEditing=false;
+const fbw=v=>'$'+Math.round(+v||0).toLocaleString('en-US');      // whole dollars for this card
+function moneySay(text,ok){const el=document.getElementById('money-msg');if(el){el.textContent=text||'';el.style.color=ok?'var(--green)':'var(--red)';}}
+async function loadMoney(){
+  const d=await api('/api/my-money');
+  if(d&&d.status==='success'){moneyItems=d.items||[];moneyKinds=d.kinds||{};}
+  else if(moneyItems===null){moneyItems=[];moneySay((d&&d.message)||"Couldn't load what you added. Reload to try again.",false);}
+  renderMoney();
+}
+function moneySlices(){
+  const rows=pfRows||[],st=rows.filter(x=>!isCommodity(x)),co=rows.filter(isCommodity),out=[];
+  const group=(key,label,list)=>{
+    const priced=list.filter(x=>x.current_value!=null);
+    const v=priced.reduce((a,x)=>a+(+x.current_value||0),0),inv=priced.reduce((a,x)=>a+(+x.invested_value||0),0);
+    if(v>0)out.push({key,label,value:v,pnl:inv>0?(v/inv-1)*100:null});
+  };
+  group('stocks','Stocks',st);group('commodities','Commodities',co);
+  const byKind={};
+  (moneyItems||[]).forEach(m=>{byKind[m.kind]=(byKind[m.kind]||0)+(+m.amount||0);});
+  Object.keys(byKind).forEach(k=>out.push({key:k,label:moneyKinds[k]||k,value:byKind[k],pnl:null}));
+  return out.sort((a,b)=>b.value-a.value);
+}
+function renderMoney(){
+  const legend=document.getElementById('money-legend'),donut=document.getElementById('money-donut');if(!legend||!donut)return;
+  const slices=moneySlices(),total=slices.reduce((a,x)=>a+x.value,0);
+  document.getElementById('money-total').textContent=fbw(total);
+  dc('money-c');
+  if(!slices.length){
+    donut.style.display='none';
+    legend.innerHTML='<div class="empty" style="padding:14px 4px">Nothing here yet. Add a BUY on the Transactions tab, or press <b>+ Add</b> for your savings, fixed deposits, property and more.</div>';
+  }else{
+    donut.style.display='';
+    legend.innerHTML=slices.map(x=>`<div class="ml-row"><span class="ml-dot" style="background:${MONEY_COLORS[x.key]||MONEY_COLORS.other}"></span><span class="ml-l">${escapeHtml(x.label)}${x.pnl!=null?`<span class="ml-p ${x.pnl>=0?'g':'r'}">${x.pnl>=0?'▲ +':'▼ '}${f2(x.pnl,1)}%</span>`:''}</span><span class="ml-v">${fbw(x.value)}</span><span class="ml-pc">${f2(x.value/total*100,1)}%</span></div>`).join('');
+    const ctx=document.getElementById('money-c')?.getContext('2d');
+    if(ctx)charts['money-c']=new Chart(ctx,{type:'doughnut',data:{labels:slices.map(x=>x.label),datasets:[{data:slices.map(x=>x.value),backgroundColor:slices.map(x=>MONEY_COLORS[x.key]||MONEY_COLORS.other),borderColor:'#0d1117',borderWidth:2,hoverOffset:6}]},
+      options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: $${(+c.raw).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})} (${f2(c.raw/total*100,1)}%)`}}}}});
+  }
+  // The items you added: hidden until "Edit" is pressed, so the card stays the same size however many there are
+  const has=(moneyItems||[]).length>0;
+  if(!has)moneyEditing=false;
+  const eb=document.getElementById('money-edit-btn');
+  if(eb){eb.hidden=!has;eb.textContent=moneyEditing?'Done':'Edit';eb.classList.toggle('on',moneyEditing);}
+  const items=document.getElementById('money-items');
+  if(items){
+    items.hidden=!moneyEditing;
+    items.innerHTML=moneyEditing?moneyItems.map(m=>`<div class="mi-row"><span class="ml-dot" style="background:${MONEY_COLORS[m.kind]||MONEY_COLORS.other}"></span><span class="mi-n">${escapeHtml(m.name||m.kind_label)}${m.name?`<span class="mi-k">${escapeHtml(m.kind_label)}</span>`:''}</span><span class="ml-v">${fbw(m.amount)}</span><span class="mi-a"><button class="mi-ic" type="button" data-id="${m.id}" title="Edit" aria-label="Edit ${escapeHtml(m.name||m.kind_label)}" onclick="openMoneyForm(+this.dataset.id)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></button><button class="mi-ic mi-del" type="button" data-id="${m.id}" title="Remove" aria-label="Remove ${escapeHtml(m.name||m.kind_label)}" onclick="deleteMoney(+this.dataset.id)">${X_ICON}</button></span></div>`).join(''):'';
+  }
+}
+function toggleMoneyEdit(){moneyEditing=!moneyEditing;if(!moneyEditing)closeMoneyForm();renderMoney();}
+function openMoneyForm(id){
+  const f=document.getElementById('money-form');if(!f)return;
+  const sel=document.getElementById('money-kind');
+  sel.innerHTML=Object.entries(moneyKinds).map(([k,v])=>`<option value="${escapeHtml(k)}">${escapeHtml(v)}</option>`).join('');
+  const m=id?(moneyItems||[]).find(x=>x.id===id):null;
+  moneyEditId=m?m.id:null;
+  sel.value=m?m.kind:'savings';
+  document.getElementById('money-name').value=m?m.name:'';
+  document.getElementById('money-amt').value=m?m.amount:'';
+  document.getElementById('money-save').textContent=m?'Save':'Add';
+  f.hidden=false;moneySay('');document.getElementById('money-amt').focus();
+}
+function closeMoneyForm(){const f=document.getElementById('money-form');if(f)f.hidden=true;moneyEditId=null;}
+async function saveMoney(){
+  const body={kind:document.getElementById('money-kind').value,name:document.getElementById('money-name').value.trim(),amount:parseFloat(document.getElementById('money-amt').value)};
+  if(!(body.amount>0)){moneySay('Enter an amount more than $0.',false);return;}
+  const btn=document.getElementById('money-save');btn.disabled=true;
+  try{
+    // api() only reads; saving needs fetch with the method and body (like the Transactions form)
+    const res=await fetch(API+(moneyEditId?`/api/my-money/${encodeURIComponent(moneyEditId)}`:'/api/my-money'),
+      {method:moneyEditId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    let d=null;try{d=await res.json();}catch(e){}
+    if(!res.ok||!d||d.status!=='success'){moneySay(apiMessage(d,res),false);return;}
+    closeMoneyForm();moneySay(d.message,true);await loadMoney();
+  }catch(e){moneySay("Couldn't reach the server. Please try again.",false);}
+  finally{btn.disabled=false;}
+}
+async function deleteMoney(id){
+  const m=(moneyItems||[]).find(x=>x.id===id);if(!m)return;
+  if(!confirm(`Remove ${m.name||m.kind_label} (${fb(m.amount)})?`))return;
+  try{
+    const res=await fetch(API+`/api/my-money/${encodeURIComponent(id)}`,{method:'DELETE'});
+    let d=null;try{d=await res.json();}catch(e){}
+    if(!res.ok||!d||d.status!=='success'){moneySay(apiMessage(d,res),false);return;}
+    moneySay(d.message,true);await loadMoney();
+  }catch(e){moneySay("Couldn't reach the server. Please try again.",false);}
 }
 function drawAllocDonut(id,emptyId,valueId,items){
   dc(id);
@@ -5145,13 +6231,14 @@ async function loadTx(){
   }
   aTx=Array.isArray(t)?t:[];renderTx();buildTxCharts();
 }
-function setTxF(f,btn){txF=f;document.querySelectorAll('#page-transactions .toolbar .fbtn:not([data-kind])').forEach(b=>b.classList.remove('on'));btn.classList.add('on');renderTx();}
-function setTxKind(k){txKind=k;document.querySelectorAll('#page-transactions .toolbar .fbtn[data-kind]').forEach(b=>b.classList.toggle('on',b.dataset.kind===k));renderTx();}
+function setTxF(f,btn){txF=f;txPg=1;document.querySelectorAll('#page-transactions .toolbar .fbtn:not([data-kind])').forEach(b=>b.classList.remove('on'));btn.classList.add('on');renderTx();}
+function setTxKind(k){txKind=k;txPg=1;document.querySelectorAll('#page-transactions .toolbar .fbtn[data-kind]').forEach(b=>b.classList.toggle('on',b.dataset.kind===k));renderTx();}
 function renderTx(){
   const q=document.getElementById('tx-srch').value.toLowerCase();
   const f=aTx.filter(t=>{const mf=txF==='all'||t.transaction_type===txF;const mk=txKind==='all'||(isCommodity(t)?'commodity':'stock')===txKind;const mq=!q||t.ticker?.toLowerCase().includes(q)||t.company_name?.toLowerCase().includes(q);return mf&&mk&&mq;});
   const badge={BUY:'bg',SELL:'br',DIVIDEND:'bc'};
-  document.getElementById('tb-tx').innerHTML=f.length?f.map(t=>`<tr><td style="color:var(--t2);font-weight:600">${escapeHtml(String(t.transaction_date||'--').slice(0,10))}</td><td class="sym">${escapeHtml(holdingName(t))}</td><td style="color:var(--t2);font-weight:600">${isCommodity(t)?escapeHtml('per '+(t.unit||'unit')):escapeHtml(t.company_name||'--')}</td><td>${kindCell(t)}</td><td><span class="badge ${badge[t.transaction_type]||'bb'}">${escapeHtml(t.transaction_type)}</span></td><td class="num">${escapeHtml(qtyText(t))}</td><td class="num">${fp(t.price)}</td><td class="num c">${fb(t.total_value)}</td><td style="color:var(--t3);font-size:12px">${escapeHtml(t.notes||'--')}</td>
+  const pg=tablePage(f,txPg,txSize,'tx-pgn','goTxPg','setTxSize');txPg=pg.page;
+  document.getElementById('tb-tx').innerHTML=f.length?pg.rows.map(t=>`<tr><td style="color:var(--t2);font-weight:600">${escapeHtml(String(t.transaction_date||'--').slice(0,10))}</td><td class="sym">${escapeHtml(holdingName(t))}</td><td style="color:var(--t2);font-weight:600">${isCommodity(t)?escapeHtml('per '+(t.unit||'unit')):escapeHtml(t.company_name||'--')}</td><td>${kindCell(t)}</td><td><span class="badge ${badge[t.transaction_type]||'bb'}">${escapeHtml(t.transaction_type)}</span></td><td class="num">${escapeHtml(qtyText(t))}</td><td class="num">${fp(t.price)}</td><td class="num c">${fb(t.total_value)}</td><td style="color:var(--t3);font-size:12px">${escapeHtml(t.notes||'--')}</td>
     <td style="white-space:nowrap"><button class="bm-act" data-id="${t.id}" onclick="editTx(this.dataset.id)">Edit</button> <button class="bm-act" data-id="${t.id}" onclick="deleteTx(this.dataset.id)">Remove</button></td></tr>`).join(''):`<tr><td colspan="10" class="empty">${aTx.length?'No transactions match these filters.':'No transactions yet.'}</td></tr>`;
 }
 function buildTxCharts(){
@@ -5203,6 +6290,7 @@ async function saveTx(){
       body:JSON.stringify(editing?{quantity:q,price:p,transaction_date:d,notes}:{ticker:t,transaction_type:type,quantity:q,price:p,transaction_date:d,notes})});
     let data=null;try{data=await res.json();}catch(e){}
     if(!res.ok||!data||data.status==='error'){txSay(apiMessage(data,res),false);return;}
+    if(!editing)txPg=1;                             // a new trade is the newest: show the first page
     resetTxForm();txSay(data.message,true);
     await loadTx();loadPortfolio();                 // buys and sales always change the Portfolio
   }catch(e){txSay("Couldn't reach the server. Please try again.",false);}
@@ -6027,9 +7115,9 @@ async function fetchQuotes(tickers){
 // The Watchlist table appears at once from the stock list the dashboard already has, then the fresh prices
 // (one request for all of them) replace it. Every saved stock gets a row, so even one we have no data for can be removed.
 let wlSeq = 0;
-let wlSector = 'All';                          // the sector button that's on ('All' = every stock)
+let wlSector = 'All';                          // the sector chosen in the dropdown ('All' = every stock)
 function wlSectorOf(s){ return (s.sector || '').trim() || 'Other'; }
-/** One button per sector in the watchlist, with how many stocks it has; clicking one shows only those. */
+/** A dropdown of the sectors in the watchlist, with how many stocks each has; choosing one shows only those. */
 function renderWlSectors(rows){
   const el = document.getElementById('wl-sec'); if(!el) return;
   const counts = {};
@@ -6038,8 +7126,9 @@ function renderWlSectors(rows){
   if(wlSector !== 'All' && !counts[wlSector]) wlSector = 'All';          // its last stock was removed
   el.style.display = names.length > 1 ? 'flex' : 'none';
   if(names.length <= 1) { wlSector = 'All'; return; }
-  const btn = (k, n) => `<button type="button" class="fbtn${wlSector === k ? ' on' : ''}" data-k="${escapeHtml(k)}" onclick="setWlSector(this.dataset.k)">${escapeHtml(k)} <span class="wl-sec-n">${n}</span></button>`;
-  el.innerHTML = btn('All', rows.length) + names.map(k => btn(k, counts[k])).join('');
+  const opt = (k, label, n) => `<option value="${escapeHtml(k)}"${wlSector === k ? ' selected' : ''}>${escapeHtml(label)} (${n})</option>`;
+  el.innerHTML = `<label class="wl-sec-l" for="wl-sec-sel">Sector</label><select class="sel" id="wl-sec-sel" onchange="setWlSector(this.value)">` +
+    opt('All', 'All sectors', rows.length) + names.map(k => opt(k, k, counts[k])).join('') + '</select>';
 }
 function setWlSector(k){ wlSector = k; renderWatchlistTable(wlKnown); }
 let wlKnown = {};
@@ -6555,6 +7644,170 @@ function loadPortfolioTickers() {
 <!-- ═══════════ BOUNTY — AI CHATBOT ═══════════ -->
 <style>
 /* World News Cards — Compact */
+/* ═══ Your personal finance ═══ */
+#page-finance{max-width:1240px;margin:0 auto}
+.fin-head{margin:4px 0 14px}.fin-h{font-size:22px;font-weight:800;margin:0 0 4px;color:var(--t1)}
+.fin-sub{font-size:12.5px;color:var(--t3);margin:0;line-height:1.5}
+.fin-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.fin-kpi{background:var(--bg2);border:1px solid var(--b2);border-radius:12px;padding:13px 14px;min-width:0}
+.fin-kl{font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--t3)}
+.fin-kv{font-size:21px;font-weight:800;color:var(--t1);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fin-ks{font-size:11.5px;color:var(--t3)}
+.fin-kv.g,.fin-tbl .g,.fin-big.g,.fin-rows .g,#page-finance .g{color:var(--green)}#page-finance .r{color:var(--red)}
+.fin-tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.fin-tab{background:none;border:1px solid var(--b2);border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;color:var(--t2);cursor:pointer;font-family:var(--sans)}
+.fin-tab:hover{color:var(--t1);border-color:var(--b3)}.fin-tab.on{background:#fff;border-color:#fff;color:#000}
+.fin-msg{min-height:18px;font-size:12.5px;font-weight:600;margin-bottom:6px}.fin-msg.ok{color:var(--green)}.fin-msg.bad{color:var(--red)}
+.fin-panel{display:none;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:14px;align-items:start}
+.fin-panel.on{display:grid}#fin-p-calc.on{display:block}
+#fin-p-wish.on{display:block}
+.fin-sub2{display:inline-flex;gap:4px;padding:4px;border:1px solid var(--b2);border-radius:10px;margin-bottom:12px}
+.fin-sub2 button{background:none;border:0;border-radius:7px;padding:7px 14px;font:700 12.5px var(--sans);color:var(--t2);cursor:pointer}
+.fin-sub2 button.on{background:rgba(79,142,247,.16);color:var(--blue)}
+.fin-wgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:14px;align-items:start}.fin-wgrid[hidden]{display:none}
+.fin-ac{position:relative;display:block}.fin-ac .srch{width:100%;margin:0}
+.fin-acbox{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:20;background:var(--bg2);border:1px solid var(--b2);border-radius:9px;padding:4px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.fin-acbox[hidden]{display:none}
+.fin-acbox button{display:block;width:100%;text-align:left;background:none;border:0;border-radius:6px;padding:8px 10px;color:var(--t2);font:500 12.5px var(--sans);cursor:pointer}
+.fin-acbox button:hover,.fin-acbox button:focus{background:var(--bg3);color:var(--t1)}.fin-acbox b{color:var(--t1);margin-right:4px}
+.fin-fl.fin-fl-row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.fin-ws{padding:12px 0;border-bottom:1px solid var(--b1)}.fin-ws:last-of-type{border-bottom:0}
+.fin-wsh{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;color:var(--t1);font-size:13.5px}
+.fin-verdict{flex-shrink:0;font-size:11.5px;font-weight:800;border-radius:20px;padding:4px 10px;border:1px solid}
+.v-good{color:var(--green);border-color:rgba(0,200,83,.5);background:rgba(0,200,83,.1)}
+.v-wait{color:#f5a623;border-color:rgba(245,166,35,.5);background:rgba(245,166,35,.1)}
+.v-careful{color:var(--red);border-color:rgba(255,68,68,.5);background:rgba(255,68,68,.1)}
+.v-none{color:var(--t3);border-color:var(--b2)}
+.fin-pts{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:7px}
+.fin-pts li{display:flex;gap:9px;font-size:12.5px;color:var(--t2);line-height:1.45}.fin-pts b{color:var(--t1)}.fin-pts .fin-dot{margin-top:5px}
+.fin-wsa{justify-content:flex-end;margin-top:10px}
+.fin-wsbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+.fin-chk{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:var(--blue);cursor:pointer;min-height:32px}
+.fin-chk input{width:16px;height:16px;accent-color:var(--blue);margin:0;cursor:pointer}.fin-chk input:disabled+span{color:var(--t3)}
+.fin-wsbody{margin-top:6px;padding:10px 12px;border-radius:9px;background:var(--bg3);border:1px solid var(--b2)}
+.fin-wsbody .fin-pts{margin:0}.fin-wsclose{display:flex;justify-content:flex-end;margin-top:8px}
+.fin-wstop{display:flex;justify-content:flex-end;margin-bottom:4px}
+.fin-saving{margin-top:6px;line-height:1.5}.fin-saving b{color:var(--t1)}
+.fin-loans{margin-top:10px;font-size:12.5px}.fin-loans td{white-space:normal}.fin-loans td.n{white-space:nowrap}.fin-loans tr.best td{background:rgba(0,200,83,.06)}
+.fin-best{display:inline-block;font-size:10px;font-weight:800;color:var(--green);border:1px solid rgba(0,200,83,.5);border-radius:10px;padding:1px 6px;margin-left:4px;vertical-align:1px}
+.fin-afford{margin-top:8px}
+.fin-overall{font-size:13px;color:var(--t2);line-height:1.5;padding:10px 12px;border-radius:9px;background:rgba(79,142,247,.08);border:1px solid rgba(79,142,247,.3)}.fin-overall b{color:var(--t1)}
+.fin-comp{color:var(--t2)}
+#page-finance .card{margin-bottom:0}
+.fin-acts,.fin-rowacts{display:flex;gap:6px}
+.fin-ic{background:none;border:1px solid var(--b2);border-radius:6px;padding:4px 10px;font-size:11.5px;font-weight:700;color:var(--t2);cursor:pointer;font-family:var(--sans)}
+.fin-ic:hover{color:var(--t1);border-color:var(--t3)}.fin-ic.fin-rm:hover{color:var(--red);border-color:var(--red)}
+.fin-sugg{background:rgba(79,142,247,.12);border:1px solid rgba(79,142,247,.5);color:var(--blue);border-radius:6px;padding:5px 12px;font-size:12px;font-weight:800;cursor:pointer;font-family:var(--sans)}
+.fin-sugg:hover{background:rgba(79,142,247,.22)}
+.fin-qr{display:grid;grid-template-columns:minmax(0,1fr) 170px;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--b1);font-size:13px;font-weight:600;color:var(--t1)}
+.fin-qr:last-of-type{border-bottom:0}.fin-qr small{display:block;font-size:11.5px;font-weight:400;color:var(--t3)}
+.fin-qr.fin-ro b{text-align:right;font-size:13.5px}
+.fin-in{display:flex;align-items:center;background:var(--bg3);border:1px solid var(--b2);border-radius:8px;padding:0 10px;min-width:0}
+.fin-in:focus-within{border-color:var(--blue)}
+.fin-in i{font-style:normal;color:var(--t3);font-weight:700;font-size:12.5px}.fin-in .fin-after{margin-left:4px}
+.fin-in input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--t1);font:700 13.5px var(--sans);padding:8px 0 8px 6px;text-align:right}
+.fin-qr .sel,.fin-txt{width:100%;margin:0}
+.fin-fbtns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.fin-sbtn{padding:6px 12px;font-size:12px}
+.fin-form{display:grid;gap:10px;margin:12px 0 4px;padding:12px;border:1px solid var(--b2);border-radius:10px;background:var(--bg3)}
+.fin-form[hidden]{display:none}.fin-form-open{background:none;border:0;padding:0;margin:0}
+.fin-fl[hidden]{display:none}
+.fin-fl{display:grid;gap:5px;font-size:12px;font-weight:700;color:var(--t2)}.fin-fl small{font-weight:400;color:var(--t3)}
+.fin-fl .srch,.fin-fl .sel{width:100%;margin:0}
+.fin-preview{font-size:12.5px;color:var(--t2);min-height:18px}
+.fin-empty{font-size:13px;color:var(--t3);padding:6px 0;line-height:1.5}
+.fin-mini{font-size:12px;color:var(--t3);font-weight:500}
+.fin-big{font-size:26px;font-weight:800;color:var(--t1);margin:2px 0 10px;line-height:1.2}
+.fin-bar{display:flex;height:10px;border-radius:6px;background:var(--bg3);overflow:hidden;margin:8px 0}.fin-bar i{display:block;height:100%}
+.fin-leg{display:flex;flex-wrap:wrap;gap:5px 14px;font-size:12px;color:var(--t2)}
+.fin-leg b{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:0}.fin-leg em{font-style:normal;color:var(--t3);margin-left:4px}
+.fin-legcol{flex-direction:column;gap:7px}
+.fin-rows{display:grid;gap:6px;margin-top:12px;font-size:13px}.fin-rows div{display:flex;justify-content:space-between;color:var(--t2)}.fin-rows b{color:var(--t1)}
+.fin-tips{margin-top:14px;border-top:1px solid var(--b1);padding-top:12px;display:grid;gap:8px}.fin-tips[hidden]{display:none}
+.fin-tips-h{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--t2)}
+.fin-clear{background:none;border:1px solid var(--b2);border-radius:6px;padding:3px 10px;font-size:11.5px;font-weight:700;color:var(--t2);cursor:pointer;text-transform:none;letter-spacing:0;font-family:var(--sans)}
+.fin-clear:hover{color:var(--t1);border-color:var(--t3)}
+.fin-tip{display:flex;gap:10px;padding:10px 12px;border-radius:9px;background:var(--bg3);border:1px solid var(--b2);font-size:13px;color:var(--t2);line-height:1.45}.fin-tip b{color:var(--t1)}
+.fin-dot{width:8px;height:8px;border-radius:50%;margin-top:6px;flex-shrink:0}
+.fin-tbl{width:100%;border-collapse:collapse;font-size:13px}.fin-tbl th,.fin-tbl td{padding:8px 6px;border-bottom:1px solid var(--b1);text-align:left;color:var(--t1)}
+.fin-tbl th{font-size:10.5px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em}.fin-tbl .n{text-align:right;white-space:nowrap}
+.fin-tbl tfoot td{font-weight:800;border-bottom:0}.fin-tbl .fin-rowacts{justify-content:flex-end}
+.fin-note{font-size:11.5px;color:var(--t3);margin:10px 0 0;line-height:1.5}
+.fin-piewrap{display:flex;gap:18px;align-items:center}.fin-pie{position:relative;width:160px;height:160px;flex-shrink:0}
+.fin-goal{padding:10px 0;border-bottom:1px solid var(--b1)}.fin-goal:last-of-type{border-bottom:0}
+.fin-gh{display:flex;justify-content:space-between;gap:10px;font-weight:700;font-size:13.5px;color:var(--t1)}.fin-gh em{font-style:normal;color:var(--t3);font-weight:500}
+.fin-gf{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.fin-gf b{color:var(--t1)}
+.fin-sw{display:inline-flex;align-items:center;gap:8px;justify-self:end;position:relative;cursor:pointer}
+.fin-sw input{position:absolute;opacity:0;width:38px;height:22px;margin:0;cursor:pointer}
+.fin-sw i{width:38px;height:22px;border-radius:12px;background:var(--b3);position:relative;transition:background .15s}
+.fin-sw i:after{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .15s}
+.fin-sw input:checked+i{background:var(--green)}.fin-sw input:checked+i:after{left:19px}.fin-sw input:focus-visible+i{outline:2px solid var(--blue);outline-offset:2px}
+.fin-sw em{font-style:normal;font-weight:700;font-size:12.5px;min-width:22px}
+#fd-more[hidden]{display:none}
+.fin-calcs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-bottom:12px}
+.fin-calcs button{background:none;border:1px solid var(--b2);border-radius:8px;padding:9px 6px;font:700 12.5px var(--sans);color:var(--t2);cursor:pointer}
+.fin-calcs button.on{border-color:var(--blue);color:var(--blue);background:rgba(79,142,247,.1)}
+.fin-calc-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px;align-items:start}
+.fin-lock{grid-column:1/-1;display:flex;gap:14px;align-items:center;padding:18px;border:1px dashed var(--b3);border-radius:12px;color:var(--t2);font-size:13px}
+.fin-lock svg{width:22px;height:22px;flex-shrink:0;color:var(--t3)}
+.fin-foot{font-size:11.5px;color:var(--t3);margin:16px 0 0;line-height:1.5}
+@media(max-width:900px){.fin-panel{grid-template-columns:1fr}.fin-wgrid{grid-template-columns:1fr}.fin-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.fin-calc-grid{grid-template-columns:1fr}}
+@media(max-width:560px){
+  .fin-tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-right:-4px}.fin-tabs::-webkit-scrollbar{display:none}.fin-tab{flex-shrink:0;min-height:40px}
+  .fin-qr{grid-template-columns:minmax(0,1fr) 130px}.fin-kv{font-size:18px}.fin-big{font-size:22px}
+  .fin-calcs{grid-template-columns:repeat(2,minmax(0,1fr))}.fin-calcs button{min-height:40px}
+  .fin-piewrap{flex-direction:column;align-items:flex-start}
+  .fin-tbl th:nth-child(2),.fin-tbl td:nth-child(2){display:none}
+  .fin-tbl.fin-loans th:nth-child(2),.fin-tbl.fin-loans td:nth-child(2){display:table-cell}
+  .fin-loans{font-size:12px}.fin-loans th{white-space:normal}.fin-loans th,.fin-loans td{padding:7px 4px}
+  .fin-sub2{display:flex}.fin-sub2 button{flex:1;min-height:40px}
+  .fin-lock{flex-direction:column;align-items:flex-start}
+}
+/* ═══ News tab ═══ */
+.nw-intro{font-size:12.5px;color:var(--t3);margin:4px 0 12px;line-height:1.5}
+.nw-reset{background:none;border:1px solid var(--b2);border-radius:6px;padding:4px 10px;color:var(--t2);font-size:11px;font-weight:700;cursor:pointer}
+.nw-reset:hover{color:var(--t1);border-color:var(--t3)}
+.nw-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.nw-bar .srch{margin:0}
+.nw-q{flex:2 1 220px;min-width:0}
+.nw-tk{flex:1 1 150px;min-width:0;text-transform:uppercase}
+.nw-tk::placeholder{text-transform:none}
+.nw-bar .sel{flex:0 0 auto}
+.nw-bar .sel:disabled{opacity:.45;cursor:default}
+.nw-scope{display:flex;gap:4px;flex:0 0 auto}
+.nw-note{font-size:12px;color:var(--t2);margin:-4px 0 12px}
+.nw-link{background:none;border:0;padding:0;color:var(--t1);text-decoration:underline;font:inherit;cursor:pointer}
+.nw-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.nw-card{display:flex;gap:12px;background:var(--bg3);border:1px solid var(--b2);border-radius:10px;padding:10px;cursor:pointer;min-width:0;transition:border-color .15s}
+.nw-card:hover,.nw-card:focus-visible{border-color:var(--mline,var(--b2));outline:none}
+.nw-img{width:96px;height:96px;border-radius:7px;object-fit:cover;flex-shrink:0;background:var(--bg2)}
+.nw-ph{display:flex;align-items:center;justify-content:center;color:var(--t3)}
+.nw-ph .lic{width:26px;height:26px}
+.nw-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.nw-title{font-size:13.5px;font-weight:700;color:var(--t1);line-height:1.4;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.nw-sum{font-size:12px;color:var(--t3);line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.nw-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin-top:auto;font-size:11px}
+.nw-src{font-weight:700;color:var(--t2)}
+.nw-time{color:var(--t3)}
+.nw-tags{display:inline-flex;flex-wrap:wrap;gap:4px}
+.nw-tk-tag{background:none;border:1px solid var(--b2);border-radius:4px;padding:1px 6px;font-size:10px;font-weight:800;color:var(--t1);cursor:pointer}
+.nw-tk-tag:hover{background:#fff;color:#000;border-color:#fff}
+.nw-more{display:flex;justify-content:center;margin-top:14px}
+.nw-more .fbtn{padding:8px 22px}
+.nw-more .fbtn:disabled{opacity:.6;cursor:default}
+@media(max-width:900px){.nw-grid{grid-template-columns:1fr}}
+@media(max-width:560px){
+  .nw-q{flex-basis:100%}
+  .nw-tk{flex:1 1 120px}
+  .nw-bar .sel{flex:1 1 140px;min-height:40px}
+  .nw-scope{flex:1 1 100%}.nw-scope .fbtn{flex:1;min-height:40px}
+  .nw-img{width:72px;height:72px}
+  .nw-title{font-size:13px}
+  .nw-sum{display:none}
+}
+/* the "More" button and its menu exist only on narrow phones (see the 560px rule below) */
+.ntab-more,.more-menu{display:none}
+body.more-open #bounty-btn{display:none!important}
 .news-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
 @media(max-width:768px){.news-grid{grid-template-columns:1fr;}}
 .news-card{background:var(--bg3);border:1px solid var(--b2);border-radius:10px;overflow:hidden;cursor:pointer;transition:border-color 0.2s;display:flex;flex-direction:row;height:90px;}
@@ -6808,8 +8061,41 @@ body.pg-home #bounty-btn,body.pg-home #bounty-win{display:none!important;}   /* 
 .wl-sig.g{color:var(--green);}.wl-sig.r{color:var(--red);}.wl-sig.y{color:var(--yellow);}
 .wl-lock{color:var(--t3);}
 .wl-wait{color:var(--t3);}
-.wl-sec{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;}
-.wl-sec-n{font-family:var(--mono);font-size:10px;font-weight:800;opacity:.7;margin-left:4px;}
+.pf-row2{align-items:stretch;}
+.pf-row2 .card{margin-bottom:0;display:flex;flex-direction:column;}
+.pf-pnl-box{flex:1;min-height:220px;position:relative;}
+.money-add{padding:5px 12px;font-size:11px;}
+.money-wrap{display:flex;align-items:center;gap:16px;}
+.money-donut{position:relative;width:170px;height:170px;flex:0 0 170px;}
+.money-mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;}
+.money-total{font-family:var(--mono);font-size:15px;font-weight:800;color:var(--t1);}
+.money-cap{font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);margin-top:2px;}
+.money-legend{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px;}
+.ml-row,.mi-row{display:grid;grid-template-columns:10px minmax(0,1fr) auto auto;gap:8px;align-items:center;font-size:12px;}
+.ml-dot{width:10px;height:10px;border-radius:3px;display:inline-block;}
+.ml-l,.mi-n{font-weight:700;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ml-p{font-size:10px;font-weight:800;margin-left:6px;}.ml-p.g{color:var(--green);}.ml-p.r{color:var(--red);}
+.ml-v{font-family:var(--mono);font-weight:700;color:var(--t1);text-align:right;}
+.ml-pc{font-family:var(--mono);font-size:11px;color:var(--t3);min-width:44px;text-align:right;}
+.money-form[hidden]{display:none;}
+.money-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:8px;align-items:end;margin-top:14px;padding-top:12px;border-top:1px solid var(--b1);}
+.money-form-btns{display:flex;gap:6px;}
+.money-msg{font-size:12px;font-weight:700;min-height:14px;margin-top:8px;}
+.money-btns{display:flex;gap:6px;}
+.money-btns .btn[hidden]{display:none;}
+.money-btns .btn.on{border-color:var(--accent,#4f8cff);color:var(--t1);}
+.money-items{display:flex;flex-direction:column;gap:4px;margin-top:12px;padding-top:10px;border-top:1px solid var(--b1);}
+.money-items[hidden]{display:none;}
+.mi-ic{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;border:1px solid var(--b2);background:transparent;color:var(--t2);cursor:pointer;padding:0;}
+.mi-ic:hover{color:var(--t1);border-color:var(--t3);}
+.mi-del:hover{color:var(--red);border-color:rgba(255,68,68,.5);background:rgba(255,68,68,.1);}
+.mi-row{grid-template-columns:10px minmax(0,1fr) auto auto;}
+.mi-k{font-size:10px;font-weight:600;color:var(--t3);margin-left:6px;}
+.mi-a{display:flex;gap:4px;}
+@media(max-width:700px){.money-wrap{flex-direction:column;align-items:stretch;}.money-donut{margin:0 auto;}.money-form{grid-template-columns:1fr;}}
+.wl-sec{display:flex;align-items:center;gap:8px;margin:0 0 12px;}
+.wl-sec-l{font-size:12px;font-weight:700;color:var(--t2);}
+.wl-sec .sel{margin:0;min-width:200px;max-width:100%;}
 .pft-sub{font-size:11px;font-weight:600;color:var(--t3);}
 .pft-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:12px;}
 .pft-pick{display:flex;flex-wrap:wrap;gap:6px;}
@@ -6836,15 +8122,18 @@ button,select,.ntab,.fstab,.stab,.fbtn,.pgbtn{touch-action:manipulation;-webkit-
 .brand,.nav-r{flex-shrink:0;}
 @media(max-width:1500px){.nav-r #nconn{display:none;}}
 @media(max-width:1260px){.nav-r .ntime{display:none;}}
-@media(max-width:1160px){.nav{padding:0 16px;}.ntab{padding:7px 12px;}}
+@media(max-width:1400px){.nav{padding:0 16px;}.ntab{padding:7px 12px;}}   /* nine tabs: they tighten in steps as the window narrows */
+@media(max-width:1160px){.ntab{padding:7px 8px;}}
 @media(max-width:1060px){.nav-r .lpill{display:none;}.ntab{padding:7px 8px;}.nav{padding:0 12px;}.nav-r{gap:8px;}}
 /* An administrator's bar also holds the Admin link, so it sheds items sooner: the clock, then the word "Admin", then Live. */
 .na-icon{display:inline-flex;line-height:1;}
 @media(max-width:1450px){.nav.has-admin .ntime{display:none;}}
 @media(max-width:1300px){.nav.has-admin .na-text{display:none;}}
-@media(max-width:1200px){.nav.has-admin{padding:0 16px;}.nav.has-admin .ntab{padding:7px 12px;}}
+@media(max-width:1540px){.nav.has-admin{padding:0 16px;}.nav.has-admin .ntab{padding:7px 12px;}}
+@media(max-width:1220px){.nav.has-admin .ntab{padding:7px 8px;}}
 @media(max-width:1120px){.nav.has-admin .lpill{display:none;}}
 @media(max-width:1060px){.nav.has-admin .ntab{padding:7px 8px;}.nav.has-admin{padding:0 12px;}}
+@media(max-width:1010px){.nav.has-admin .ntab{padding:7px 5px;}.nav.has-admin{padding:0 10px;}}
 @media(max-width:960px){
   body{min-height:100dvh;}
   .nav{height:auto;min-height:calc(54px + env(safe-area-inset-top));padding:env(safe-area-inset-top) calc(14px + env(safe-area-inset-right)) 0 calc(14px + env(safe-area-inset-left));gap:8px;}
@@ -6965,6 +8254,14 @@ button,select,.ntab,.fstab,.stab,.fbtn,.pgbtn{touch-action:manipulation;-webkit-
   #bounty-send{min-height:44px;padding:11px 26px;}
 }
 @media(max-width:560px){
+  /* Learn and News move behind "More" so the other tabs keep room for their names */
+  #ntab-learn,#ntab-news{display:none;}
+  .ntab.ntab-more{display:flex;}
+  .more-menu:not([hidden]){display:flex;flex-direction:column;position:fixed;z-index:10000;right:calc(8px + env(safe-area-inset-right));bottom:calc(66px + env(safe-area-inset-bottom));
+    min-width:170px;padding:6px;background:var(--bg2);border:1px solid var(--b2);border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.6);}
+  .more-menu button{display:flex;align-items:center;gap:10px;min-height:46px;padding:0 12px;background:none;border:0;border-radius:8px;color:var(--t1);font-size:14px;font-weight:700;text-align:left;cursor:pointer;}
+  .more-menu button.on{background:rgba(79,142,247,0.16);color:var(--blue);}
+  .more-menu .more-lock{margin-left:auto;display:flex;color:var(--t3)}.more-menu .more-lock svg{width:15px;height:15px}
   /* six labels do not fit side by side on a phone, so the two long ones show a short form (the full text stays for screen readers) */
   .ntab .lbl[data-short]{font-size:0;}
   .ntab .lbl[data-short]::after{content:attr(data-short);font-size:10px;letter-spacing:-0.1px;}

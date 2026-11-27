@@ -160,7 +160,8 @@ class DeleteAccount(unittest.TestCase):
         mu.delete_account(conn, 5)
         deleted = [re.search(r"FROM (\w+)", sql).group(1) for sql, _ in conn.statements("DELETE")]
         self.assertEqual(deleted, ["portfolio", "transactions", "price_alerts", "watchlist", "support_messages", "support_tickets",
-                                   "user_notifications", "password_resets", "email_changes", "restore_links", "user_profiles", "users"])
+                                   "user_notifications", "password_resets", "email_changes", "restore_links", "user_profiles", "user_assets",
+                                   "user_finance", "user_goals", "user_wishlist", "users"])
         self.assertTrue(all(p == (5,) for _, p in conn.statements("DELETE")))
         self.assertEqual((conn.commits, conn.rollbacks), (1, 0))
 
