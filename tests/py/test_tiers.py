@@ -39,7 +39,7 @@ F1 = {"initial_screen", "portfolio_view"}
 F2 = F1 | {"market", "portfolio_mgt", "raise_ticket"}
 F3 = F2 | {"stock_prediction", "ai_stock_finder", "peer_comparison"}
 F4 = F3 | {"ai_interaction", "learn"}
-F5 = F4 | {"commodities"}
+F5 = F4 | {"commodities", "personal_finance"}        # personal finance: the owner put it on Deluxe and up (2026-11-27)
 F6 = F5 | {"pre_ipo", "insider_dealings", "filings"}
 TABLE = {1: ("Free", 0.00, F1), 2: ("Basic", 9.99, F2), 3: ("AI Stock Finder", 19.99, F3), 4: ("AI Interaction", 29.99, F4), 5: ("Deluxe", 39.99, F5), 6: ("Premier", 49.99, F6)}
 
@@ -56,6 +56,7 @@ SAMPLE = {
     "ai_interaction":   ("POST", "/agent/recommend/stream"),
     "learn":            ("GET", "/api/learn"),
     "commodities":      ("GET", "/api/market/commodities"),
+    "personal_finance": ("GET", "/api/finance"),
     "pre_ipo":          ("GET", "/api/ipos"),
     "insider_dealings": ("GET", "/api/stocks/AAPL/insiders"),
     "filings":          ("GET", "/api/stocks/AAPL/filings"),
@@ -80,7 +81,7 @@ class RealPlans(unittest.TestCase):
         self.assertEqual(list(tiers.FEATURES.items()), [
             ("initial_screen", "Home tab"), ("portfolio_view", "Portfolio visibility"), ("market", "Market tab"), ("portfolio_mgt", "Portfolio management"),
             ("raise_ticket", "Raising tickets"), ("stock_prediction", "Stock prediction"), ("ai_stock_finder", "AI stock finder"), ("peer_comparison", "Peer comparison"),
-            ("ai_interaction", "AI interaction"), ("learn", "Learn tab"), ("commodities", "Commodities"), ("pre_ipo", "IPO details"),
+            ("ai_interaction", "AI interaction"), ("learn", "Learn tab"), ("commodities", "Commodities"), ("personal_finance", "Personal finance"), ("pre_ipo", "IPO details"),
             ("insider_dealings", "Insider dealings"), ("filings", "Company filings")])
         self.assertEqual(set().union(*(t.adds for t in tiers.TIERS.values())), set(tiers.FEATURES))
 
@@ -90,7 +91,7 @@ class RealPlans(unittest.TestCase):
         self.assertEqual(added[2], {"market", "portfolio_mgt", "raise_ticket"})                              # Basic: market, portfolio management, raising tickets
         self.assertEqual(added[3], {"stock_prediction", "ai_stock_finder", "peer_comparison"})               # AI Stock Finder: prediction, peer comparison
         self.assertEqual(added[4], {"ai_interaction", "learn"})                                              # AI Interaction: the Learn tab
-        self.assertEqual(added[5], {"commodities"})                                                          # Deluxe: commodities
+        self.assertEqual(added[5], {"commodities", "personal_finance"})                                      # Deluxe: commodities, personal finance
         self.assertEqual(added[6], {"pre_ipo", "insider_dealings", "filings"})                               # Premier: IPO details, insider dealings, filings
         for level in range(2, 7):
             self.assertLess(tiers.features_for(level - 1), tiers.features_for(level))                        # each plan includes the one below
@@ -114,7 +115,7 @@ class RealPlans(unittest.TestCase):
     def test_what_a_refused_person_is_told(self):
         for feature, plan, price in (("market", "Basic", 9.99), ("portfolio_mgt", "Basic", 9.99), ("raise_ticket", "Basic", 9.99),
                                      ("stock_prediction", "AI Stock Finder", 19.99), ("ai_stock_finder", "AI Stock Finder", 19.99), ("peer_comparison", "AI Stock Finder", 19.99),
-                                     ("ai_interaction", "AI Interaction", 29.99), ("learn", "AI Interaction", 29.99), ("commodities", "Deluxe", 39.99),
+                                     ("ai_interaction", "AI Interaction", 29.99), ("learn", "AI Interaction", 29.99), ("commodities", "Deluxe", 39.99), ("personal_finance", "Deluxe", 39.99),
                                      ("pre_ipo", "Premier", 49.99), ("insider_dealings", "Premier", 49.99), ("filings", "Premier", 49.99),
                                      ("initial_screen", "Free", 0.0), ("portfolio_view", "Free", 0.0)):
             info = tiers.upgrade_info(feature)
@@ -194,6 +195,9 @@ class EveryRouteIsClassified(unittest.TestCase):
         assigned = {"/api/learn": "learn", "/api/support/tickets": "raise_ticket", "/api/support/tickets/{ticket_id}": "raise_ticket",
                     "/api/support/updates": "raise_ticket", "/api/support/tickets/{ticket_id}/messages": "raise_ticket", "/api/support/updates/seen": "raise_ticket",
                     "/api/stocks/{ticker}/insiders": "insider_dealings", "/api/stocks/{ticker}/filings": "filings", "/api/stocks/{ticker}/filings/download": "filings"}
+        assigned.update({path: "personal_finance" for path in (                      # the owner put Your personal finance on Deluxe and up
+            "/api/finance", "/api/finance/monthly", "/api/finance/giving", "/api/finance/goals", "/api/finance/goals/{goal_id}",
+            "/api/finance/wishlist", "/api/finance/wishlist/{wish_id}", "/api/finance/wishlist-stocks")})
         free = tiers.features_for(tiers.account_tier())
         checked = 0
         for line in filter(None, ONLY_AARYA_LATER):
@@ -336,7 +340,8 @@ class WhatEachPlanReaches(AccountsTestCase, unittest.TestCase):
         features = html.split('<meta name="smp-features" content="')[1].split('"')[0].split(",")
         self.assertEqual(set(features), TABLE[3][2])
         locks = json.loads(html_lib.unescape(html.split('<meta name="smp-locks" content="')[1].split('">')[0]))
-        self.assertEqual(set(locks), {"ai_interaction", "learn", "commodities", "pre_ipo", "insider_dealings", "filings"})      # exactly what is padlocked
+        self.assertEqual(set(locks), {"ai_interaction", "learn", "commodities", "personal_finance", "pre_ipo", "insider_dealings", "filings"})      # exactly what is padlocked
+        self.assertEqual(locks["personal_finance"], {"label": "Personal finance", "plan": "Deluxe"})
         self.assertEqual(locks["pre_ipo"], {"label": "IPO details", "plan": "Premier"})
         self.assertEqual(locks["learn"], {"label": "Learn tab", "plan": "AI Interaction"})
         self.assertEqual(locks["commodities"], {"label": "Commodities", "plan": "Deluxe"})

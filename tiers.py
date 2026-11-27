@@ -30,6 +30,7 @@ FEATURES = {
     "ai_interaction":   "AI interaction",
     "learn":            "Learn tab",
     "commodities":      "Commodities",
+    "personal_finance": "Personal finance",
     "pre_ipo":          "IPO details",
     "insider_dealings": "Insider dealings",
     "filings":          "Company filings",
@@ -50,7 +51,7 @@ TIERS = {
     2: Tier(2, "Basic",           9.99,  ("market", "portfolio_mgt", "raise_ticket")),
     3: Tier(3, "AI Stock Finder", 19.99, ("stock_prediction", "ai_stock_finder", "peer_comparison")),
     4: Tier(4, "AI Interaction",  29.99, ("ai_interaction", "learn")),
-    5: Tier(5, "Deluxe",          39.99, ("commodities",)),
+    5: Tier(5, "Deluxe",          39.99, ("commodities", "personal_finance")),
     6: Tier(6, "Premier",         49.99, ("pre_ipo", "insider_dealings", "filings")),
 }
 EXISTING_ACCOUNTS_TIER = 2     # accounts that existed before Free accounts did were all on Basic, so a database update keeps them there
@@ -140,6 +141,7 @@ DESCRIPTIONS = {
     "ai_interaction":   "Chat with Bounty, the AI assistant, and get an AI review of your portfolio",
     "learn":            "Beginner videos, investing podcasts and practical tips from US investor-education sources",
     "commodities":      "The Commodities page: commodity prices, macro indicators and the companies behind them",
+    "personal_finance": "Your personal finance, in the account menu: monthly money, investments, goals, a wishlist, donations and calculators",
     "pre_ipo":          "The IPOs tab: upcoming and recently priced US IPOs",
     "insider_dealings": "On every stock page: shares bought or sold by the company's own people in the last 12 months",
     "filings":          "On every stock page: annual reports, shareholder notices and announcements from the SEC, with downloads",
@@ -222,8 +224,8 @@ _RULES = [
     # everything else the dashboard shows is the Home tab and what you reach from it
     ("*",    r"/api/watchlist", _INITIAL),
     ("GET",  r"/api/watchlist/extras", _INITIAL),              # signal and chance-up only for plans with stock_prediction (api.py)
-    ("*",    r"/api/my-money(/[^/]+)?", "portfolio_view"),     # Where your money is (plan to be decided; for now with the Portfolio)
-    ("*",    r"/api/finance(/(monthly|giving|goals|wishlist|wishlist-stocks)(/[^/]+)?)?", "portfolio_view"),   # Your personal finance (plan to be decided, as above)
+    ("*",    r"/api/my-money(/[^/]+)?", "portfolio_view"),     # Where your money is, on the Portfolio (Personal finance lists the same items)
+    ("*",    r"/api/finance(/(monthly|giving|goals|wishlist|wishlist-stocks)(/[^/]+)?)?", "personal_finance"),   # Your personal finance
     ("GET",  r"/api/stocks(/(directory|search|batch))?", _INITIAL),                  # "/api/stocks" is the full list that Home's cards are drawn from
     ("GET",  rf"/api/stocks/{_P}", _INITIAL),
     ("GET",  rf"/api/stocks/{_P}/(price-history|intraday|price-range|period|period-spikes|price-spikes|news-sentiment|historical|quarterly|company|dividends|buy-sell)", _INITIAL),

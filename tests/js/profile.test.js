@@ -185,10 +185,10 @@ function profile({ fetchImpl, signedOut = () => false } = {}) {
     addEventListener(ev, fn) { (this.listeners[ev] = this.listeners[ev] || []).push(fn); } fire(ev, e = {}) { (this.listeners[ev] || []).forEach(fn => fn({ stopPropagation() {}, target: this, ...e })); }
     contains(t) { return t === this || this.children.some(c => c.contains(t)); }
   }
-  function accountMenu({ name = '' } = {}) {
+  function accountMenu({ name = '', plan = null } = {}) {
     const docListeners = {}, calls = [];
     const document = { createElement: tag => new El(tag), addEventListener: (ev, fn) => { (docListeners[ev] = docListeners[ev] || []).push(fn); } };
-    const ctx = { document, ME: { name, email: 'abheek@example.com' }, openProfile: () => calls.push('openProfile'), showPage: n => calls.push('showPage:' + n) };
+    const ctx = { document, ME: { name, email: 'abheek@example.com' }, openProfile: () => calls.push('openProfile'), showPage: n => calls.push('showPage:' + n), ...(plan || {}) };
     vm.createContext(ctx); vm.runInContext(between('function addAccountMenu(nav){', "(()=>{const nav=document.querySelector('.nav-r')"), ctx);
     const nav = new El('nav'), parts = ctx.addAccountMenu(nav);
     return { nav, parts, calls, docListeners, press: (ev, e) => (docListeners[ev] || []).forEach(fn => fn(e)) };
@@ -214,6 +214,17 @@ function profile({ fetchImpl, signedOut = () => false } = {}) {
     parts.menu.children[3].fire('click');
     assert(!parts.menu.classList.contains('open')); assert.strictEqual(parts.btn.attrs['aria-expanded'], 'false');
     assert.deepStrictEqual(calls, ['openProfile']);
+  });
+
+  await t('on a plan without it, Your personal finance carries a padlock that names the plan which has it', () => {
+    const planWith = (allowed) => ({ can: f => (f === 'personal_finance' ? allowed : true), lockText: () => ({ label: 'Personal finance', where: 'Included in the Deluxe plan' }), LOCK_ICON: '<svg></svg>' });
+    const locked = accountMenu({ plan: planWith(false) }).parts.menu.children[4];
+    assert(locked.innerHTML.includes('<span>Your personal finance</span>') && locked.innerHTML.includes('class="nmenu-lock"'));
+    assert.strictEqual(locked.title, 'Included in the Deluxe plan');
+    assert.strictEqual(locked.attrs['aria-label'], 'Your personal finance, locked. Included in the Deluxe plan');
+    assert(!locked.className.includes('is-locked'), 'that class would blur the entry like a locked card');
+    const open = accountMenu({ plan: planWith(true) }).parts.menu.children[4];
+    assert(!open.innerHTML.includes('nmenu-lock') && !open.title && !open.attrs['aria-label']);
   });
 
   await t('choosing Your personal finance closes the menu and opens that page', () => {

@@ -15,7 +15,7 @@ F1 = {"initial_screen", "portfolio_view"}
 F2 = F1 | {"market", "portfolio_mgt", "raise_ticket"}
 F3 = F2 | {"stock_prediction", "ai_stock_finder", "peer_comparison"}
 F4 = F3 | {"ai_interaction", "learn"}
-F5 = F4 | {"commodities"}
+F5 = F4 | {"commodities", "personal_finance"}
 FEATURES_OF = {1: F1, 2: F2, 3: F3, 4: F4, 5: F5, 6: set(tiers.FEATURES)}
 
 
@@ -38,7 +38,7 @@ class Catalog(unittest.TestCase):
         self.assertEqual(adds[1], ["initial_screen", "portfolio_view"])                         # Free: the Home tab (and a read-only portfolio)
         self.assertEqual(adds[2], ["market", "portfolio_mgt", "raise_ticket"])
         self.assertEqual(adds[3], ["stock_prediction", "ai_stock_finder", "peer_comparison"]); self.assertEqual(adds[4], ["ai_interaction", "learn"])
-        self.assertEqual(adds[5], ["commodities"]); self.assertEqual(adds[6], ["pre_ipo", "insider_dealings", "filings"])
+        self.assertEqual(adds[5], ["commodities", "personal_finance"]); self.assertEqual(adds[6], ["pre_ipo", "insider_dealings", "filings"])
         for level, features in FEATURES_OF.items():                             # what each plan can use in all
             self.assertEqual(set().union(*(set(adds[n]) for n in range(1, level + 1))), features, level)
 

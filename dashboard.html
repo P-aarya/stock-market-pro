@@ -55,6 +55,8 @@ body{background:var(--bg0);color:var(--t1);font-family:var(--sans);min-height:10
 .nmenu-item{background:none;border:0;cursor:pointer;font-family:inherit;text-align:left;}
 .nsignout:hover,.nmenu-item:hover{color:var(--t1);background:var(--bg3);}
 .nmenu-item:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px;}
+.nmenu-lock{display:flex;margin-left:auto;padding-left:8px;color:var(--t3);}
+.nmenu-lock svg{width:13px;height:13px;}
 .nprof-btn.on{border-color:var(--blue);background:rgba(79,142,247,0.14);}          /* the Profile page is open */
 /* An administrator looking at the app as a plan: a small bar that stays on screen, with the way to switch plan or stop */
 .pvbar{position:fixed;left:16px;bottom:16px;z-index:350;display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;max-width:calc(100vw - 32px);padding:8px 10px 8px 12px;background:var(--bg2);border:1px solid var(--cyan);border-radius:12px;box-shadow:0 6px 28px rgba(0,0,0,0.55);font-size:12px;color:var(--t2);}
@@ -1922,6 +1924,11 @@ function addAccountMenu(nav){
   out.innerHTML='<svg class="lic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Sign out</span>';
   const fin=document.createElement('button');fin.type='button';fin.className='nmenu-item';fin.id='nprof-finance';fin.setAttribute('role','menuitem');
   fin.innerHTML='<svg class="lic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M16 15h2"/><path d="M6 6V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/></svg><span>Your personal finance</span>';
+  if(typeof can==='function'&&!can('personal_finance')){            // not in this plan: a padlock, and choosing it says which plan has it
+    const where=lockText('personal_finance').where;
+    fin.title=where;fin.setAttribute('aria-label','Your personal finance, locked. '+where);
+    fin.innerHTML+='<span class="nmenu-lock" aria-hidden="true">'+LOCK_ICON+'</span>';
+  }
   menu.appendChild(nm);menu.appendChild(em);menu.appendChild(hr);menu.appendChild(prof);menu.appendChild(fin);menu.appendChild(out);
   wrap.appendChild(btn);wrap.appendChild(menu);nav.appendChild(wrap);
   const setOpen=(open)=>{menu.classList.toggle('open',open);btn.setAttribute('aria-expanded',open?'true':'false');};
@@ -2109,7 +2116,7 @@ function seePlans(){
 }
 
 function showPage(n,btn){
-  const lockedBy=btn&&btn.dataset&&btn.dataset.feature;
+  const lockedBy=n==='finance'?'personal_finance':btn&&btn.dataset&&btn.dataset.feature;     // Your personal finance has no tab to carry its plan
   if(lockedBy&&!can(lockedBy)){showUpgrade(lockedBy);return;}           // not in this plan: say so rather than open an empty page
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('on'));
@@ -3671,7 +3678,7 @@ function timeAgo(ts){
 
 // ═══ YOUR PERSONAL FINANCE: Monthly money, Investments, Goals, Wishlist, Donations (optional) and Calculators ═══
 // Answers are saved per account (/api/finance); the numbers on the right are worked out here as people type. The Analysis only
-// shows when its button is pressed, and Clear hides it. The calculators work for everyone and save nothing.
+// shows when its button is pressed, and Clear hides it. The calculators save nothing. showPage keeps plans without it out.
 const FIN_Q=[['income','How much comes in each month?','Pay after tax, plus any other income'],['housing','Rent or home loan',''],
   ['bills','Bills','Power, water, phone, internet'],['food','Food and shopping',''],['transport','Transport','Fuel, fares, car costs'],
   ['repayments','Loan or card repayments',''],['other_spend','Everything else','Fun, subscriptions, gifts…']];
@@ -3692,11 +3699,9 @@ async function finSend(method,url,body){
     finSay(d.message,true);return d;
   }catch(e){finSay("Couldn't reach the server. Please try again.",false);return null;}
 }
-const finLocked=()=>typeof can==='function'&&!can('portfolio_view');
 
 async function loadFinance(){
   finTab(finTabNow,true);
-  if(finLocked()){finRenderAll();return;}
   if(finLoading)return;finLoading=true;
   try{
     const [d,h]=await Promise.all([api('/api/finance'),api('/api/portfolio'),moneyItems===null?loadMoney():null]);
@@ -3713,16 +3718,9 @@ function finTab(t,quiet){
   document.querySelectorAll('.fin-panel').forEach(p=>p.classList.toggle('on',p.id==='fin-p-'+t));
   if(t==='calc')finRenderCalc();
   if(!quiet&&t==='invest')finRenderInvest();
-  if(t==='wish'&&finData&&!finLocked()&&finWishStocks===null)finLoadWishStocks();
+  if(t==='wish'&&finData&&finWishStocks===null)finLoadWishStocks();
 }
 function finRenderAll(){
-  if(finLocked()){
-    const box=`<div class="fin-lock">${LOCK_ICON}<div><b>${escapeHtml(lockText('portfolio_view').label)} isn’t part of your plan.</b> ${escapeHtml(lockText('portfolio_view').where)}. The Calculators tab works on every plan.</div><button class="btn btnp" type="button" onclick="seePlans()">See plans</button></div>`;
-    ['monthly','invest','goals','wish','give'].forEach(t=>{document.getElementById('fin-p-'+t).innerHTML=box;});
-    document.getElementById('fin-kpis').innerHTML='';
-    if(finTabNow!=='calc')finTab('calc');
-    return;
-  }
   if(!finData)return;
   finRenderMonthly();finRenderInvest();finRenderGoals();finRenderWishItems();finRenderWishStocks();finRenderGive();finRenderKpis();
   if(finTabNow==='wish'&&finWishStocks===null)finLoadWishStocks();
@@ -3914,7 +3912,7 @@ async function finRemoveMonthly(){
 /* ---- 2 Investments ---- */
 let finInvId=null,finPieKey='';
 function finRenderInvest(){
-  const body=document.getElementById('fi-body');if(!body||finLocked())return;
+  const body=document.getElementById('fi-body');if(!body)return;
   const own=finOwn(),items=moneyItems||[];
   const rows=[];
   if(own.shares>0)rows.push(`<tr><td>Shares</td><td class="fin-mini">from Transactions</td><td class="n">${finUsd(own.shares)}</td><td class="fin-mini">auto</td></tr>`);
@@ -7547,8 +7545,6 @@ function loadPortfolioTickers() {
 .fin-calcs button{background:none;border:1px solid var(--b2);border-radius:8px;padding:9px 6px;font:700 12.5px var(--sans);color:var(--t2);cursor:pointer}
 .fin-calcs button.on{border-color:var(--blue);color:var(--blue);background:rgba(79,142,247,.1)}
 .fin-calc-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px;align-items:start}
-.fin-lock{grid-column:1/-1;display:flex;gap:14px;align-items:center;padding:18px;border:1px dashed var(--b3);border-radius:12px;color:var(--t2);font-size:13px}
-.fin-lock svg{width:22px;height:22px;flex-shrink:0;color:var(--t3)}
 .fin-foot{font-size:11.5px;color:var(--t3);margin:16px 0 0;line-height:1.5}
 @media(max-width:900px){.fin-panel{grid-template-columns:1fr}.fin-wgrid{grid-template-columns:1fr}.fin-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.fin-calc-grid{grid-template-columns:1fr}}
 @media(max-width:560px){
@@ -7560,7 +7556,6 @@ function loadPortfolioTickers() {
   .fin-tbl.fin-loans th:nth-child(2),.fin-tbl.fin-loans td:nth-child(2){display:table-cell}
   .fin-loans{font-size:12px}.fin-loans th{white-space:normal}.fin-loans th,.fin-loans td{padding:7px 4px}
   .fin-sub2{display:flex}.fin-sub2 button{flex:1;min-height:40px}
-  .fin-lock{flex-direction:column;align-items:flex-start}
 }
 /* ═══ News tab ═══ */
 .nw-intro{font-size:12.5px;color:var(--t3);margin:4px 0 12px;line-height:1.5}

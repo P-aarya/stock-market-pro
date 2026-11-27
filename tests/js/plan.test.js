@@ -92,6 +92,19 @@ function plan({ features, locks = {}, name = 'Basic', tagged = [], hidden = [] }
     p.run("showUpgrade('portfolio')"); p.run('closeUpgrade()'); assert(!p.registry['up-modal'].classList.has('open'));
   });
 
+  await t('Your personal finance, which has no tab, is refused by showPage itself to a plan without it', () => {
+    const src = between('function showPage(n,btn){', 'function showSub');
+    for (const allowed of [false, true]) {
+      const shown = [], touched = [];
+      const ctx = { can: f => (f === 'personal_finance' ? allowed : true), showUpgrade: f => shown.push(f), loadFinance: () => touched.push('load'), pageChrome() {},
+        document: { querySelectorAll: () => { touched.push('qsa'); return []; }, getElementById: () => ({ classList: { add() {}, remove() {} }, style: {} }) } };
+      vm.createContext(ctx); vm.runInContext(src, ctx);
+      ctx.showPage('finance');
+      if (allowed) { assert.deepStrictEqual(shown, []); assert(touched.includes('load'), 'the page opens'); }
+      else { assert.deepStrictEqual(shown, ['personal_finance']); assert.deepStrictEqual(touched, [], 'nothing is switched or asked for'); }
+    }
+  });
+
   await t('pressing a locked tab shows the message and opens nothing; an allowed tab opens as before', () => {
     for (const [fn, start, end, args] of [['showPage', 'function showPage(n,btn){', 'function showSub', "'portfolio'"], ['showFST', 'function showFST(t,btn){', 'async function loadDividends', "'news'"]]) {
       const src = between(start, end), shown = [], touched = [];
@@ -164,7 +177,7 @@ function plan({ features, locks = {}, name = 'Basic', tagged = [], hidden = [] }
 
   await t('every tag in the markup names a feature the server knows, and every plan feature is used somewhere on the page', () => {
     assert.deepStrictEqual(FEATURES, ['initial_screen', 'portfolio_view', 'market', 'portfolio_mgt', 'raise_ticket', 'stock_prediction', 'ai_stock_finder', 'peer_comparison',
-                                       'ai_interaction', 'learn', 'commodities', 'pre_ipo', 'insider_dealings', 'filings'], 'the rows of the plan table, in its order');
+                                       'ai_interaction', 'learn', 'commodities', 'personal_finance', 'pre_ipo', 'insider_dealings', 'filings'], 'the rows of the plan table, in its order');
     const tags = [...html.matchAll(/data-feature(?:-hide)?="([^"]+)"/g)].map(m => m[1]);
     const checks = [...html.matchAll(/\bcan\('([a-z_]+)'\)/g)].map(m => m[1]);
     assert(tags.length >= 14, 'the page is tagged');

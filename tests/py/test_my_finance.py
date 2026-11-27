@@ -105,7 +105,22 @@ class Routes(unittest.TestCase):
         for m, p in (("GET", "/api/finance"), ("PUT", "/api/finance/monthly"), ("DELETE", "/api/finance/monthly"),
                      ("PUT", "/api/finance/giving"), ("DELETE", "/api/finance/giving"), ("POST", "/api/finance/goals"),
                      ("PUT", "/api/finance/goals/3"), ("DELETE", "/api/finance/goals/3")):
-            self.assertEqual(tiers.feature_for(m, p), "portfolio_view", p)
+            self.assertEqual(tiers.feature_for(m, p), "personal_finance", p)
+
+    def test_only_deluxe_and_up_get_in_and_the_others_are_told_which_plan_has_it(self):
+        mock.patch.object(api.my_finance, "get_all", return_value={"monthly": {}, "goals": []}).start()
+        mock.patch.object(api.my_finance, "save_giving", side_effect=AssertionError("a plan without it wrote something")).start()
+        mock.patch.dict(tiers.TIERS, {n: t for n, t in tiers.TIERS.items() if n <= 6}, clear=True).start()          # the real plans only
+        for level in (1, 2, 3, 4):
+            c = signed_in_client(10 + level, tier=level)
+            r = c.get("/api/finance")
+            self.assertEqual(r.status_code, 403, level)
+            self.assertEqual((r.json()["code"], r.json()["required_name"]), ("upgrade_required", "Deluxe"), level)
+            self.assertEqual(c.put("/api/finance/giving", json={"on": False}).status_code, 403, level)
+            self.assertEqual(c.get("/api/finance/wishlist-stocks").status_code, 403, level)
+        for level in (5, 6):
+            self.assertEqual(signed_in_client(10 + level, tier=level).get("/api/finance").status_code, 200, level)
+        self.assertEqual(signed_in_client(30, is_admin=True, tier=1).get("/api/finance").status_code, 200)          # administrators have everything
 
     def test_answers_are_read_for_the_signed_in_account(self):
         seen = []
@@ -199,13 +214,12 @@ class Wishlist(unittest.TestCase):
     def test_routes_and_plan(self):
         for m, p in (("POST", "/api/finance/wishlist"), ("PUT", "/api/finance/wishlist/3"), ("DELETE", "/api/finance/wishlist/3"),
                      ("GET", "/api/finance/wishlist-stocks")):
-            self.assertEqual(tiers.feature_for(m, p), "portfolio_view", p)
+            self.assertEqual(tiers.feature_for(m, p), "personal_finance", p)
         seen = []
         mock.patch.object(api.portfolio, "list_holdings", return_value=[]).start()
         mock.patch.object(api.my_finance, "wishlist_stocks", side_effect=lambda uid, pred, h: seen.append((uid, pred)) or {"stocks": []}).start()
         signed_in_client(5).get("/api/finance/wishlist-stocks")
-        signed_in_client(6, tier=2).get("/api/finance/wishlist-stocks")
-        self.assertEqual(seen, [(5, True), (6, False)])             # the model's part only on plans with stock prediction
+        self.assertEqual(seen, [(5, True)])                         # the model's part goes with stock prediction, which every plan with this has
 
 
 TODAY = dt.date(2026, 11, 26)
